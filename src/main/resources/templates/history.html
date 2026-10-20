@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title th:text="'Historial: ' + ${shipment.trackingNumber} + ' - ShipArrival'">Historial de Embarque</title>
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <style>
+        body { background-color: #f4f6f9; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
+        .card-stat { border-radius: 10px; border: none; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+    </style>
+</head>
+<body>
+
+<nav class="navbar navbar-dark bg-dark shadow-sm">
+    <div class="container px-4">
+        <a class="navbar-brand fw-bold" href="/">
+            <i class="bi bi-water me-2 text-info"></i>ShipArrival
+        </a>
+        <a href="/" class="btn btn-outline-light btn-sm">
+            <i class="bi bi-arrow-left me-1"></i>Volver al Dashboard
+        </a>
+    </div>
+</nav>
+
+<div class="container py-4">
+
+    <!-- Shipment Header Summary Card -->
+    <div class="card card-stat bg-white p-4 mb-4">
+        <div class="d-flex flex-wrap justify-content-between align-items-center border-bottom pb-3 mb-3">
+            <div>
+                <span class="badge bg-secondary mb-1" th:text="${shipment.carrier}">ONE</span>
+                <h3 class="fw-bold mb-0 text-dark font-monospace" th:text="${shipment.trackingNumber}">TAOGR4856400</h3>
+            </div>
+            <div>
+                <span class="badge fs-6"
+                      th:classappend="${shipment.status.name() == 'NEAR_ARRIVAL'} ? 'bg-danger' : (${shipment.status.name() == 'ARRIVED'} ? 'bg-success' : 'bg-primary')"
+                      th:text="${shipment.status}">IN_TRANSIT</span>
+            </div>
+        </div>
+
+        <div class="row g-3">
+            <div class="col-6 col-md-3">
+                <div class="small text-muted">Buque</div>
+                <div class="fw-semibold text-dark" th:text="${shipment.vesselName != null ? shipment.vesselName : 'Pendiente'}">ONE FANTASTIC</div>
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="small text-muted">Viaje</div>
+                <div class="fw-semibold text-dark" th:text="${shipment.voyageNumber != null ? shipment.voyageNumber : '-'}">006E</div>
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="small text-muted">Puerto de Origen</div>
+                <div class="fw-semibold text-dark" th:text="${shipment.portOfLoading != null ? shipment.portOfLoading : '-'}">SHANGHAI, CHINA</div>
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="small text-muted">Puerto Destino</div>
+                <div class="fw-semibold text-dark" th:text="${shipment.portOfDischarge != null ? shipment.portOfDischarge : '-'}">MANZANILLO, MEXICO</div>
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="small text-muted">Fecha Salida (ATD)</div>
+                <div class="fw-semibold text-dark" th:text="${shipment.departureDate != null ? #temporals.format(shipment.departureDate, 'yyyy-MM-dd HH:mm') : '-'}">-</div>
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="small text-muted">ETA Estimado Actual</div>
+                <div class="fw-semibold text-danger" th:text="${shipment.estimatedArrival != null ? #temporals.format(shipment.estimatedArrival, 'yyyy-MM-dd HH:mm') : '-'}">-</div>
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="small text-muted">Arribo Confirmado (ATA)</div>
+                <div class="fw-semibold text-success" th:text="${shipment.actualArrival != null ? #temporals.format(shipment.actualArrival, 'yyyy-MM-dd HH:mm') : '-'}">-</div>
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="small text-muted">Contenedor</div>
+                <div class="fw-semibold text-dark" th:text="${shipment.containerNumber != null ? shipment.containerNumber : '-'}">-</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Event History Timeline Card -->
+    <div class="card card-stat bg-white">
+        <div class="card-header bg-white py-3 border-0">
+            <h5 class="fw-bold mb-0 text-dark">
+                <i class="bi bi-clock-history me-2 text-primary"></i>Bitácora de Eventos y Cambios de ETA
+            </h5>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light small text-uppercase text-muted">
+                    <tr>
+                        <th>Fecha de Registro</th>
+                        <th>Tipo de Evento</th>
+                        <th>ETA Previo</th>
+                        <th>Nuevo ETA</th>
+                        <th>Detalle / Descripción</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr th:if="${#lists.isEmpty(logs)}">
+                        <td colspan="5" class="text-center py-4 text-muted">
+                            No hay eventos registrados para este embarque.
+                        </td>
+                    </tr>
+                    <tr th:each="log : ${logs}">
+                        <td class="small text-muted" th:text="${#temporals.format(log.recordedAt, 'yyyy-MM-dd HH:mm:ss')}">2026-10-20 08:00:00</td>
+                        <td>
+                            <span class="badge"
+                                  th:classappend="${log.eventType == 'ETA_UPDATED'} ? 'bg-warning text-dark' : (${log.eventType == 'SCRAPE_FAILED'} ? 'bg-danger' : 'bg-secondary')"
+                                  th:text="${log.eventType}">ETA_UPDATED</span>
+                        </td>
+                        <td class="small" th:text="${log.previousEta != null ? #temporals.format(log.previousEta, 'yyyy-MM-dd HH:mm') : '-'}">-</td>
+                        <td class="small fw-bold" th:text="${log.newEta != null ? #temporals.format(log.newEta, 'yyyy-MM-dd HH:mm') : '-'}">-</td>
+                        <td th:text="${log.description != null ? log.description : '-'}">Actualización normal</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
