@@ -6,13 +6,13 @@ Este archivo sirve como referencia central para cualquier agente o desarrollador
 
 ## 1. Estado Actual del Proyecto
 
-- **Fase actual:** Brainstorming completado y arquitectura inicial definida y aprobada.
-- **Repositorio Git:** Inicializado en rama principal con especificación de diseño en `docs/superpowers/specs/2026-10-20-ship-arrival-monitoring-design.md`.
+- **Fase actual:** Implementación de las 9 tareas del plan completada al 100% con suite de pruebas pasando (21 tests).
+- **Repositorio Git:** Rama `feature/ship-arrival-monitoring`, con Maven Wrapper autónomo y suite de tests verde.
 - **Entorno de ejecución:** 
   - Sistema Operativo: Windows (win32)
   - Java: Java 21 LTS (`21.0.11`)
-  - Herramienta de compilación: Se configurará con Maven Wrapper (`mvnw` / `mvnw.cmd`) para independencia del entorno.
-- **Estatus del código:** Pendiente de scaffolding inicial del proyecto Spring Boot y plan de ejecución.
+  - Herramienta de compilación: Maven Wrapper (`mvnw` / `mvnw.cmd`)
+- **Estatus del código:** Base de código completamente operativa y probada.
 
 ---
 
@@ -77,46 +77,46 @@ Aplicación web monolítica ligera en **Java 21** con **Spring Boot 3**, que per
 
 ---
 
-## 4. Tareas Pendientes (Roadmap)
+## 4. Tareas del Roadmap
 
 ### Fase 1: Creación del Plan de Implementación
-- [ ] Ejecutar la habilidad `writing-plans` para desglosar la construcción en tareas atómicas con pruebas automatizadas (TDD).
+- [x] Ejecutar la habilidad `writing-plans` para desglosar la construcción en tareas atómicas con pruebas automatizadas (TDD).
 
 ### Fase 2: Scaffolding y Configuración Base
-- [ ] Generar la estructura del proyecto Spring Boot 3 con Maven Wrapper.
-- [ ] Configurar `pom.xml` con dependencias: Spring Web, Thymeleaf, Spring Data JPA, H2, Apache POI, Lombok, Testcontainers/JUnit.
-- [ ] Configurar `application.properties` (H2 en archivo, H2 console, variables de Telegram).
+- [x] Generar la estructura del proyecto Spring Boot 3 con Maven Wrapper.
+- [x] Configurar `pom.xml` con dependencias: Spring Web, Thymeleaf, Spring Data JPA, H2, Apache POI, Lombok, Testcontainers/JUnit.
+- [x] Configurar `application.properties` (H2 en archivo, H2 console, variables de Telegram).
 
 ### Fase 3: Entidades y Repositorios
-- [ ] Implementar entidades `Shipment` y `ShipmentEventLog`.
-- [ ] Implementar repositorios `ShipmentRepository` y `ShipmentEventLogRepository`.
-- [ ] Pruebas unitarias y de integración para la persistencia.
+- [x] Implementar entidades `Shipment` y `ShipmentEventLog`.
+- [x] Implementar repositorios `ShipmentRepository` y `ShipmentEventLogRepository`.
+- [x] Pruebas unitarias y de integración para la persistencia.
 
 ### Fase 4: Adaptador de Rastreo ONE
-- [ ] Diseñar interfaz `CarrierTrackingAdapter` y modelo `TrackingResult`.
-- [ ] Implementar `OneLineTrackingAdapter` (cliente HTTP resiliente para consultar guías y extraer ETA, buque, viaje, puerto y estatus).
-- [ ] Factoría `CarrierTrackingAdapterFactory`.
-- [ ] Pruebas unitarias con respuestas simuladas (mocked JSON/HTML) y validación de extracción de datos.
+- [x] Diseñar interfaz `CarrierTrackingAdapter` y modelo `TrackingResult`.
+- [x] Implementar `OneLineTrackingAdapter` (cliente HTTP resiliente para consultar guías y extraer ETA, buque, viaje, puerto y estatus).
+- [x] Factoría `CarrierTrackingAdapterFactory`.
+- [x] Pruebas unitarias con respuestas simuladas (mocked JSON/HTML) y validación de extracción de datos.
 
 ### Fase 5: Servicios de Negocio e Importación Excel
-- [ ] Implementar `ExcelImportService` para procesar archivos `.xlsx` y extraer guías.
-- [ ] Implementar `ShipmentService` (creación individual, deduplicación, actualización de estado e historial).
-- [ ] Implementar regla de detección de proximidad (ETA ≤ 3 días).
+- [x] Implementar `ExcelImportService` para procesar archivos `.xlsx` y extraer guías.
+- [x] Implementar `ShipmentService` (creación individual, deduplicación, actualización de estado e historial).
+- [x] Implementar regla de detección de proximidad (ETA ≤ 3 días).
 
 ### Fase 6: Servicio de Notificaciones Telegram
-- [ ] Implementar `TelegramNotificationService` para enviar mensajes formateados vía Telegram Bot API.
-- [ ] Control de envío único por estado para evitar spam repetitivo.
+- [x] Implementar `TelegramNotificationService` para enviar mensajes formateados vía Telegram Bot API.
+- [x] Control de envío único por estado para evitar spam repetitivo.
 
 ### Fase 7: Programador de Tareas (Scheduler)
-- [ ] Implementar `TrackingSchedulerService` (`@Scheduled` a las 08:00 AM) para iterar sobre embarques activos con pausas entre peticiones.
-- [ ] Soporte para ejecución manual asíncrona ("Monitorear Ahora").
+- [x] Implementar `TrackingSchedulerService` (`@Scheduled` a las 08:00 AM) para iterar sobre embarques activos con pausas entre peticiones.
+- [x] Soporte para ejecución manual asíncrona ("Monitorear Ahora").
 
 ### Fase 8: Interfaz Web (Thymeleaf)
-- [ ] Vista principal (dashboard) con tabla de embarques, filtros e insignias de estado (colores según proximidad).
-- [ ] Modal/Formulario de registro manual individual.
-- [ ] Componente para subida de archivo Excel con reporte de resultados.
-- [ ] Botón de "Monitorear Ahora" con retroalimentación visual.
-- [ ] Modal/Página para ver el historial de cambios de ETA de un embarque.
+- [x] Vista principal (dashboard) con tabla de embarques, filtros e insignias de estado (colores según proximidad).
+- [x] Modal/Formulario de registro manual individual.
+- [x] Componente para subida de archivo Excel con reporte de resultados.
+- [x] Botón de "Monitorear Ahora" con retroalimentación visual.
+- [x] Modal/Página para ver el historial de cambios de ETA de un embarque.
 
 ### Fase 9: Pruebas E2E y Verificación Final
-- [ ] Probar flujo completo: Carga manual/Excel -> Rastreo -> Actualización de datos -> Disparo de alerta -> Visualización web.
+- [x] Probar flujo completo: Carga manual/Excel -> Rastreo -> Actualización de datos -> Disparo de alerta -> Visualización web.
