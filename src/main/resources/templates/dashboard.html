@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ShipArrival - Sistema de Monitoreo de Buques</title>
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <style>
+        body { background-color: #f4f6f9; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
+        .card-stat { border-radius: 10px; border: none; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+        .badge-near-arrival { background-color: #dc3545; color: white; animation: pulse 2s infinite; }
+        .badge-in-transit { background-color: #0d6efd; color: white; }
+        .badge-arrived { background-color: #198754; color: white; }
+        .badge-pending { background-color: #6c757d; color: white; }
+        .badge-error { background-color: #fd7e14; color: white; }
+        .table-hover tbody tr:hover { background-color: #eef2f7; }
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.75; }
+            100% { opacity: 1; }
+        }
+    </style>
+</head>
+<body>
+
+<!-- Navbar -->
+<nav class="navbar navbar-expand-lg navbar-dark bg-dark shadow-sm">
+    <div class="container-fluid px-4">
+        <a class="navbar-brand fw-bold" href="/">
+            <i class="bi bi-water me-2 text-info"></i>ShipArrival
+        </a>
+        <span class="navbar-text text-light-50 small d-none d-md-inline">
+            Monitoreo Desatendido de Arribo de Buques (ONE / MSC)
+        </span>
+        <div class="ms-auto d-flex align-items-center gap-2">
+            <form th:action="@{/shipments/track-now}" method="post" class="m-0">
+                <button type="submit" class="btn btn-warning btn-sm fw-semibold" th:disabled="${isTrackingInProgress}">
+                    <i class="bi bi-arrow-repeat me-1"></i>
+                    <span th:text="${isTrackingInProgress ? 'Monitoreando...' : 'Monitorear Ahora'}">Monitorear Ahora</span>
+                </button>
+            </form>
+        </div>
+    </div>
+</nav>
+
+<div class="container-fluid px-4 py-4">
+
+    <!-- Flash Alert Messages -->
+    <div th:if="${successMessage}" class="alert alert-success alert-dismissible fade show" role="alert">
+        <i class="bi bi-check-circle-fill me-2"></i><span th:text="${successMessage}"></span>
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+    <div th:if="${errorMessage}" class="alert alert-danger alert-dismissible fade show" role="alert">
+        <i class="bi bi-exclamation-triangle-fill me-2"></i><span th:text="${errorMessage}"></span>
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+    <div th:if="${warningMessage}" class="alert alert-warning alert-dismissible fade show" role="alert">
+        <i class="bi bi-exclamation-circle-fill me-2"></i><span th:text="${warningMessage}"></span>
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+    <div th:if="${infoMessage}" class="alert alert-info alert-dismissible fade show" role="alert">
+        <i class="bi bi-info-circle-fill me-2"></i><span th:text="${infoMessage}"></span>
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+
+    <!-- Metric Cards -->
+    <div class="row g-3 mb-4">
+        <div class="col-12 col-sm-6 col-xl-3">
+            <div class="card card-stat bg-white p-3">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <div class="text-muted small text-uppercase fw-bold">Total Embarques</div>
+                        <h2 class="fw-bold mb-0 text-dark" th:text="${totalCount}">0</h2>
+                    </div>
+                    <div class="fs-1 text-primary"><i class="bi bi-boxes"></i></div>
+                </div>
+            </div>
+        </div>
+        <div class="col-12 col-sm-6 col-xl-3">
+            <div class="card card-stat bg-white p-3">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <div class="text-muted small text-uppercase fw-bold">En Tránsito</div>
+                        <h2 class="fw-bold mb-0 text-info" th:text="${inTransitCount}">0</h2>
+                    </div>
+                    <div class="fs-1 text-info"><i class="bi bi-navigation"></i></div>
+                </div>
+            </div>
+        </div>
+        <div class="col-12 col-sm-6 col-xl-3">
+            <div class="card card-stat bg-white p-3 border-start border-danger border-4">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <div class="text-danger small text-uppercase fw-bold">Próximos (≤ 3 Días)</div>
+                        <h2 class="fw-bold mb-0 text-danger" th:text="${nearArrivalCount}">0</h2>
+                    </div>
+                    <div class="fs-1 text-danger"><i class="bi bi-bell-fill"></i></div>
+                </div>
+            </div>
+        </div>
+        <div class="col-12 col-sm-6 col-xl-3">
+            <div class="card card-stat bg-white p-3">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <div class="text-muted small text-uppercase fw-bold">Arribados</div>
+                        <h2 class="fw-bold mb-0 text-success" th:text="${arrivedCount}">0</h2>
+                    </div>
+                    <div class="fs-1 text-success"><i class="bi bi-check2-circle"></i></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Action Forms (Manual + Excel) -->
+    <div class="row g-3 mb-4">
+        <!-- Registro Manual -->
+        <div class="col-12 col-lg-6">
+            <div class="card card-stat bg-white p-3 h-100">
+                <h6 class="card-title fw-bold text-dark mb-3">
+                    <i class="bi bi-plus-circle me-1 text-primary"></i>Registrar Embarque Individual
+                </h6>
+                <form th:action="@{/shipments}" method="post" class="row g-2">
+                    <div class="col-12 col-sm-6">
+                        <label class="form-label small text-muted">Número de Guía (B/L)</label>
+                        <input type="text" name="trackingNumber" class="form-control form-control-sm text-uppercase" placeholder="Ej. TAOGR4856400" required>
+                    </div>
+                    <div class="col-12 col-sm-4">
+                        <label class="form-label small text-muted">Naviera</label>
+                        <select name="carrier" class="form-select form-select-sm">
+                            <option th:each="c : ${carriers}" th:value="${c}" th:text="${c}" th:selected="${c.name() == 'ONE'}"></option>
+                        </select>
+                    </div>
+                    <div class="col-12 col-sm-2 d-flex align-items-end">
+                        <button type="submit" class="btn btn-primary btn-sm w-100">Registrar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Carga Masiva Excel -->
+        <div class="col-12 col-lg-6">
+            <div class="card card-stat bg-white p-3 h-100">
+                <h6 class="card-title fw-bold text-dark mb-3">
+                    <i class="bi bi-file-earmark-spreadsheet me-1 text-success"></i>Carga Masiva desde Excel (.xlsx)
+                </h6>
+                <form th:action="@{/shipments/upload-excel}" method="post" enctype="multipart/form-data" class="row g-2">
+                    <div class="col-12 col-sm-6">
+                        <label class="form-label small text-muted">Seleccionar Archivo</label>
+                        <input type="file" name="file" accept=".xlsx" class="form-control form-control-sm" required>
+                    </div>
+                    <div class="col-12 col-sm-4">
+                        <label class="form-label small text-muted">Naviera Predeterminada</label>
+                        <select name="carrier" class="form-select form-select-sm">
+                            <option th:each="c : ${carriers}" th:value="${c}" th:text="${c}" th:selected="${c.name() == 'ONE'}"></option>
+                        </select>
+                    </div>
+                    <div class="col-12 col-sm-2 d-flex align-items-end">
+                        <button type="submit" class="btn btn-success btn-sm w-100">Subir</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Shipments Table -->
+    <div class="card card-stat bg-white">
+        <div class="card-header bg-white py-3 border-0 d-flex justify-content-between align-items-center">
+            <h5 class="card-title fw-bold text-dark mb-0">
+                <i class="bi bi-ship me-2 text-primary"></i>Lista de Buques y Guías Monitoreadas
+            </h5>
+            <span class="badge bg-light text-muted fw-normal" th:text="${shipments.size()} + ' registros'"></span>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light small text-uppercase text-muted">
+                    <tr>
+                        <th>Guía (B/L)</th>
+                        <th>Naviera</th>
+                        <th>Buque / Viaje</th>
+                        <th>Destino</th>
+                        <th>Salida (ATD)</th>
+                        <th>ETA Estimado</th>
+                        <th>Días Restantes</th>
+                        <th>Estatus</th>
+                        <th>Último Chequeo</th>
+                        <th class="text-end">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr th:if="${#lists.isEmpty(shipments)}">
+                        <td colspan="10" class="text-center py-4 text-muted">
+                            <i class="bi bi-inbox fs-3 d-block mb-2"></i>
+                            No hay embarques registrados todavía. Usa el formulario de arriba o carga un archivo Excel.
+                        </td>
+                    </tr>
+                    <tr th:each="s : ${shipments}">
+                        <td>
+                            <strong class="text-dark font-monospace" th:text="${s.trackingNumber}">TAOGR4856400</strong>
+                            <div th:if="${s.containerNumber}" class="small text-muted" th:text="'Cont: ' + ${s.containerNumber}"></div>
+                        </td>
+                        <td>
+                            <span class="badge bg-secondary" th:text="${s.carrier}">ONE</span>
+                        </td>
+                        <td>
+                            <div class="fw-semibold text-dark" th:text="${s.vesselName != null ? s.vesselName : '-'}">-</div>
+                            <div class="small text-muted" th:if="${s.voyageNumber}" th:text="'Viaje: ' + ${s.voyageNumber}"></div>
+                        </td>
+                        <td>
+                            <span th:text="${s.portOfDischarge != null ? s.portOfDischarge : '-'}">-</span>
+                        </td>
+                        <td class="small" th:text="${s.departureDate != null ? #temporals.format(s.departureDate, 'yyyy-MM-dd HH:mm') : '-'}">-</td>
+                        <td>
+                            <span class="fw-bold" th:classappend="${s.status.name() == 'NEAR_ARRIVAL'} ? 'text-danger' : 'text-dark'"
+                                  th:text="${s.estimatedArrival != null ? #temporals.format(s.estimatedArrival, 'yyyy-MM-dd HH:mm') : '-'}">-</span>
+                        </td>
+                        <td>
+                            <span th:if="${s.daysRemaining != null}">
+                                <span th:if="${s.daysRemaining &lt;= 3 and s.daysRemaining &gt;= 0}" class="badge bg-danger">
+                                    <i class="bi bi-hourglass-split me-1"></i><span th:text="${s.daysRemaining} + ' d'">2 d</span>
+                                </span>
+                                <span th:if="${s.daysRemaining &gt; 3}" class="badge bg-light text-dark border" th:text="${s.daysRemaining} + ' días'">5 días</span>
+                                <span th:if="${s.daysRemaining &lt; 0}" class="badge bg-secondary" th:text="'Pasó hace ' + ${-s.daysRemaining} + ' d'">-</span>
+                            </span>
+                            <span th:if="${s.daysRemaining == null}" class="text-muted small">-</span>
+                        </td>
+                        <td>
+                            <span th:if="${s.status.name() == 'NEAR_ARRIVAL'}" class="badge badge-near-arrival">
+                                <i class="bi bi-exclamation-circle me-1"></i>Arribo Próximo
+                            </span>
+                            <span th:if="${s.status.name() == 'IN_TRANSIT'}" class="badge badge-in-transit">En Tránsito</span>
+                            <span th:if="${s.status.name() == 'ARRIVED'}" class="badge badge-arrived">Arribado</span>
+                            <span th:if="${s.status.name() == 'PENDING_FIRST_CHECK'}" class="badge badge-pending">Pendiente Rastreo</span>
+                            <span th:if="${s.status.name() == 'ERROR_CHECKING'}" class="badge badge-error">Error al Consultar</span>
+                        </td>
+                        <td class="small text-muted" th:text="${s.lastCheckedAt != null ? #temporals.format(s.lastCheckedAt, 'yyyy-MM-dd HH:mm') : 'Nunca'}">Nunca</td>
+                        <td class="text-end">
+                            <a th:href="@{'/shipments/' + ${s.id} + '/history'}" class="btn btn-outline-secondary btn-sm" title="Ver Historial de Cambios">
+                                <i class="bi bi-clock-history"></i>
+                            </a>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</div>
+
+<!-- Bootstrap 5 JS Bundle -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
