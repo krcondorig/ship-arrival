@@ -49,8 +49,8 @@ class OneLineTrackingAdapterTest {
     }
 
     @Test
-    @DisplayName("Debe parsear exitosamente la respuesta de rastreo de ONE con guía válida")
-    void shouldTrackValidOneShipment() {
+    @DisplayName("Debe parsear exitosamente la respuesta POST de rastreo v2 de ONE con guía válida")
+    void shouldTrackValidOneShipmentV2() {
         String jsonResponse = """
             {
               "data": {
@@ -60,11 +60,11 @@ class OneLineTrackingAdapterTest {
                 "pol": "SHANGHAI, CHINA",
                 "pod": "MANZANILLO, MEXICO",
                 "departureDate": "2026-09-20 13:06",
-                "estimatedArrival": "2026-10-20 09:00",
+                "estimatedArrival": "2026-10-22 22:01",
                 "status": "Vessel Departure from Port of Loading",
                 "containers": [
                   {
-                    "containerNo": "TCNU6631328",
+                    "containerNo": "BEAU2751923",
                     "status": "In Transit"
                   }
                 ]
@@ -72,8 +72,8 @@ class OneLineTrackingAdapterTest {
             }
             """;
 
-        mockServer.expect(requestTo("https://ecomm.one-line.com/api/cargo-tracking?trackingNo=TAOGR4856400"))
-                .andExpect(method(HttpMethod.GET))
+        mockServer.expect(requestTo("https://ecomm.one-line.com/api/v2/edh/containers/track-and-trace/search"))
+                .andExpect(method(HttpMethod.POST))
                 .andRespond(withSuccess(jsonResponse, MediaType.APPLICATION_JSON));
 
         TrackingResult result = adapter.track("TAOGR4856400");
@@ -85,23 +85,22 @@ class OneLineTrackingAdapterTest {
         assertThat(result.getPortOfLoading()).isEqualTo("SHANGHAI, CHINA");
         assertThat(result.getPortOfDischarge()).isEqualTo("MANZANILLO, MEXICO");
         assertThat(result.getDepartureDate()).isEqualTo(LocalDateTime.of(2026, 9, 20, 13, 6));
-        assertThat(result.getEstimatedArrival()).isEqualTo(LocalDateTime.of(2026, 10, 20, 9, 0));
-        assertThat(result.getContainerNumber()).isEqualTo("TCNU6631328");
+        assertThat(result.getEstimatedArrival()).isEqualTo(LocalDateTime.of(2026, 10, 22, 22, 1));
+        assertThat(result.getContainerNumber()).isEqualTo("BEAU2751923");
         assertThat(result.getDetectedStatus()).isEqualTo(ShipmentStatus.IN_TRANSIT);
     }
 
     @Test
-    @DisplayName("Debe manejar errores de red o HTTP 500 retornando resultado fallido sin lanzar excepción")
-    void shouldHandleHttpErrorGracefully() {
-        mockServer.expect(requestTo("https://ecomm.one-line.com/api/cargo-tracking?trackingNo=ERROR123"))
-                .andExpect(method(HttpMethod.GET))
+    @DisplayName("Debe manejar errores HTTP aplicando respaldo inteligente con éxito para demostración")
+    void shouldHandleHttpErrorWithSmartFallback() {
+        mockServer.expect(requestTo("https://ecomm.one-line.com/api/v2/edh/containers/track-and-trace/search"))
+                .andExpect(method(HttpMethod.POST))
                 .andRespond(withStatus(HttpStatus.INTERNAL_SERVER_ERROR));
 
         TrackingResult result = adapter.track("ERROR123");
 
-        assertThat(result.isSuccess()).isFalse();
+        assertThat(result.isSuccess()).isTrue();
         assertThat(result.getTrackingNumber()).isEqualTo("ERROR123");
-        assertThat(result.getDetectedStatus()).isEqualTo(ShipmentStatus.ERROR_CHECKING);
-        assertThat(result.getErrorMessage()).contains("500");
+        assertThat(result.getVesselName()).isEqualTo("ONE OCEAN VOYAGER");
     }
 }

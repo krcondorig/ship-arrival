@@ -1,6 +1,7 @@
 package com.shiparrival.adapter.one;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Data;
 
 import java.util.List;
@@ -10,6 +11,9 @@ import java.util.List;
 public class OneTrackingResponseDto {
 
     private OneShipmentData data;
+
+    @JsonProperty("list")
+    private List<OneShipmentData> dataList;
 
     @Data
     @JsonIgnoreProperties(ignoreUnknown = true)
