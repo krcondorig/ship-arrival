@@ -28,9 +28,9 @@ class ShipmentRepositoryTest {
     @DisplayName("Debe persistir y buscar un Shipment por número de guía y filtrar por activos")
     void shouldSaveAndFindShipment() {
         Shipment shipment = Shipment.builder()
-                .trackingNumber("TAOGR4856400")
+                .trackingNumber("TESTBL900001")
                 .carrier(Carrier.ONE)
-                .containerNumber("TCNU1234567")
+                .containerNumber("TEST1234567")
                 .vesselName("ONE FANTASTIC")
                 .voyageNumber("006E")
                 .portOfLoading("SHANGHAI, CHINA")
@@ -48,7 +48,7 @@ class ShipmentRepositoryTest {
         Shipment saved = shipmentRepository.save(shipment);
         assertThat(saved.getId()).isNotNull();
 
-        Optional<Shipment> foundByTracking = shipmentRepository.findByTrackingNumber("TAOGR4856400");
+        Optional<Shipment> foundByTracking = shipmentRepository.findByTrackingNumber("TESTBL900001");
         assertThat(foundByTracking).isPresent();
         assertThat(foundByTracking.get().getVesselName()).isEqualTo("ONE FANTASTIC");
         assertThat(foundByTracking.get().getCarrier()).isEqualTo(Carrier.ONE);

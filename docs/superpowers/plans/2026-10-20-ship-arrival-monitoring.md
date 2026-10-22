@@ -129,7 +129,7 @@
   - `CarrierTrackingAdapterFactory.getAdapter(Carrier carrier) -> CarrierTrackingAdapter`
 
 - [ ] **Step 1: Escribir test fallido en `OneLineTrackingAdapterTest`**
-  - Test con respuesta simulada JSON/HTML típica de ONE con guía `TAOGR4856400`: verifica extracción correcta de buque, viaje, puerto Manzanillo, ETA `2026-10-20 09:00`, partida y estatus.
+  - Test con respuesta simulada JSON/HTML típica de ONE con guía `TESTBL900001`: verifica extracción correcta de buque, viaje, puerto Manzanillo, ETA `2026-10-20 09:00`, partida y estatus.
   - Test de manejo de error (guía no encontrada o error 500 del servidor naviero).
 
 - [ ] **Step 2: Ejecutar test para verificar que falla**
@@ -164,7 +164,7 @@
 
 - [ ] **Step 1: Escribir test fallido en `ExcelImportServiceTest`**
   - Test con archivo Excel generado en memoria (usando Apache POI en el test):
-    - Hoja con columna de guías (`TAOGR4856400`, `SZPG70884900`), celdas vacías intermedias, filas con espacios.
+    - Hoja con columna de guías (`TESTBL900001`, `TESTBL900002`), celdas vacías intermedias, filas con espacios.
     - Validar que extrae las guías limpias y descarta filas vacías o no válidas sin lanzar excepción.
 
 - [ ] **Step 2: Ejecutar test para verificar que falla**

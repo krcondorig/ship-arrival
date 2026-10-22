@@ -9,6 +9,7 @@ import com.shiparrival.domain.ShipmentStatus;
 import com.shiparrival.repository.ShipmentEventLogRepository;
 import com.shiparrival.repository.ShipmentRepository;
 import com.shiparrival.service.TelegramNotificationService;
+import com.shiparrival.service.TrackingSchedulerService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -16,6 +17,7 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.test.web.servlet.MockMvc;
@@ -37,6 +39,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @SpringBootTest
 @AutoConfigureMockMvc
+@TestPropertySource(properties = "tracking.request.delay-ms=0")
 class ShipArrivalE2EIntegrationTest {
 
     @Autowired
@@ -47,6 +50,9 @@ class ShipArrivalE2EIntegrationTest {
 
     @Autowired
     private ShipmentEventLogRepository shipmentEventLogRepository;
+
+    @Autowired
+    private TrackingSchedulerService trackingSchedulerService;
 
     @MockitoBean
     private TelegramNotificationService telegramNotificationService;
@@ -61,9 +67,9 @@ class ShipArrivalE2EIntegrationTest {
 
         when(telegramNotificationService.sendNearArrivalAlert(any(), anyLong())).thenReturn(true);
         when(oneLineTrackingAdapter.supports(Carrier.ONE)).thenReturn(true);
-        when(oneLineTrackingAdapter.track("TAOGR4856400")).thenReturn(TrackingResult.builder()
+        when(oneLineTrackingAdapter.track("TESTBL900001")).thenReturn(TrackingResult.builder()
                 .success(true)
-                .trackingNumber("TAOGR4856400")
+                .trackingNumber("TESTBL900001")
                 .vesselName("ONE FANTASTIC")
                 .voyageNumber("006E")
                 .portOfLoading("SHANGHAI, CHINA")
@@ -75,13 +81,13 @@ class ShipArrivalE2EIntegrationTest {
 
         // 1. Registrar embarque individual vía POST /shipments
         mockMvc.perform(post("/shipments")
-                        .param("trackingNumber", "TAOGR4856400")
+                        .param("trackingNumber", "TESTBL900001")
                         .param("carrier", "ONE"))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/"));
 
         // Verificar que está en base de datos con estatus PENDING_FIRST_CHECK
-        Shipment initial = shipmentRepository.findByTrackingNumber("TAOGR4856400").orElseThrow();
+        Shipment initial = shipmentRepository.findByTrackingNumber("TESTBL900001").orElseThrow();
         assertThat(initial.getStatus()).isEqualTo(ShipmentStatus.PENDING_FIRST_CHECK);
         assertThat(initial.getCarrier()).isEqualTo(Carrier.ONE);
 
@@ -90,8 +96,10 @@ class ShipArrivalE2EIntegrationTest {
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/"));
 
+        awaitTrackingCompletion();
+
         // Verificar que se actualizó el embarque en base de datos
-        Shipment updated = shipmentRepository.findByTrackingNumber("TAOGR4856400").orElseThrow();
+        Shipment updated = shipmentRepository.findByTrackingNumber("TESTBL900001").orElseThrow();
         assertThat(updated.getVesselName()).isEqualTo("ONE FANTASTIC");
         assertThat(updated.getStatus()).isEqualTo(ShipmentStatus.NEAR_ARRIVAL);
         assertThat(updated.isAlertSent3Days()).isTrue();
@@ -108,7 +116,7 @@ class ShipArrivalE2EIntegrationTest {
         mockMvc.perform(get("/"))
                 .andExpect(status().isOk())
                 .andExpect(view().name("dashboard"))
-                .andExpect(content().string(org.hamcrest.Matchers.containsString("TAOGR4856400")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("TESTBL900001")))
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("ONE FANTASTIC")))
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("MANZANILLO, MEXICO")))
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("Arribo Próximo")));
@@ -117,7 +125,17 @@ class ShipArrivalE2EIntegrationTest {
         mockMvc.perform(get("/shipments/" + updated.getId() + "/history"))
                 .andExpect(status().isOk())
                 .andExpect(view().name("history"))
-                .andExpect(content().string(org.hamcrest.Matchers.containsString("TAOGR4856400")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("TESTBL900001")))
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("ETA_UPDATED")));
+    }
+
+    private void awaitTrackingCompletion() throws InterruptedException {
+        long deadline = System.currentTimeMillis() + 10_000;
+        while (trackingSchedulerService.isTrackingInProgress() && System.currentTimeMillis() < deadline) {
+            Thread.sleep(50);
+        }
+        assertThat(trackingSchedulerService.isTrackingInProgress())
+                .as("El monitoreo asíncrono debe terminar antes del timeout")
+                .isFalse();
     }
 }

@@ -32,12 +32,12 @@ class ExcelImportServiceTest {
 
             // Fila 1: Guía válida con espacios
             Row row1 = sheet.createRow(1);
-            row1.createCell(0).setCellValue("  TAOGR4856400  ");
+            row1.createCell(0).setCellValue("  TESTBL900001  ");
             row1.createCell(1).setCellValue("Embarque 1");
 
             // Fila 2: Guía válida normal
             Row row2 = sheet.createRow(2);
-            row2.createCell(0).setCellValue("SZPG70884900");
+            row2.createCell(0).setCellValue("TESTBL900002");
 
             // Fila 3: Celda vacía
             Row row3 = sheet.createRow(3);
@@ -49,7 +49,7 @@ class ExcelImportServiceTest {
 
             // Fila 5: Guía válida adicional
             Row row5 = sheet.createRow(5);
-            row5.createCell(0).setCellValue("SH5FVD622400");
+            row5.createCell(0).setCellValue("TESTBL900003");
 
             workbook.write(out);
         }
@@ -59,7 +59,7 @@ class ExcelImportServiceTest {
 
         assertThat(result).isNotNull();
         assertThat(result.getValidTrackingNumbers())
-                .containsExactly("TAOGR4856400", "SZPG70884900", "SH5FVD622400");
+                .containsExactly("TESTBL900001", "TESTBL900002", "TESTBL900003");
         assertThat(result.getTotalRowsProcessed()).isGreaterThanOrEqualTo(5);
     }
 }

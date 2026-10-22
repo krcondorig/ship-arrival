@@ -29,7 +29,7 @@ class TelegramNotificationServiceTest {
         );
 
         Shipment shipment = Shipment.builder()
-                .trackingNumber("TAOGR4856400")
+                .trackingNumber("TESTBL900001")
                 .carrier(Carrier.ONE)
                 .build();
 
@@ -52,13 +52,13 @@ class TelegramNotificationServiceTest {
                 .andExpect(content().contentType(MediaType.APPLICATION_JSON))
                 .andExpect(jsonPath("$.chat_id").value("12345"))
                 .andExpect(jsonPath("$.parse_mode").value("HTML"))
-                .andExpect(jsonPath("$.text").value(org.hamcrest.Matchers.containsString("TAOGR4856400")))
+                .andExpect(jsonPath("$.text").value(org.hamcrest.Matchers.containsString("TESTBL900001")))
                 .andExpect(jsonPath("$.text").value(org.hamcrest.Matchers.containsString("ONE FANTASTIC")))
                 .andExpect(jsonPath("$.text").value(org.hamcrest.Matchers.containsString("MANZANILLO, MEXICO")))
                 .andRespond(withSuccess("{\"ok\":true}", MediaType.APPLICATION_JSON));
 
         Shipment shipment = Shipment.builder()
-                .trackingNumber("TAOGR4856400")
+                .trackingNumber("TESTBL900001")
                 .carrier(Carrier.ONE)
                 .vesselName("ONE FANTASTIC")
                 .voyageNumber("006E")
@@ -87,7 +87,7 @@ class TelegramNotificationServiceTest {
                 .andRespond(withStatus(HttpStatus.BAD_REQUEST));
 
         Shipment shipment = Shipment.builder()
-                .trackingNumber("TAOGR4856400")
+                .trackingNumber("TESTBL900001")
                 .carrier(Carrier.ONE)
                 .build();
 

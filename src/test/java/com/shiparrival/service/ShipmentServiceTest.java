@@ -48,21 +48,21 @@ class ShipmentServiceTest {
     @Test
     @DisplayName("Debe registrar un nuevo embarque y no duplicar si ya existe")
     void shouldRegisterNewShipmentAndAvoidDuplicates() {
-        when(shipmentRepository.findByTrackingNumber("TAOGR4856400")).thenReturn(Optional.empty());
+        when(shipmentRepository.findByTrackingNumber("TESTBL900001")).thenReturn(Optional.empty());
         when(shipmentRepository.save(any(Shipment.class))).thenAnswer(inv -> {
             Shipment s = inv.getArgument(0);
             s.setId(1L);
             return s;
         });
 
-        Shipment created = shipmentService.registerShipment("TAOGR4856400", Carrier.ONE);
+        Shipment created = shipmentService.registerShipment("TESTBL900001", Carrier.ONE);
         assertThat(created).isNotNull();
-        assertThat(created.getTrackingNumber()).isEqualTo("TAOGR4856400");
+        assertThat(created.getTrackingNumber()).isEqualTo("TESTBL900001");
         assertThat(created.getStatus()).isEqualTo(ShipmentStatus.PENDING_FIRST_CHECK);
 
         // Registro de una guía ya existente
-        when(shipmentRepository.findByTrackingNumber("TAOGR4856400")).thenReturn(Optional.of(created));
-        Shipment existing = shipmentService.registerShipment("TAOGR4856400", Carrier.ONE);
+        when(shipmentRepository.findByTrackingNumber("TESTBL900001")).thenReturn(Optional.of(created));
+        Shipment existing = shipmentService.registerShipment("TESTBL900001", Carrier.ONE);
         assertThat(existing.getId()).isEqualTo(1L);
         verify(shipmentRepository, times(1)).save(any(Shipment.class));
     }
@@ -123,7 +123,7 @@ class ShipmentServiceTest {
     void shouldUpdateShipmentAndLogEtaChange() {
         Shipment shipment = Shipment.builder()
                 .id(1L)
-                .trackingNumber("TAOGR4856400")
+                .trackingNumber("TESTBL900001")
                 .carrier(Carrier.ONE)
                 .estimatedArrival(LocalDateTime.of(2026, 10, 15, 9, 0))
                 .status(ShipmentStatus.IN_TRANSIT)
@@ -132,7 +132,7 @@ class ShipmentServiceTest {
 
         TrackingResult result = TrackingResult.builder()
                 .success(true)
-                .trackingNumber("TAOGR4856400")
+                .trackingNumber("TESTBL900001")
                 .vesselName("ONE FANTASTIC")
                 .voyageNumber("006E")
                 .portOfLoading("SHANGHAI, CHINA")

@@ -7,11 +7,12 @@ import com.shiparrival.domain.ShipmentStatus;
 import com.shiparrival.service.ShipmentService;
 import com.shiparrival.service.TrackingSchedulerService;
 import com.shiparrival.service.dto.BatchImportSummary;
-import com.shiparrival.service.dto.TrackingExecutionSummary;
+import com.shiparrival.service.dto.TrackingStatus;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -22,6 +23,7 @@ import java.util.Optional;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
@@ -45,7 +47,7 @@ class ShipmentWebControllerTest {
     void shouldRenderDashboard() throws Exception {
         Shipment shipment = Shipment.builder()
                 .id(1L)
-                .trackingNumber("TAOGR4856400")
+                .trackingNumber("TESTBL900001")
                 .carrier(Carrier.ONE)
                 .vesselName("ONE FANTASTIC")
                 .status(ShipmentStatus.IN_TRANSIT)
@@ -66,11 +68,11 @@ class ShipmentWebControllerTest {
     @Test
     @DisplayName("POST /shipments debe registrar una guía individual y redirigir")
     void shouldRegisterShipmentAndRedirect() throws Exception {
-        when(shipmentService.registerShipment("TAOGR4856400", Carrier.ONE))
+        when(shipmentService.registerShipment("TESTBL900001", Carrier.ONE))
                 .thenReturn(new Shipment());
 
         mockMvc.perform(post("/shipments")
-                        .param("trackingNumber", "TAOGR4856400")
+                        .param("trackingNumber", "TESTBL900001")
                         .param("carrier", "ONE"))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/"))
@@ -102,21 +104,57 @@ class ShipmentWebControllerTest {
     }
 
     @Test
-    @DisplayName("POST /shipments/track-now debe invocar el ciclo de monitoreo y redirigir")
+    @DisplayName("POST /shipments/track-now debe iniciar el monitoreo en segundo plano y redirigir")
     void shouldTriggerTrackNowAndRedirect() throws Exception {
-        TrackingExecutionSummary summary = TrackingExecutionSummary.builder()
-                .totalProcessed(5)
-                .updatedCount(5)
-                .alertsSentCount(1)
-                .executionDurationMs(1200)
-                .build();
-
-        when(trackingSchedulerService.runTrackingCycle()).thenReturn(summary);
+        when(trackingSchedulerService.startTrackingCycleAsync()).thenReturn(true);
 
         mockMvc.perform(post("/shipments/track-now"))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/"))
                 .andExpect(flash().attributeExists("infoMessage"));
+
+        verify(trackingSchedulerService).startTrackingCycleAsync();
+    }
+
+    @Test
+    @DisplayName("POST /shipments/track-now debe advertir si ya hay un monitoreo en progreso")
+    void shouldWarnWhenTrackingAlreadyInProgress() throws Exception {
+        when(trackingSchedulerService.startTrackingCycleAsync()).thenReturn(false);
+
+        mockMvc.perform(post("/shipments/track-now"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/"))
+                .andExpect(flash().attributeExists("warningMessage"));
+    }
+
+    @Test
+    @DisplayName("GET /shipments/track-status debe devolver el estado del monitoreo en JSON")
+    void shouldReturnTrackingStatus() throws Exception {
+        TrackingStatus status = TrackingStatus.builder()
+                .running(true)
+                .total(80)
+                .processed(37)
+                .updated(35)
+                .failed(2)
+                .alertsSent(1)
+                .currentTrackingNumber("TESTBL000038")
+                .startedAt(LocalDateTime.now())
+                .message("Monitoreando...")
+                .details(List.of())
+                .build();
+
+        when(trackingSchedulerService.getTrackingStatus()).thenReturn(status);
+
+        mockMvc.perform(get("/shipments/track-status").accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.running").value(true))
+                .andExpect(jsonPath("$.total").value(80))
+                .andExpect(jsonPath("$.processed").value(37))
+                .andExpect(jsonPath("$.updated").value(35))
+                .andExpect(jsonPath("$.failed").value(2))
+                .andExpect(jsonPath("$.alertsSent").value(1))
+                .andExpect(jsonPath("$.currentTrackingNumber").value("TESTBL000038"));
     }
 
     @Test
@@ -124,7 +162,7 @@ class ShipmentWebControllerTest {
     void shouldRenderHistory() throws Exception {
         Shipment shipment = Shipment.builder()
                 .id(1L)
-                .trackingNumber("TAOGR4856400")
+                .trackingNumber("TESTBL900001")
                 .carrier(Carrier.ONE)
                 .build();
 

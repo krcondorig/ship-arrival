@@ -8,7 +8,7 @@ import com.shiparrival.service.ShipmentService;
 import com.shiparrival.service.TrackingSchedulerService;
 import com.shiparrival.service.dto.BatchImportSummary;
 import com.shiparrival.service.dto.ShipmentDto;
-import com.shiparrival.service.dto.TrackingExecutionSummary;
+import com.shiparrival.service.dto.TrackingStatus;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Controller;
@@ -115,21 +115,26 @@ public class ShipmentWebController {
     @PostMapping("/shipments/track-now")
     public String trackNow(RedirectAttributes redirectAttributes) {
         try {
-            TrackingExecutionSummary summary = trackingSchedulerService.runTrackingCycle();
-            if (summary.getErrorMessage() != null) {
-                redirectAttributes.addFlashAttribute("warningMessage", summary.getErrorMessage());
-            } else {
+            boolean started = trackingSchedulerService.startTrackingCycleAsync();
+            if (started) {
                 redirectAttributes.addFlashAttribute("infoMessage",
-                        String.format("Monitoreo ejecutado: %d procesados, %d actualizados, %d fallidos, %d alertas enviadas (%d ms).",
-                                summary.getTotalProcessed(), summary.getUpdatedCount(), summary.getFailedCount(),
-                                summary.getAlertsSentCount(), summary.getExecutionDurationMs()));
+                        "Monitoreo iniciado en segundo plano. Puedes seguir usando la aplicación; el progreso se actualiza automáticamente.");
+            } else {
+                redirectAttributes.addFlashAttribute("warningMessage",
+                        "Ya hay un monitoreo en progreso. Espera a que termine para iniciar otro.");
             }
         } catch (Exception ex) {
             log.error("Error al disparar monitoreo manual: {}", ex.getMessage());
             redirectAttributes.addFlashAttribute("errorMessage",
-                    "Error al ejecutar monitoreo: " + ex.getMessage());
+                    "Error al iniciar monitoreo: " + ex.getMessage());
         }
         return "redirect:/";
+    }
+
+    @GetMapping("/shipments/track-status")
+    @ResponseBody
+    public TrackingStatus trackStatus() {
+        return trackingSchedulerService.getTrackingStatus();
     }
 
     @GetMapping("/shipments/{id}/history")

@@ -51,7 +51,7 @@ Aplicación web monolítica ligera en **Java 21** con **Spring Boot 3**, que per
 
 - **`Shipment`:**
   - `id` (Long, PK)
-  - `trackingNumber` (String, ej. "TAOGR4856400")
+  - `trackingNumber` (String, ej. "TESTBL900001")
   - `carrier` (Enum: `ONE`, `MSC`, etc.)
   - `containerNumber` (String)
   - `vesselName` (String)

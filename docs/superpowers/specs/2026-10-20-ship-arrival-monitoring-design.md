@@ -70,7 +70,7 @@ El objetivo de este sistema es **automatizar por completo la extracción, seguim
 2. **Modelo de Dominio:**
    - `Shipment` (Embarque):
      - `id` (Long, PK)
-     - `trackingNumber` (String, ej. "TAOGR4856400", único por naviera)
+     - `trackingNumber` (String, ej. "TESTBL900001", único por naviera)
      - `carrier` (Enum: `ONE`, `MSC`, etc.)
      - `containerNumber` (String, opcional o contenedor principal representativo)
      - `vesselName` (String, ej. "ONE FANTASTIC")
@@ -116,7 +116,7 @@ El objetivo de este sistema es **automatizar por completo la extracción, seguim
        - Disparar mensaje a Telegram:
          ```text
          🚢 ALERTA DE ARRIBO PRÓXIMO (≤ 3 DÍAS)
-         📦 Guía: TAOGR4856400
+         📦 Guía: TESTBL900001
          🏢 Naviera: ONE
          ⚓ Buque: ONE FANTASTIC (Viaje 006E)
          📍 Destino: MANZANILLO, MEXICO
