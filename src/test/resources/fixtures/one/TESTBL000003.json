@@ -1,0 +1,100 @@
+{
+    "status":  200,
+    "code":  1,
+    "message":  "Success",
+    "total":  1,
+    "data":  [
+                 {
+                     "bookingNo":  "TESTBL000003",
+                     "containerNo":  "TEST3234501",
+                     "containerTypeSize":  "20\u0027DRY ST.",
+                     "weight":  "20,000.000 KGS",
+                     "latestEvent":  {
+                                         "eventName":  "Vessel Departure from Port of Loading",
+                                         "locationName":  "HONG KONG",
+                                         "date":  "2026-09-28T08:15:00.000Z"
+                                     },
+                     "socFlag":  false,
+                     "seals":  [
+                                   {
+                                       "sealSequence":  0,
+                                       "sealNo":  "********"
+                                   }
+                               ],
+                     "place":  {
+                                   "yardCode":  "HKHKG05",
+                                   "yardName":  "HIT (HONGKONG INTERNATIONAL TERMINALS )",
+                                   "locationName":  "HONG KONG"
+                               },
+                     "por":  {
+                                 "code":  "CNZHA",
+                                 "locationName":  "ZHANJIANG, GUANGDONG",
+                                 "countryName":  "CHINA"
+                             },
+                     "pod":  {
+                                 "code":  "MXZAP",
+                                 "locationName":  "ZAPOPAN",
+                                 "countryName":  "MEXICO"
+                             },
+                     "copNo":  "TESTCOP000301",
+                     "bookingNoShow":  "TESTBL000003",
+                     "cargoEvents":  [
+                                         {
+                                             "matrixId":  "E061",
+                                             "locationName":  "HONG KONG",
+                                             "countryCode":  "CN",
+                                             "countryName":  "HONG KONG, CHINA",
+                                             "date":  "2026-09-28T00:15:00.000Z",
+                                             "localPortDate":  "2026-09-28T08:15:00.000Z",
+                                             "trigger":  "ACTUAL"
+                                         },
+                                         {
+                                             "matrixId":  "E089",
+                                             "locationName":  "MANZANILLO",
+                                             "countryCode":  "MX",
+                                             "countryName":  "MEXICO",
+                                             "date":  "2026-10-28T10:00:00.000Z",
+                                             "localPortDate":  "2026-10-28T04:00:00.000Z",
+                                             "trigger":  "ESTIMATED"
+                                         },
+                                         {
+                                             "matrixId":  "E105",
+                                             "locationName":  "GUADALAJARA",
+                                             "countryCode":  "MX",
+                                             "countryName":  "MEXICO",
+                                             "date":  "2026-10-31T22:00:00.000Z",
+                                             "localPortDate":  "2026-10-31T16:00:00.000Z",
+                                             "trigger":  "ESTIMATED"
+                                         }
+                                     ],
+                     "vesselVoyage":  {
+                                          "vesselCode":  "RLIT",
+                                          "vesselName":  "MSC NOA ARIELA",
+                                          "voyageNo":  "0637",
+                                          "directionCode":  "E",
+                                          "inboundConsortiumVoyage":  "FA637A",
+                                          "outboundConsortiumVoyage":  "FA637A"
+                                      },
+                     "deadlineEvents":  [
+                                            {
+                                                "matrixId":  "E167",
+                                                "date":  "2026-09-16T10:00:00.000Z",
+                                                "localPortDate":  "2026-09-16T18:00:00.000Z",
+                                                "isShowData":  true
+                                            },
+                                            {
+                                                "matrixId":  "E105",
+                                                "date":  "",
+                                                "localPortDate":  "",
+                                                "isShowData":  false
+                                            },
+                                            {
+                                                "matrixId":  "E138",
+                                                "date":  "",
+                                                "localPortDate":  "",
+                                                "isShowData":  false
+                                            }
+                                        ]
+                 }
+             ]
+}

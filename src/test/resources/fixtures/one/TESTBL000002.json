@@ -1,0 +1,468 @@
+{
+    "status":  200,
+    "code":  1,
+    "message":  "Success",
+    "total":  5,
+    "data":  [
+                 {
+                     "bookingNo":  "TESTBL000002",
+                     "containerNo":  "TEST2234501",
+                     "containerTypeSize":  "20\u0027DRY ST.",
+                     "weight":  "20,000.000 KGS",
+                     "latestEvent":  {
+                                         "eventName":  "Unloaded from Vessel at Port of Discharging",
+                                         "locationName":  "MANZANILLO",
+                                         "date":  "2026-10-12T17:20:00.000Z"
+                                     },
+                     "socFlag":  false,
+                     "seals":  [
+                                   {
+                                       "sealSequence":  0,
+                                       "sealNo":  "********"
+                                   }
+                               ],
+                     "place":  {
+                                   "yardCode":  "MXZLO03",
+                                   "yardName":  "CONTECON MANZANILLO",
+                                   "locationName":  "MANZANILLO"
+                               },
+                     "por":  {
+                                 "code":  "CNTAO",
+                                 "locationName":  "QINGDAO, SHANDONG",
+                                 "countryName":  "CHINA"
+                             },
+                     "pod":  {
+                                 "code":  "MXMEX",
+                                 "locationName":  "MEXICO CITY",
+                                 "countryName":  "MEXICO"
+                             },
+                     "copNo":  "TESTCOP000201",
+                     "bookingNoShow":  "TESTBL000002",
+                     "cargoEvents":  [
+                                         {
+                                             "matrixId":  "E061",
+                                             "locationName":  "QINGDAO, SHANDONG",
+                                             "countryCode":  "CN",
+                                             "countryName":  "CHINA",
+                                             "date":  "2026-09-11T19:20:00.000Z",
+                                             "localPortDate":  "2026-09-12T03:20:00.000Z",
+                                             "trigger":  "ACTUAL"
+                                         },
+                                         {
+                                             "matrixId":  "E089",
+                                             "locationName":  "MANZANILLO",
+                                             "countryCode":  "MX",
+                                             "countryName":  "MEXICO",
+                                             "date":  "2026-10-07T08:46:00.000Z",
+                                             "localPortDate":  "2026-10-07T02:46:00.000Z",
+                                             "trigger":  "ACTUAL"
+                                         },
+                                         {
+                                             "matrixId":  "E105",
+                                             "locationName":  "CUAUTITLAN IZCALLI",
+                                             "countryCode":  "MX",
+                                             "countryName":  "MEXICO",
+                                             "date":  "2026-10-18T09:50:00.000Z",
+                                             "localPortDate":  "2026-10-18T03:50:00.000Z",
+                                             "trigger":  "ESTIMATED"
+                                         }
+                                     ],
+                     "vesselVoyage":  {
+                                          "vesselCode":  "HKOT",
+                                          "vesselName":  "HMM OAKLAND",
+                                          "voyageNo":  "0140",
+                                          "directionCode":  "E",
+                                          "inboundConsortiumVoyage":  "140E",
+                                          "outboundConsortiumVoyage":  "140E"
+                                      },
+                     "deadlineEvents":  [
+                                            {
+                                                "matrixId":  "E167",
+                                                "date":  "2026-09-09T16:00:00.000Z",
+                                                "localPortDate":  "2026-09-10T00:00:00.000Z",
+                                                "isShowData":  true
+                                            },
+                                            {
+                                                "matrixId":  "E105",
+                                                "date":  "",
+                                                "localPortDate":  "",
+                                                "isShowData":  false
+                                            },
+                                            {
+                                                "matrixId":  "E138",
+                                                "date":  "",
+                                                "localPortDate":  "",
+                                                "isShowData":  false
+                                            }
+                                        ]
+                 },
+                 {
+                     "bookingNo":  "TESTBL000002",
+                     "containerNo":  "TEST2234502",
+                     "containerTypeSize":  "20\u0027DRY ST.",
+                     "weight":  "20,000.000 KGS",
+                     "latestEvent":  {
+                                         "eventName":  "Unloaded from Vessel at Port of Discharging",
+                                         "locationName":  "MANZANILLO",
+                                         "date":  "2026-10-13T03:45:00.000Z"
+                                     },
+                     "socFlag":  false,
+                     "seals":  [
+                                   {
+                                       "sealSequence":  0,
+                                       "sealNo":  "********"
+                                   }
+                               ],
+                     "place":  {
+                                   "yardCode":  "MXZLO03",
+                                   "yardName":  "CONTECON MANZANILLO",
+                                   "locationName":  "MANZANILLO"
+                               },
+                     "por":  {
+                                 "code":  "CNTAO",
+                                 "locationName":  "QINGDAO, SHANDONG",
+                                 "countryName":  "CHINA"
+                             },
+                     "pod":  {
+                                 "code":  "MXMEX",
+                                 "locationName":  "MEXICO CITY",
+                                 "countryName":  "MEXICO"
+                             },
+                     "copNo":  "TESTCOP000202",
+                     "bookingNoShow":  "TESTBL000002",
+                     "cargoEvents":  [
+                                         {
+                                             "matrixId":  "E061",
+                                             "locationName":  "QINGDAO, SHANDONG",
+                                             "countryCode":  "CN",
+                                             "countryName":  "CHINA",
+                                             "date":  "2026-09-11T19:20:00.000Z",
+                                             "localPortDate":  "2026-09-12T03:20:00.000Z",
+                                             "trigger":  "ACTUAL"
+                                         },
+                                         {
+                                             "matrixId":  "E089",
+                                             "locationName":  "MANZANILLO",
+                                             "countryCode":  "MX",
+                                             "countryName":  "MEXICO",
+                                             "date":  "2026-10-07T08:46:00.000Z",
+                                             "localPortDate":  "2026-10-07T02:46:00.000Z",
+                                             "trigger":  "ACTUAL"
+                                         },
+                                         {
+                                             "matrixId":  "E105",
+                                             "locationName":  "CUAUTITLAN IZCALLI",
+                                             "countryCode":  "MX",
+                                             "countryName":  "MEXICO",
+                                             "date":  "2026-10-18T20:15:00.000Z",
+                                             "localPortDate":  "2026-10-18T14:15:00.000Z",
+                                             "trigger":  "ESTIMATED"
+                                         }
+                                     ],
+                     "vesselVoyage":  {
+                                          "vesselCode":  "HKOT",
+                                          "vesselName":  "HMM OAKLAND",
+                                          "voyageNo":  "0140",
+                                          "directionCode":  "E",
+                                          "inboundConsortiumVoyage":  "140E",
+                                          "outboundConsortiumVoyage":  "140E"
+                                      },
+                     "deadlineEvents":  [
+                                            {
+                                                "matrixId":  "E167",
+                                                "date":  "2026-09-09T16:00:00.000Z",
+                                                "localPortDate":  "2026-09-10T00:00:00.000Z",
+                                                "isShowData":  true
+                                            },
+                                            {
+                                                "matrixId":  "E105",
+                                                "date":  "",
+                                                "localPortDate":  "",
+                                                "isShowData":  false
+                                            },
+                                            {
+                                                "matrixId":  "E138",
+                                                "date":  "",
+                                                "localPortDate":  "",
+                                                "isShowData":  false
+                                            }
+                                        ]
+                 },
+                 {
+                     "bookingNo":  "TESTBL000002",
+                     "containerNo":  "TEST2234503",
+                     "containerTypeSize":  "20\u0027DRY ST.",
+                     "weight":  "20,000.000 KGS",
+                     "latestEvent":  {
+                                         "eventName":  "Unloaded from Vessel at Port of Discharging",
+                                         "locationName":  "MANZANILLO",
+                                         "date":  "2026-10-13T02:57:00.000Z"
+                                     },
+                     "socFlag":  false,
+                     "seals":  [
+                                   {
+                                       "sealSequence":  0,
+                                       "sealNo":  "********"
+                                   }
+                               ],
+                     "place":  {
+                                   "yardCode":  "MXZLO03",
+                                   "yardName":  "CONTECON MANZANILLO",
+                                   "locationName":  "MANZANILLO"
+                               },
+                     "por":  {
+                                 "code":  "CNTAO",
+                                 "locationName":  "QINGDAO, SHANDONG",
+                                 "countryName":  "CHINA"
+                             },
+                     "pod":  {
+                                 "code":  "MXMEX",
+                                 "locationName":  "MEXICO CITY",
+                                 "countryName":  "MEXICO"
+                             },
+                     "copNo":  "TESTCOP000203",
+                     "bookingNoShow":  "TESTBL000002",
+                     "cargoEvents":  [
+                                         {
+                                             "matrixId":  "E061",
+                                             "locationName":  "QINGDAO, SHANDONG",
+                                             "countryCode":  "CN",
+                                             "countryName":  "CHINA",
+                                             "date":  "2026-09-11T19:20:00.000Z",
+                                             "localPortDate":  "2026-09-12T03:20:00.000Z",
+                                             "trigger":  "ACTUAL"
+                                         },
+                                         {
+                                             "matrixId":  "E089",
+                                             "locationName":  "MANZANILLO",
+                                             "countryCode":  "MX",
+                                             "countryName":  "MEXICO",
+                                             "date":  "2026-10-07T08:46:00.000Z",
+                                             "localPortDate":  "2026-10-07T02:46:00.000Z",
+                                             "trigger":  "ACTUAL"
+                                         },
+                                         {
+                                             "matrixId":  "E105",
+                                             "locationName":  "CUAUTITLAN IZCALLI",
+                                             "countryCode":  "MX",
+                                             "countryName":  "MEXICO",
+                                             "date":  "2026-10-18T19:27:00.000Z",
+                                             "localPortDate":  "2026-10-18T13:27:00.000Z",
+                                             "trigger":  "ESTIMATED"
+                                         }
+                                     ],
+                     "vesselVoyage":  {
+                                          "vesselCode":  "HKOT",
+                                          "vesselName":  "HMM OAKLAND",
+                                          "voyageNo":  "0140",
+                                          "directionCode":  "E",
+                                          "inboundConsortiumVoyage":  "140E",
+                                          "outboundConsortiumVoyage":  "140E"
+                                      },
+                     "deadlineEvents":  [
+                                            {
+                                                "matrixId":  "E167",
+                                                "date":  "2026-09-09T16:00:00.000Z",
+                                                "localPortDate":  "2026-09-10T00:00:00.000Z",
+                                                "isShowData":  true
+                                            },
+                                            {
+                                                "matrixId":  "E105",
+                                                "date":  "",
+                                                "localPortDate":  "",
+                                                "isShowData":  false
+                                            },
+                                            {
+                                                "matrixId":  "E138",
+                                                "date":  "",
+                                                "localPortDate":  "",
+                                                "isShowData":  false
+                                            }
+                                        ]
+                 },
+                 {
+                     "bookingNo":  "TESTBL000002",
+                     "containerNo":  "TEST2234504",
+                     "containerTypeSize":  "20\u0027DRY ST.",
+                     "weight":  "20,000.000 KGS",
+                     "latestEvent":  {
+                                         "eventName":  "Unloaded from Vessel at Port of Discharging",
+                                         "locationName":  "MANZANILLO",
+                                         "date":  "2026-10-13T05:47:00.000Z"
+                                     },
+                     "socFlag":  false,
+                     "seals":  [
+                                   {
+                                       "sealSequence":  0,
+                                       "sealNo":  "********"
+                                   }
+                               ],
+                     "place":  {
+                                   "yardCode":  "MXZLO03",
+                                   "yardName":  "CONTECON MANZANILLO",
+                                   "locationName":  "MANZANILLO"
+                               },
+                     "por":  {
+                                 "code":  "CNTAO",
+                                 "locationName":  "QINGDAO, SHANDONG",
+                                 "countryName":  "CHINA"
+                             },
+                     "pod":  {
+                                 "code":  "MXMEX",
+                                 "locationName":  "MEXICO CITY",
+                                 "countryName":  "MEXICO"
+                             },
+                     "copNo":  "TESTCOP000204",
+                     "bookingNoShow":  "TESTBL000002",
+                     "cargoEvents":  [
+                                         {
+                                             "matrixId":  "E061",
+                                             "locationName":  "QINGDAO, SHANDONG",
+                                             "countryCode":  "CN",
+                                             "countryName":  "CHINA",
+                                             "date":  "2026-09-11T19:20:00.000Z",
+                                             "localPortDate":  "2026-09-12T03:20:00.000Z",
+                                             "trigger":  "ACTUAL"
+                                         },
+                                         {
+                                             "matrixId":  "E089",
+                                             "locationName":  "MANZANILLO",
+                                             "countryCode":  "MX",
+                                             "countryName":  "MEXICO",
+                                             "date":  "2026-10-07T08:46:00.000Z",
+                                             "localPortDate":  "2026-10-07T02:46:00.000Z",
+                                             "trigger":  "ACTUAL"
+                                         },
+                                         {
+                                             "matrixId":  "E105",
+                                             "locationName":  "CUAUTITLAN IZCALLI",
+                                             "countryCode":  "MX",
+                                             "countryName":  "MEXICO",
+                                             "date":  "2026-10-18T22:17:00.000Z",
+                                             "localPortDate":  "2026-10-18T16:17:00.000Z",
+                                             "trigger":  "ESTIMATED"
+                                         }
+                                     ],
+                     "vesselVoyage":  {
+                                          "vesselCode":  "HKOT",
+                                          "vesselName":  "HMM OAKLAND",
+                                          "voyageNo":  "0140",
+                                          "directionCode":  "E",
+                                          "inboundConsortiumVoyage":  "140E",
+                                          "outboundConsortiumVoyage":  "140E"
+                                      },
+                     "deadlineEvents":  [
+                                            {
+                                                "matrixId":  "E167",
+                                                "date":  "2026-09-09T16:00:00.000Z",
+                                                "localPortDate":  "2026-09-10T00:00:00.000Z",
+                                                "isShowData":  true
+                                            },
+                                            {
+                                                "matrixId":  "E105",
+                                                "date":  "",
+                                                "localPortDate":  "",
+                                                "isShowData":  false
+                                            },
+                                            {
+                                                "matrixId":  "E138",
+                                                "date":  "",
+                                                "localPortDate":  "",
+                                                "isShowData":  false
+                                            }
+                                        ]
+                 },
+                 {
+                     "bookingNo":  "TESTBL000002",
+                     "containerNo":  "TEST2234505",
+                     "containerTypeSize":  "20\u0027DRY ST.",
+                     "weight":  "20,000.000 KGS",
+                     "latestEvent":  {
+                                         "eventName":  "Unloaded from Vessel at Port of Discharging",
+                                         "locationName":  "MANZANILLO",
+                                         "date":  "2026-10-13T06:26:00.000Z"
+                                     },
+                     "socFlag":  false,
+                     "seals":  [
+                                   {
+                                       "sealSequence":  0,
+                                       "sealNo":  "********"
+                                   }
+                               ],
+                     "place":  {
+                                   "yardCode":  "MXZLO03",
+                                   "yardName":  "CONTECON MANZANILLO",
+                                   "locationName":  "MANZANILLO"
+                               },
+                     "por":  {
+                                 "code":  "CNTAO",
+                                 "locationName":  "QINGDAO, SHANDONG",
+                                 "countryName":  "CHINA"
+                             },
+                     "pod":  {
+                                 "code":  "MXMEX",
+                                 "locationName":  "MEXICO CITY",
+                                 "countryName":  "MEXICO"
+                             },
+                     "copNo":  "TESTCOP000205",
+                     "bookingNoShow":  "TESTBL000002",
+                     "cargoEvents":  [
+                                         {
+                                             "matrixId":  "E061",
+                                             "locationName":  "QINGDAO, SHANDONG",
+                                             "countryCode":  "CN",
+                                             "countryName":  "CHINA",
+                                             "date":  "2026-09-11T19:20:00.000Z",
+                                             "localPortDate":  "2026-09-12T03:20:00.000Z",
+                                             "trigger":  "ACTUAL"
+                                         },
+                                         {
+                                             "matrixId":  "E089",
+                                             "locationName":  "MANZANILLO",
+                                             "countryCode":  "MX",
+                                             "countryName":  "MEXICO",
+                                             "date":  "2026-10-07T08:46:00.000Z",
+                                             "localPortDate":  "2026-10-07T02:46:00.000Z",
+                                             "trigger":  "ACTUAL"
+                                         },
+                                         {
+                                             "matrixId":  "E105",
+                                             "locationName":  "CUAUTITLAN IZCALLI",
+                                             "countryCode":  "MX",
+                                             "countryName":  "MEXICO",
+                                             "date":  "2026-10-18T22:56:00.000Z",
+                                             "localPortDate":  "2026-10-18T16:56:00.000Z",
+                                             "trigger":  "ESTIMATED"
+                                         }
+                                     ],
+                     "vesselVoyage":  {
+                                          "vesselCode":  "HKOT",
+                                          "vesselName":  "HMM OAKLAND",
+                                          "voyageNo":  "0140",
+                                          "directionCode":  "E",
+                                          "inboundConsortiumVoyage":  "140E",
+                                          "outboundConsortiumVoyage":  "140E"
+                                      },
+                     "deadlineEvents":  [
+                                            {
+                                                "matrixId":  "E167",
+                                                "date":  "2026-09-09T16:00:00.000Z",
+                                                "localPortDate":  "2026-09-10T00:00:00.000Z",
+                                                "isShowData":  true
+                                            },
+                                            {
+                                                "matrixId":  "E105",
+                                                "date":  "",
+                                                "localPortDate":  "",
+                                                "isShowData":  false
+                                            },
+                                            {
+                                                "matrixId":  "E138",
+                                                "date":  "",
+                                                "localPortDate":  "",
+                                                "isShowData":  false
+                                            }
+                                        ]
+                 }
+             ]
+}

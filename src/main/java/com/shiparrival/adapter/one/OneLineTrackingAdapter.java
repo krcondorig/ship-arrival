@@ -15,14 +15,16 @@ import org.springframework.web.client.RestClientResponseException;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
+import java.util.List;
 import java.util.Map;
 
 @Slf4j
 @Component
 public class OneLineTrackingAdapter implements CarrierTrackingAdapter {
 
+    private static final String MATRIX_DEPARTURE = "E061";
+    private static final String MATRIX_PORT_OF_DISCHARGE_ARRIVAL = "E089";
     private static final DateTimeFormatter DATE_TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
-    private static final DateTimeFormatter DATE_ONLY_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd");
 
     private final RestClient restClient;
     private final String baseUrl;
@@ -49,6 +51,10 @@ public class OneLineTrackingAdapter implements CarrierTrackingAdapter {
     @Override
     public TrackingResult track(String trackingNumber) {
         String cleanTrackingNumber = trackingNumber != null ? trackingNumber.trim() : "";
+        if (cleanTrackingNumber.isEmpty()) {
+            return TrackingResult.failure(cleanTrackingNumber, "El número de guía no puede estar vacío");
+        }
+
         String url = baseUrl + "/v2/edh/containers/track-and-trace/search";
 
         Map<String, Object> requestBody = Map.of(
@@ -70,101 +76,122 @@ public class OneLineTrackingAdapter implements CarrierTrackingAdapter {
                     .retrieve()
                     .body(OneTrackingResponseDto.class);
 
-            if (response == null || (response.getData() == null && (response.getDataList() == null || response.getDataList().isEmpty()))) {
-                log.info("API v2 de ONE no retornó resultados para guía {}, usando respaldo inteligente", cleanTrackingNumber);
-                return generateSmartFallback(cleanTrackingNumber);
+            if (response == null || response.getData() == null || response.getData().isEmpty()) {
+                log.info("ONE no devolvió resultados para la guía {}", cleanTrackingNumber);
+                return TrackingResult.failure(cleanTrackingNumber,
+                        "ONE no devolvió resultados para la guía " + cleanTrackingNumber);
             }
 
-            OneTrackingResponseDto.OneShipmentData data = response.getData();
-            if (data == null && response.getDataList() != null && !response.getDataList().isEmpty()) {
-                data = response.getDataList().get(0);
-            }
-
-            if (data == null) {
-                return generateSmartFallback(cleanTrackingNumber);
-            }
-
-            String containerNo = null;
-            if (data.getContainers() != null && !data.getContainers().isEmpty()) {
-                containerNo = data.getContainers().get(0).getContainerNo();
-            }
-
-            LocalDateTime departureDate = parseDateTime(data.getDepartureDate());
-            LocalDateTime estimatedArrival = parseDateTime(data.getEstimatedArrival());
-            LocalDateTime actualArrival = parseDateTime(data.getActualArrival());
-
-            ShipmentStatus status = resolveStatus(data.getStatus(), actualArrival);
-
-            return TrackingResult.builder()
-                    .success(true)
-                    .trackingNumber(cleanTrackingNumber)
-                    .containerNumber(containerNo != null ? containerNo : "BEAU2751923")
-                    .vesselName(data.getVesselName() != null ? data.getVesselName() : "ONE FANTASTIC")
-                    .voyageNumber(data.getVoyage() != null ? data.getVoyage() : "006E")
-                    .portOfLoading(data.getPol() != null ? data.getPol() : "SHANGHAI, CHINA")
-                    .portOfDischarge(data.getPod() != null ? data.getPod() : "MANZANILLO, MEXICO")
-                    .departureDate(departureDate != null ? departureDate : LocalDateTime.of(2026, 9, 20, 13, 6))
-                    .estimatedArrival(estimatedArrival != null ? estimatedArrival : LocalDateTime.of(2026, 10, 22, 22, 1))
-                    .actualArrival(actualArrival)
-                    .detectedStatus(status)
-                    .rawStatusMessage(data.getStatus() != null ? data.getStatus() : "In Transit")
-                    .build();
+            // Todos los contenedores de una misma B/L comparten buque, viaje y eventos de arribo.
+            // Se toma el primero como contenedor representativo del embarque.
+            return mapToTrackingResult(cleanTrackingNumber, response.getData().get(0));
 
         } catch (RestClientResponseException ex) {
-            log.warn("Error HTTP al consultar ONE API v2 para guía {}: Status {}. Usando respaldo inteligente.", cleanTrackingNumber, ex.getStatusCode());
-            return generateSmartFallback(cleanTrackingNumber);
+            log.warn("Error HTTP al consultar ONE API v2 para guía {}: Status {}", cleanTrackingNumber, ex.getStatusCode());
+            return TrackingResult.failure(cleanTrackingNumber,
+                    "Error HTTP " + ex.getStatusCode().value() + " al consultar ONE");
         } catch (Exception ex) {
-            log.warn("Excepción al consultar ONE API v2 para guía {}: {}. Usando respaldo inteligente.", cleanTrackingNumber, ex.getMessage());
-            return generateSmartFallback(cleanTrackingNumber);
+            log.warn("Excepción al consultar ONE API v2 para guía {}: {}", cleanTrackingNumber, ex.getMessage());
+            return TrackingResult.failure(cleanTrackingNumber,
+                    "Error de conexión con ONE: " + ex.getMessage());
         }
     }
 
-    private TrackingResult generateSmartFallback(String trackingNumber) {
-        if ("TAOGR4856400".equalsIgnoreCase(trackingNumber)) {
-            return TrackingResult.builder()
-                    .success(true)
-                    .trackingNumber(trackingNumber)
-                    .containerNumber("BEAU2751923")
-                    .vesselName("ONE FANTASTIC")
-                    .voyageNumber("006E")
-                    .portOfLoading("SHANGHAI, CHINA")
-                    .portOfDischarge("MANZANILLO, MEXICO")
-                    .departureDate(LocalDateTime.of(2026, 9, 20, 13, 6))
-                    .estimatedArrival(LocalDateTime.of(2026, 10, 22, 22, 1))
-                    .actualArrival(null)
-                    .detectedStatus(ShipmentStatus.NEAR_ARRIVAL)
-                    .rawStatusMessage("Vessel Departure from Port of Loading - Manzanillo, Mexico")
-                    .build();
+    private TrackingResult mapToTrackingResult(String trackingNumber,
+                                               OneTrackingResponseDto.OneContainerData data) {
+        OneTrackingResponseDto.OneCargoEvent departureEvent =
+                findEvent(data.getCargoEvents(), MATRIX_DEPARTURE);
+        OneTrackingResponseDto.OneCargoEvent portArrivalEvent =
+                findEvent(data.getCargoEvents(), MATRIX_PORT_OF_DISCHARGE_ARRIVAL);
+
+        LocalDateTime departureDate = parseDateTime(
+                departureEvent != null ? departureEvent.getLocalPortDate() : null);
+
+        LocalDateTime portArrivalDate = parseDateTime(
+                portArrivalEvent != null ? portArrivalEvent.getLocalPortDate() : null);
+
+        LocalDateTime actualArrival = isActual(portArrivalEvent) ? portArrivalDate : null;
+        LocalDateTime estimatedArrival = portArrivalDate;
+
+        // Si ONE aún no marca el evento E089 como ACTUAL pero el último evento ya es
+        // un arribo/descarga en el puerto, se usa ese evento como fecha real.
+        if (actualArrival == null && isArrivalEvent(data.getLatestEvent())) {
+            actualArrival = parseDateTime(data.getLatestEvent().getDate());
+            if (estimatedArrival == null) {
+                estimatedArrival = actualArrival;
+            }
         }
+
+        ShipmentStatus detectedStatus = actualArrival != null
+                ? ShipmentStatus.ARRIVED
+                : ShipmentStatus.IN_TRANSIT;
+
+        String portOfLoading = departureEvent != null && departureEvent.getLocationName() != null
+                ? departureEvent.getLocationName()
+                : locationName(data.getPor());
+
+        String portOfDischarge = portArrivalEvent != null && portArrivalEvent.getLocationName() != null
+                ? portArrivalEvent.getLocationName()
+                : resolvePortOfDischargeFallback(data);
 
         return TrackingResult.builder()
                 .success(true)
-                .trackingNumber(trackingNumber)
-                .containerNumber("CNTR" + Math.abs(trackingNumber.hashCode() % 1000000))
-                .vesselName("ONE OCEAN VOYAGER")
-                .voyageNumber("010W")
-                .portOfLoading("SHANGHAI, CHINA")
-                .portOfDischarge("MANZANILLO, MEXICO")
-                .departureDate(LocalDateTime.now().minusDays(25))
-                .estimatedArrival(LocalDateTime.now().plusDays(2))
-                .actualArrival(null)
-                .detectedStatus(ShipmentStatus.NEAR_ARRIVAL)
-                .rawStatusMessage("In Transit - Smart Fallback")
+                .trackingNumber(data.getBookingNo() != null ? data.getBookingNo() : trackingNumber)
+                .containerNumber(data.getContainerNo())
+                .vesselName(data.getVesselVoyage() != null ? data.getVesselVoyage().getVesselName() : null)
+                .voyageNumber(data.getVesselVoyage() != null ? data.getVesselVoyage().getVoyageNo() : null)
+                .portOfLoading(portOfLoading)
+                .portOfDischarge(portOfDischarge)
+                .departureDate(departureDate)
+                .estimatedArrival(estimatedArrival)
+                .actualArrival(actualArrival)
+                .detectedStatus(detectedStatus)
+                .rawStatusMessage(buildRawStatusMessage(data.getLatestEvent()))
                 .build();
     }
 
-    private ShipmentStatus resolveStatus(String statusStr, LocalDateTime actualArrival) {
-        if (actualArrival != null) {
-            return ShipmentStatus.ARRIVED;
+    private OneTrackingResponseDto.OneCargoEvent findEvent(
+            List<OneTrackingResponseDto.OneCargoEvent> events, String matrixId) {
+        if (events == null) {
+            return null;
         }
-        if (statusStr == null) {
-            return ShipmentStatus.IN_TRANSIT;
+        return events.stream()
+                .filter(event -> matrixId.equalsIgnoreCase(event.getMatrixId()))
+                .findFirst()
+                .orElse(null);
+    }
+
+    private boolean isActual(OneTrackingResponseDto.OneCargoEvent event) {
+        return event != null && "ACTUAL".equalsIgnoreCase(event.getTrigger());
+    }
+
+    private boolean isArrivalEvent(OneTrackingResponseDto.OneEvent event) {
+        if (event == null || event.getEventName() == null) {
+            return false;
         }
-        String upper = statusStr.toUpperCase();
-        if (upper.contains("ARRIV") || upper.contains("DISCHARG") || upper.contains("DELIVERED")) {
-            return ShipmentStatus.ARRIVED;
+        String name = event.getEventName().toLowerCase();
+        return name.contains("vessel arrival")
+                || name.contains("unloaded from vessel")
+                || name.contains("arrival at port");
+    }
+
+    private String resolvePortOfDischargeFallback(OneTrackingResponseDto.OneContainerData data) {
+        if (data.getPlace() != null && data.getPlace().getLocationName() != null) {
+            return data.getPlace().getLocationName();
         }
-        return ShipmentStatus.IN_TRANSIT;
+        return locationName(data.getPod());
+    }
+
+    private String locationName(OneTrackingResponseDto.OneLocation location) {
+        return location != null ? location.getLocationName() : null;
+    }
+
+    private String buildRawStatusMessage(OneTrackingResponseDto.OneEvent event) {
+        if (event == null || event.getEventName() == null) {
+            return "En tránsito";
+        }
+        String location = event.getLocationName() != null ? " - " + event.getLocationName() : "";
+        return event.getEventName() + location;
     }
 
     private LocalDateTime parseDateTime(String dateStr) {
@@ -173,10 +200,15 @@ public class OneLineTrackingAdapter implements CarrierTrackingAdapter {
         }
         String trimmed = dateStr.trim();
         try {
-            return LocalDateTime.parse(trimmed, DATE_TIME_FORMATTER);
+            // ONE devuelve "localPortDate" con sufijo Z, pero representa la hora local
+            // del puerto. Se quita la Z para no desplazarla a UTC.
+            String withoutZ = trimmed.endsWith("Z")
+                    ? trimmed.substring(0, trimmed.length() - 1)
+                    : trimmed;
+            return LocalDateTime.parse(withoutZ, DateTimeFormatter.ISO_LOCAL_DATE_TIME);
         } catch (DateTimeParseException ignored) {
             try {
-                return LocalDateTime.parse(trimmed + " 00:00", DATE_TIME_FORMATTER);
+                return LocalDateTime.parse(trimmed, DATE_TIME_FORMATTER);
             } catch (DateTimeParseException ex) {
                 log.warn("No se pudo parsear fecha '{}' devuelta por ONE", dateStr);
                 return null;
