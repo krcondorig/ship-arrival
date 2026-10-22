@@ -30,9 +30,16 @@ public class ShipmentWebController {
     private final TrackingSchedulerService trackingSchedulerService;
 
     @GetMapping({"/", "/shipments"})
-    public String dashboard(Model model) {
+    public String dashboard(@RequestParam(required = false) String search, Model model) {
         LocalDate today = LocalDate.now();
-        List<Shipment> shipments = shipmentService.getAllShipments();
+        List<Shipment> shipments;
+        
+        if (search != null && !search.trim().isEmpty()) {
+            shipments = shipmentService.searchShipments(search.trim());
+            model.addAttribute("searchQuery", search.trim());
+        } else {
+            shipments = shipmentService.getAllShipments();
+        }
 
         List<ShipmentDto> dtos = shipments.stream().map(s -> ShipmentDto.builder()
                 .id(s.getId())
@@ -73,9 +80,15 @@ public class ShipmentWebController {
                                    @RequestParam(defaultValue = "ONE") Carrier carrier,
                                    RedirectAttributes redirectAttributes) {
         try {
+            boolean alreadyRegistered = shipmentService.existsByTrackingNumber(trackingNumber);
             Shipment registered = shipmentService.registerShipment(trackingNumber, carrier);
-            redirectAttributes.addFlashAttribute("successMessage",
-                    "Guía " + registered.getTrackingNumber() + " registrada con éxito.");
+            if (alreadyRegistered) {
+                redirectAttributes.addFlashAttribute("warningMessage",
+                        "La guía " + registered.getTrackingNumber() + " ya estaba registrada.");
+            } else {
+                redirectAttributes.addFlashAttribute("successMessage",
+                        "Guía " + registered.getTrackingNumber() + " registrada con éxito.");
+            }
         } catch (Exception ex) {
             log.error("Error al registrar guía individual: {}", ex.getMessage());
             redirectAttributes.addFlashAttribute("errorMessage",
@@ -150,5 +163,17 @@ public class ShipmentWebController {
                     redirectAttributes.addFlashAttribute("errorMessage", "Embarque no encontrado (ID: " + id + ")");
                     return "redirect:/";
                 });
+    }
+
+    @PostMapping("/shipments/{id}/delete")
+    public String deleteShipment(@PathVariable Long id, RedirectAttributes redirectAttributes) {
+        try {
+            shipmentService.deleteShipment(id);
+            redirectAttributes.addFlashAttribute("successMessage", "Embarque eliminado correctamente.");
+        } catch (Exception ex) {
+            log.error("Error al eliminar embarque ID {}: {}", id, ex.getMessage());
+            redirectAttributes.addFlashAttribute("errorMessage", "Error al eliminar embarque: " + ex.getMessage());
+        }
+        return "redirect:/";
     }
 }

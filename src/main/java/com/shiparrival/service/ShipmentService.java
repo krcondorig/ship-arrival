@@ -9,6 +9,7 @@ import com.shiparrival.repository.ShipmentEventLogRepository;
 import com.shiparrival.repository.ShipmentRepository;
 import com.shiparrival.service.dto.BatchImportSummary;
 import com.shiparrival.service.dto.ExcelImportResult;
+import com.shiparrival.service.dto.ExcelShipmentRow;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -30,6 +31,13 @@ public class ShipmentService {
     private final ShipmentRepository shipmentRepository;
     private final ShipmentEventLogRepository shipmentEventLogRepository;
     private final ExcelImportService excelImportService;
+
+    @Transactional(readOnly = true)
+    public boolean existsByTrackingNumber(String trackingNumber) {
+        String cleanTrackingNumber = trackingNumber != null ? trackingNumber.trim() : "";
+        return !cleanTrackingNumber.isEmpty()
+                && shipmentRepository.findByTrackingNumber(cleanTrackingNumber).isPresent();
+    }
 
     @Transactional
     public Shipment registerShipment(String trackingNumber, Carrier carrier) {
@@ -72,14 +80,19 @@ public class ShipmentService {
         List<String> added = new ArrayList<>();
         List<String> duplicates = new ArrayList<>();
 
-        for (String trackingNumber : excelResult.getValidTrackingNumbers()) {
+        for (ExcelShipmentRow row : excelResult.getValidRows()) {
+            String trackingNumber = row.getTrackingNumber();
+            Carrier carrier = row.getCarrier() != null
+                    ? row.getCarrier()
+                    : (defaultCarrier != null ? defaultCarrier : Carrier.ONE);
+
             Optional<Shipment> existing = shipmentRepository.findByTrackingNumber(trackingNumber);
             if (existing.isPresent()) {
                 duplicates.add(trackingNumber);
             } else {
                 Shipment shipment = Shipment.builder()
                         .trackingNumber(trackingNumber)
-                        .carrier(defaultCarrier != null ? defaultCarrier : Carrier.ONE)
+                        .carrier(carrier)
                         .status(ShipmentStatus.PENDING_FIRST_CHECK)
                         .active(true)
                         .alertSent3Days(false)
@@ -99,7 +112,7 @@ public class ShipmentService {
         }
 
         return BatchImportSummary.builder()
-                .totalProcessed(excelResult.getValidTrackingNumbers().size())
+                .totalProcessed(excelResult.getValidRows().size())
                 .addedCount(added.size())
                 .duplicateCount(duplicates.size())
                 .addedTrackingNumbers(added)
@@ -214,5 +227,31 @@ public class ShipmentService {
     @Transactional(readOnly = true)
     public List<ShipmentEventLog> getEventLogs(Long shipmentId) {
         return shipmentEventLogRepository.findByShipmentIdOrderByRecordedAtDesc(shipmentId);
+    }
+
+    @Transactional(readOnly = true)
+    public List<Shipment> searchShipments(String searchTerm) {
+        if (searchTerm == null || searchTerm.trim().isEmpty()) {
+            return getAllShipments();
+        }
+        String search = "%" + searchTerm.toLowerCase() + "%";
+        return shipmentRepository.findAll().stream()
+                .filter(s -> s.getTrackingNumber().toLowerCase().contains(searchTerm.toLowerCase()) ||
+                           (s.getContainerNumber() != null && s.getContainerNumber().toLowerCase().contains(searchTerm.toLowerCase())) ||
+                           (s.getVesselName() != null && s.getVesselName().toLowerCase().contains(searchTerm.toLowerCase())))
+                .toList();
+    }
+
+    @Transactional
+    public void deleteShipment(Long id) {
+        Shipment shipment = shipmentRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Embarque no encontrado con ID: " + id));
+        
+        // Primero eliminar los logs relacionados
+        shipmentEventLogRepository.deleteByShipmentId(id);
+        
+        // Luego eliminar el embarque
+        shipmentRepository.delete(shipment);
+        log.info("Embarque eliminado: ID={}, Guía={}", id, shipment.getTrackingNumber());
     }
 }

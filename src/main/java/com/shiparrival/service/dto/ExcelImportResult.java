@@ -15,7 +15,7 @@ import java.util.List;
 public class ExcelImportResult {
 
     @Builder.Default
-    private List<String> validTrackingNumbers = new ArrayList<>();
+    private List<ExcelShipmentRow> validRows = new ArrayList<>();
 
     @Builder.Default
     private List<String> invalidRows = new ArrayList<>();

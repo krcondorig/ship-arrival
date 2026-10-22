@@ -134,4 +134,4 @@ El objetivo de este sistema es **automatizar por completo la extracción, seguim
 - La estructura exacta de los DTOs y mapeos de datos internos del adaptador de ONE (ya sea consumiendo la API JSON interna de `ecomm.one-line.com` o parseando la estructura devuelta).
 - Estilo y diseño visual de la interfaz web en Thymeleaf (asegurando badges de colores para los estados: verde para arribado, amarillo/naranja para próximo a arribar, azul para en tránsito, rojo para errores).
 - Intervalo de delay / pausa entre peticiones en lote (por defecto 2 a 3 segundos entre consulta para respetar los servidores de la naviera y no ser baneado).
-- Formato de plantilla de Excel aceptada (flexible: detectar automáticamente si la primera columna o la columna titulada "Guía" / "BL" / "Tracking" contiene los números de guía).
+- Formato de plantilla de Excel aceptada (flexible: detectar automáticamente la columna titulada "Guía" / "BL" / "Tracking" / "Embarque"; columna opcional "Naviera" / "Carrier" con ONE, MSC o UNKNOWN; si está vacía se usa la naviera predeterminada del formulario).

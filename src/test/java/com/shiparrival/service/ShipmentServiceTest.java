@@ -9,10 +9,12 @@ import com.shiparrival.repository.ShipmentEventLogRepository;
 import com.shiparrival.repository.ShipmentRepository;
 import com.shiparrival.service.dto.BatchImportSummary;
 import com.shiparrival.service.dto.ExcelImportResult;
+import com.shiparrival.service.dto.ExcelShipmentRow;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -68,11 +70,26 @@ class ShipmentServiceTest {
     }
 
     @Test
+    @DisplayName("Debe indicar si una guía ya está registrada")
+    void shouldReportWhetherTrackingNumberExists() {
+        when(shipmentRepository.findByTrackingNumber("TESTBL900001"))
+                .thenReturn(Optional.of(new Shipment()));
+        when(shipmentRepository.findByTrackingNumber("TESTBL900002"))
+                .thenReturn(Optional.empty());
+
+        assertThat(shipmentService.existsByTrackingNumber("TESTBL900001")).isTrue();
+        assertThat(shipmentService.existsByTrackingNumber("TESTBL900002")).isFalse();
+    }
+
+    @Test
     @DisplayName("Debe importar lote desde Excel y reportar nuevas y duplicadas")
     void shouldImportFromExcelAndSummarize() {
         InputStream mockStream = mock(InputStream.class);
         ExcelImportResult excelResult = ExcelImportResult.builder()
-                .validTrackingNumbers(List.of("GUIA1", "GUIA2", "GUIA3"))
+                .validRows(List.of(
+                        ExcelShipmentRow.builder().trackingNumber("GUIA1").carrier(Carrier.MSC).build(),
+                        ExcelShipmentRow.builder().trackingNumber("GUIA2").build(),
+                        ExcelShipmentRow.builder().trackingNumber("GUIA3").carrier(Carrier.ONE).build()))
                 .invalidRows(List.of())
                 .totalRowsProcessed(3)
                 .build();
@@ -89,6 +106,12 @@ class ShipmentServiceTest {
         assertThat(summary.getAddedCount()).isEqualTo(2);
         assertThat(summary.getDuplicateCount()).isEqualTo(1);
         assertThat(summary.getAddedTrackingNumbers()).containsExactly("GUIA1", "GUIA2");
+
+        ArgumentCaptor<Shipment> shipmentCaptor = ArgumentCaptor.forClass(Shipment.class);
+        verify(shipmentRepository, times(2)).save(shipmentCaptor.capture());
+        assertThat(shipmentCaptor.getAllValues())
+                .extracting(Shipment::getCarrier)
+                .containsExactly(Carrier.MSC, Carrier.ONE);
     }
 
     @Test

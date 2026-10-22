@@ -194,6 +194,12 @@
                     <div class="col-12 col-sm-2 d-flex align-items-end">
                         <button type="submit" class="btn btn-success btn-sm w-100">Subir</button>
                     </div>
+                    <div class="col-12">
+                        <div class="form-text">
+                            Opcional: agrega una columna <strong>NAVIERA</strong> (ONE, MSC o UNKNOWN)
+                            para asignar la naviera fila por fila. Si está vacía, se usa la naviera predeterminada.
+                        </div>
+                    </div>
                 </form>
             </div>
         </div>
@@ -201,11 +207,35 @@
 
     <!-- Shipments Table -->
     <div class="card card-stat bg-white">
-        <div class="card-header bg-white py-3 border-0 d-flex justify-content-between align-items-center">
-            <h5 class="card-title fw-bold text-dark mb-0">
-                <i class="bi bi-ship me-2 text-primary"></i>Lista de Buques y Guías Monitoreadas
-            </h5>
-            <span class="badge bg-light text-muted fw-normal" th:text="${shipments.size()} + ' registros'"></span>
+        <div class="card-header bg-white py-3 border-0">
+            <div class="row align-items-center">
+                <div class="col-12 col-md-6 mb-2 mb-md-0">
+                    <h5 class="card-title fw-bold text-dark mb-0">
+                        <i class="bi bi-ship me-2 text-primary"></i>Lista de Buques y Guías Monitoreadas
+                    </h5>
+                </div>
+                <div class="col-12 col-md-6">
+                    <form method="get" action="/" class="input-group input-group-sm">
+                        <input type="text" name="search" class="form-control" 
+                               placeholder="Buscar por guía, contenedor o buque..." 
+                               th:value="${searchQuery}"
+                               aria-label="Buscar embarques">
+                        <button class="btn btn-outline-primary" type="submit">
+                            <i class="bi bi-search"></i> Buscar
+                        </button>
+                        <a th:if="${searchQuery}" href="/" class="btn btn-outline-secondary">
+                            <i class="bi bi-x-lg"></i>
+                        </a>
+                    </form>
+                </div>
+            </div>
+            <div th:if="${searchQuery}" class="mt-2">
+                <small class="text-muted">
+                    <i class="bi bi-filter-circle me-1"></i>
+                    Mostrando resultados para: <strong th:text="${searchQuery}"></strong>
+                    (<span th:text="${shipments.size()}"></span> encontrados)
+                </small>
+            </div>
         </div>
         <div class="table-responsive">
             <table class="table table-hover align-middle mb-0">
@@ -271,9 +301,23 @@
                         </td>
                         <td class="small text-muted" th:text="${s.lastCheckedAt != null ? #temporals.format(s.lastCheckedAt, 'yyyy-MM-dd HH:mm') : 'Nunca'}">Nunca</td>
                         <td class="text-end">
-                            <a th:href="@{'/shipments/' + ${s.id} + '/history'}" class="btn btn-outline-secondary btn-sm" title="Ver Historial de Cambios">
-                                <i class="bi bi-clock-history"></i>
-                            </a>
+                            <div class="btn-group btn-group-sm" role="group">
+                                <a th:href="@{'/shipments/' + ${s.id} + '/history'}" 
+                                   class="btn btn-outline-secondary" 
+                                   title="Ver Historial de Cambios">
+                                    <i class="bi bi-clock-history"></i>
+                                </a>
+                                <form th:action="@{'/shipments/' + ${s.id} + '/delete'}" 
+                                      method="post" 
+                                      style="display: inline;"
+                                      onsubmit="return confirm('¿Estás seguro de eliminar el embarque ' + [[${s.trackingNumber}]] + '?');">
+                                    <button type="submit" 
+                                            class="btn btn-outline-danger" 
+                                            title="Eliminar Embarque">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </form>
+                            </div>
                         </td>
                     </tr>
                 </tbody>

@@ -68,6 +68,7 @@ class ShipmentWebControllerTest {
     @Test
     @DisplayName("POST /shipments debe registrar una guía individual y redirigir")
     void shouldRegisterShipmentAndRedirect() throws Exception {
+        when(shipmentService.existsByTrackingNumber("TESTBL900001")).thenReturn(false);
         when(shipmentService.registerShipment("TESTBL900001", Carrier.ONE))
                 .thenReturn(new Shipment());
 
@@ -77,6 +78,28 @@ class ShipmentWebControllerTest {
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/"))
                 .andExpect(flash().attributeExists("successMessage"));
+    }
+
+    @Test
+    @DisplayName("POST /shipments debe advertir cuando la guía ya estaba registrada")
+    void shouldWarnWhenShipmentAlreadyExists() throws Exception {
+        Shipment existing = Shipment.builder()
+                .id(33L)
+                .trackingNumber("TESTBL900001")
+                .carrier(Carrier.ONE)
+                .build();
+
+        when(shipmentService.existsByTrackingNumber("TESTBL900001")).thenReturn(true);
+        when(shipmentService.registerShipment("TESTBL900001", Carrier.ONE)).thenReturn(existing);
+
+        mockMvc.perform(post("/shipments")
+                        .param("trackingNumber", "TESTBL900001")
+                        .param("carrier", "ONE"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/"))
+                .andExpect(flash().attribute("warningMessage",
+                        "La guía TESTBL900001 ya estaba registrada."))
+                .andExpect(flash().attributeCount(1));
     }
 
     @Test

@@ -10,4 +10,6 @@ import java.util.List;
 public interface ShipmentEventLogRepository extends JpaRepository<ShipmentEventLog, Long> {
 
     List<ShipmentEventLog> findByShipmentIdOrderByRecordedAtDesc(Long shipmentId);
+    
+    void deleteByShipmentId(Long shipmentId);
 }
