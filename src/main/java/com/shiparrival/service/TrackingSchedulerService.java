@@ -292,15 +292,35 @@ public class TrackingSchedulerService {
 
         // Caso 2: Buque arribó a puerto
         if (shipment.getStatus() == ShipmentStatus.ARRIVED && !shipment.isAlertSentArrived()) {
-            boolean tgSent = telegramNotificationService.sendArrivedAlert(shipment);
-            boolean dcSent = discordNotificationService.sendArrivedAlert(shipment);
-            if (tgSent || dcSent) {
+            if (isHistoricalArrival(shipment)) {
+                // El arribo ocurrió antes de registrar el embarque (por ejemplo,
+                // guías históricas cargadas por Excel). No se notifica.
+                log.info("Arribo histórico para guía {}: arribo {} anterior al registro {}; se omite la notificación.",
+                        shipment.getTrackingNumber(), shipment.getActualArrival(), shipment.getCreatedAt());
                 shipment.setAlertSentArrived(true);
                 shipmentRepository.save(shipment);
-                sent = true;
+            } else {
+                boolean tgSent = telegramNotificationService.sendArrivedAlert(shipment);
+                boolean dcSent = discordNotificationService.sendArrivedAlert(shipment);
+                if (tgSent || dcSent) {
+                    shipment.setAlertSentArrived(true);
+                    shipmentRepository.save(shipment);
+                    sent = true;
+                }
             }
         }
 
         return sent;
+    }
+
+    /**
+     * Un arribo es histórico cuando ocurrió antes de que el embarque fuera
+     * registrado en el sistema. En ese caso no debe generar una notificación
+     * retroactiva (típico de guías ya arribadas importadas por Excel).
+     */
+    private boolean isHistoricalArrival(Shipment shipment) {
+        LocalDateTime actualArrival = shipment.getActualArrival();
+        LocalDateTime createdAt = shipment.getCreatedAt();
+        return actualArrival != null && createdAt != null && actualArrival.isBefore(createdAt);
     }
 }

@@ -149,6 +149,102 @@ class TrackingSchedulerServiceTest {
     }
 
     @Test
+    @DisplayName("No debe notificar arribos históricos detectados en el primer rastreo tras importar Excel")
+    void shouldNotSendArrivedAlertForHistoricalArrival() {
+        LocalDateTime now = LocalDateTime.now();
+
+        Shipment pending = Shipment.builder()
+                .id(10L)
+                .trackingNumber("HISTORICAL1")
+                .carrier(Carrier.ONE)
+                .status(ShipmentStatus.PENDING_FIRST_CHECK)
+                .active(true)
+                .createdAt(now)
+                .alertSentArrived(false)
+                .build();
+
+        TrackingResult result = TrackingResult.builder()
+                .success(true)
+                .trackingNumber("HISTORICAL1")
+                .actualArrival(now.minusDays(1))
+                .detectedStatus(ShipmentStatus.ARRIVED)
+                .build();
+
+        Shipment arrived = Shipment.builder()
+                .id(10L)
+                .trackingNumber("HISTORICAL1")
+                .carrier(Carrier.ONE)
+                .status(ShipmentStatus.ARRIVED)
+                .active(false)
+                .createdAt(now)
+                .actualArrival(now.minusDays(1))
+                .alertSent3Days(false)
+                .alertSentArrived(false)
+                .build();
+
+        when(shipmentService.getActiveShipments()).thenReturn(List.of(pending));
+        when(adapterFactory.getAdapter(Carrier.ONE)).thenReturn(trackingAdapter);
+        when(trackingAdapter.track("HISTORICAL1")).thenReturn(result);
+        when(shipmentService.updateFromTrackingResult(pending, result)).thenReturn(arrived);
+
+        TrackingExecutionSummary summary = schedulerService.runTrackingCycle();
+
+        assertThat(summary.getAlertsSentCount()).isZero();
+        verify(telegramService, never()).sendArrivedAlert(any());
+        verify(discordService, never()).sendArrivedAlert(any());
+        assertThat(arrived.isAlertSentArrived()).isTrue();
+        verify(shipmentRepository).save(arrived);
+    }
+
+    @Test
+    @DisplayName("Debe notificar el arribo cuando ocurre después del registro del embarque")
+    void shouldSendArrivedAlertWhenArrivalOccursAfterRegistration() {
+        LocalDateTime now = LocalDateTime.now();
+
+        Shipment pending = Shipment.builder()
+                .id(11L)
+                .trackingNumber("REALARRIVAL1")
+                .carrier(Carrier.ONE)
+                .status(ShipmentStatus.IN_TRANSIT)
+                .active(true)
+                .createdAt(now.minusDays(5))
+                .alertSentArrived(false)
+                .build();
+
+        TrackingResult result = TrackingResult.builder()
+                .success(true)
+                .trackingNumber("REALARRIVAL1")
+                .actualArrival(now.minusHours(1))
+                .detectedStatus(ShipmentStatus.ARRIVED)
+                .build();
+
+        Shipment arrived = Shipment.builder()
+                .id(11L)
+                .trackingNumber("REALARRIVAL1")
+                .carrier(Carrier.ONE)
+                .status(ShipmentStatus.ARRIVED)
+                .active(false)
+                .createdAt(now.minusDays(5))
+                .actualArrival(now.minusHours(1))
+                .alertSent3Days(false)
+                .alertSentArrived(false)
+                .build();
+
+        when(shipmentService.getActiveShipments()).thenReturn(List.of(pending));
+        when(adapterFactory.getAdapter(Carrier.ONE)).thenReturn(trackingAdapter);
+        when(trackingAdapter.track("REALARRIVAL1")).thenReturn(result);
+        when(shipmentService.updateFromTrackingResult(pending, result)).thenReturn(arrived);
+        when(telegramService.sendArrivedAlert(arrived)).thenReturn(true);
+
+        TrackingExecutionSummary summary = schedulerService.runTrackingCycle();
+
+        assertThat(summary.getAlertsSentCount()).isEqualTo(1);
+        verify(telegramService, times(1)).sendArrivedAlert(arrived);
+        verify(discordService, times(1)).sendArrivedAlert(arrived);
+        assertThat(arrived.isAlertSentArrived()).isTrue();
+    }
+
+    @Test
     @DisplayName("No debe ejecutar ciclos simultáneos si ya hay un rastreo en progreso")
     void shouldNotRunConcurrentlyWhenAlreadyRunning() {
         // Marcamos que ya está corriendo mediante reflexión o estado
