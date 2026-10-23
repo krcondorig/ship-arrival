@@ -1,0 +1,62 @@
+/* ShipArrival Dashboard Styles */
+
+body {
+    background-color: #f4f6f9;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+.card-stat {
+    border-radius: 10px;
+    border: none;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+}
+
+.badge-near-arrival {
+    background-color: #dc3545;
+    color: white;
+    animation: pulse 2s infinite;
+}
+
+.badge-in-transit {
+    background-color: #0d6efd;
+    color: white;
+}
+
+.badge-arrived {
+    background-color: #198754;
+    color: white;
+}
+
+.badge-pending {
+    background-color: #6c757d;
+    color: white;
+}
+
+.badge-error {
+    background-color: #fd7e14;
+    color: white;
+}
+
+.table-hover tbody tr:hover {
+    background-color: #eef2f7;
+}
+
+#trackingProgress {
+    border-left: 4px solid #ffc107;
+}
+
+#trackingProgress .progress-bar {
+    transition: width 0.4s ease;
+}
+
+@keyframes pulse {
+    0% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.75;
+    }
+    100% {
+        opacity: 1;
+    }
+}
