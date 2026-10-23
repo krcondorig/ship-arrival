@@ -7,11 +7,16 @@ import com.shiparrival.domain.ShipmentStatus;
 import com.shiparrival.service.ShipmentService;
 import com.shiparrival.service.TrackingSchedulerService;
 import com.shiparrival.service.dto.BatchImportSummary;
+import com.shiparrival.service.dto.ShipmentStats;
 import com.shiparrival.service.dto.TrackingStatus;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -54,7 +59,9 @@ class ShipmentWebControllerTest {
                 .estimatedArrival(LocalDateTime.now().plusDays(5))
                 .build();
 
-        when(shipmentService.getAllShipments()).thenReturn(List.of(shipment));
+        Page<Shipment> page = new PageImpl<>(List.of(shipment), PageRequest.of(0, 10), 1);
+        when(shipmentService.getVisibleShipments(any(), any(Pageable.class))).thenReturn(page);
+        when(shipmentService.getVisibleShipmentStats(any())).thenReturn(new ShipmentStats(1, 1, 0, 0));
         when(shipmentService.calculateDaysRemaining(any(), any())).thenReturn(5L);
 
         mockMvc.perform(get("/"))
@@ -62,7 +69,61 @@ class ShipmentWebControllerTest {
                 .andExpect(view().name("dashboard"))
                 .andExpect(model().attributeExists("shipments"))
                 .andExpect(model().attributeExists("totalCount"))
-                .andExpect(model().attributeExists("nearArrivalCount"));
+                .andExpect(model().attributeExists("nearArrivalCount"))
+                .andExpect(model().attribute("currentPage", 0))
+                .andExpect(model().attribute("totalPages", 1))
+                .andExpect(model().attribute("totalElements", 1L));
+    }
+
+    @Test
+    @DisplayName("GET / debe aplicar paginación y exponer metadatos de página")
+    void shouldPaginateDashboard() throws Exception {
+        Shipment shipment = Shipment.builder()
+                .id(11L)
+                .trackingNumber("TESTBL900011")
+                .carrier(Carrier.ONE)
+                .status(ShipmentStatus.IN_TRANSIT)
+                .estimatedArrival(LocalDateTime.now().plusDays(5))
+                .build();
+
+        Page<Shipment> page = new PageImpl<>(List.of(shipment), PageRequest.of(1, 10), 25);
+        when(shipmentService.getVisibleShipments(any(), any(Pageable.class))).thenReturn(page);
+        when(shipmentService.getVisibleShipmentStats(any())).thenReturn(new ShipmentStats(25, 20, 3, 2));
+        when(shipmentService.calculateDaysRemaining(any(), any())).thenReturn(5L);
+
+        mockMvc.perform(get("/").param("page", "1").param("size", "10"))
+                .andExpect(status().isOk())
+                .andExpect(view().name("dashboard"))
+                .andExpect(model().attribute("currentPage", 1))
+                .andExpect(model().attribute("totalPages", 3))
+                .andExpect(model().attribute("totalElements", 25L))
+                .andExpect(model().attribute("pageSize", 10))
+                .andExpect(model().attribute("startItem", 11))
+                .andExpect(model().attribute("endItem", 11));
+    }
+
+    @Test
+    @DisplayName("GET / debe redirigir a la última página válida si la página solicitada no existe")
+    void shouldRedirectWhenPageOutOfRange() throws Exception {
+        Page<Shipment> emptyPage = new PageImpl<>(List.of(), PageRequest.of(5, 10), 25);
+        when(shipmentService.getVisibleShipments(any(), any(Pageable.class))).thenReturn(emptyPage);
+
+        mockMvc.perform(get("/").param("page", "5"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/?page=2&size=10"));
+    }
+
+    @Test
+    @DisplayName("POST /shipments/{id}/delete debe conservar página y búsqueda")
+    void shouldDeleteAndPreservePagination() throws Exception {
+        mockMvc.perform(post("/shipments/1/delete")
+                        .param("page", "2")
+                        .param("size", "20")
+                        .param("search", "ONE"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/?page=2&size=20&search=ONE"));
+
+        verify(shipmentService).deleteShipment(1L);
     }
 
     @Test

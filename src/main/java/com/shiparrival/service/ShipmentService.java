@@ -10,8 +10,11 @@ import com.shiparrival.repository.ShipmentRepository;
 import com.shiparrival.service.dto.BatchImportSummary;
 import com.shiparrival.service.dto.ExcelImportResult;
 import com.shiparrival.service.dto.ExcelShipmentRow;
+import com.shiparrival.service.dto.ShipmentStats;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -234,12 +237,61 @@ public class ShipmentService {
         if (searchTerm == null || searchTerm.trim().isEmpty()) {
             return getAllShipments();
         }
-        String search = "%" + searchTerm.toLowerCase() + "%";
         return shipmentRepository.findAll().stream()
                 .filter(s -> s.getTrackingNumber().toLowerCase().contains(searchTerm.toLowerCase()) ||
                            (s.getContainerNumber() != null && s.getContainerNumber().toLowerCase().contains(searchTerm.toLowerCase())) ||
                            (s.getVesselName() != null && s.getVesselName().toLowerCase().contains(searchTerm.toLowerCase())))
                 .toList();
+    }
+
+    /**
+     * Obtiene los embarques visibles en el dashboard de forma paginada.
+     * Los embarques arribados hace más de 3 días se omiten automáticamente
+     * (quedan archivados en la base de datos).
+     */
+    @Transactional(readOnly = true)
+    public Page<Shipment> getVisibleShipments(String searchTerm, Pageable pageable) {
+        LocalDateTime cutoff = LocalDateTime.now().minusDays(3);
+        return shipmentRepository.findVisibleShipments(
+                cutoff, ShipmentStatus.ARRIVED, toSearchPattern(searchTerm), pageable);
+    }
+
+    /**
+     * Calcula las métricas del dashboard sobre el universo de embarques visibles
+     * (no solo la página actual), respetando el filtro de búsqueda.
+     */
+    @Transactional(readOnly = true)
+    public ShipmentStats getVisibleShipmentStats(String searchTerm) {
+        LocalDateTime cutoff = LocalDateTime.now().minusDays(3);
+        List<Object[]> rows = shipmentRepository.countVisibleByStatus(
+                cutoff, ShipmentStatus.ARRIVED, toSearchPattern(searchTerm));
+
+        long total = 0;
+        long inTransit = 0;
+        long nearArrival = 0;
+        long arrived = 0;
+
+        for (Object[] row : rows) {
+            ShipmentStatus status = (ShipmentStatus) row[0];
+            long count = ((Number) row[1]).longValue();
+            total += count;
+            switch (status) {
+                case IN_TRANSIT -> inTransit += count;
+                case NEAR_ARRIVAL -> nearArrival += count;
+                case ARRIVED -> arrived += count;
+                default -> {
+                    // PENDING_FIRST_CHECK, ERROR_CHECKING y CANCELLED solo suman al total
+                }
+            }
+        }
+
+        return new ShipmentStats(total, inTransit, nearArrival, arrived);
+    }
+
+    private String toSearchPattern(String searchTerm) {
+        return (searchTerm == null || searchTerm.isBlank())
+                ? "%"
+                : "%" + searchTerm.trim().toLowerCase() + "%";
     }
 
     @Transactional

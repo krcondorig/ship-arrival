@@ -8,6 +8,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -71,5 +73,51 @@ class ShipmentRepositoryTest {
         List<ShipmentEventLog> logs = shipmentEventLogRepository.findByShipmentIdOrderByRecordedAtDesc(saved.getId());
         assertThat(logs).hasSize(1);
         assertThat(logs.get(0).getEventType()).isEqualTo("ETA_UPDATED");
+    }
+
+    @Test
+    @DisplayName("Debe ocultar embarques arribados hace más de 3 días y mantener los recientes")
+    void shouldHideOldArrivedShipments() {
+        LocalDateTime now = LocalDateTime.now();
+
+        shipmentRepository.save(Shipment.builder()
+                .trackingNumber("ACTIVE1")
+                .carrier(Carrier.ONE)
+                .status(ShipmentStatus.IN_TRANSIT)
+                .active(true)
+                .build());
+
+        shipmentRepository.save(Shipment.builder()
+                .trackingNumber("ARRIVED_RECENT")
+                .carrier(Carrier.ONE)
+                .status(ShipmentStatus.ARRIVED)
+                .active(false)
+                .actualArrival(now.minusDays(1))
+                .build());
+
+        shipmentRepository.save(Shipment.builder()
+                .trackingNumber("ARRIVED_OLD")
+                .carrier(Carrier.ONE)
+                .status(ShipmentStatus.ARRIVED)
+                .active(false)
+                .actualArrival(now.minusDays(5))
+                .build());
+
+        // Dato legado: arribado antiguo que quedó marcado como activo.
+        // Debe ocultarse igualmente por su fecha de arribo.
+        shipmentRepository.save(Shipment.builder()
+                .trackingNumber("ARRIVED_OLD_ACTIVE")
+                .carrier(Carrier.ONE)
+                .status(ShipmentStatus.ARRIVED)
+                .active(true)
+                .actualArrival(now.minusDays(10))
+                .build());
+
+        Page<Shipment> visible = shipmentRepository.findVisibleShipments(
+                now.minusDays(3), ShipmentStatus.ARRIVED, "%", PageRequest.of(0, 10));
+
+        assertThat(visible.getContent())
+                .extracting(Shipment::getTrackingNumber)
+                .containsExactlyInAnyOrder("ACTIVE1", "ARRIVED_RECENT");
     }
 }

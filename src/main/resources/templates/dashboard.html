@@ -218,7 +218,7 @@
                 <small class="text-muted">
                     <i class="bi bi-filter-circle me-1"></i>
                     Mostrando resultados para: <strong th:text="${searchQuery}"></strong>
-                    (<span th:text="${shipments.size()}"></span> encontrados)
+                    (<span th:text="${totalElements}"></span> encontrados)
                 </small>
             </div>
         </div>
@@ -296,6 +296,9 @@
                                       method="post" 
                                       style="display: inline;"
                                       onsubmit="return confirm('¿Estás seguro de eliminar el embarque ' + [[${s.trackingNumber}]] + '?');">
+                                    <input type="hidden" name="page" th:value="${currentPage}">
+                                    <input type="hidden" name="size" th:value="${pageSize}">
+                                    <input type="hidden" name="search" th:value="${searchQuery}">
                                     <button type="submit" 
                                             class="btn btn-outline-danger" 
                                             title="Eliminar Embarque">
@@ -307,6 +310,54 @@
                     </tr>
                 </tbody>
             </table>
+        </div>
+
+        <!-- Paginación -->
+        <div class="card-footer bg-white border-top-0 py-3">
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
+                <small class="text-muted">
+                    <i class="bi bi-list-ol me-1"></i>
+                    Mostrando <strong th:text="${startItem}">1</strong>–<strong th:text="${endItem}">10</strong>
+                    de <strong th:text="${totalElements}">0</strong> registros
+                </small>
+
+                <nav th:if="${totalPages > 1}" aria-label="Paginación de embarques">
+                    <ul class="pagination pagination-sm mb-0">
+                        <li class="page-item" th:classappend="${hasPrevious} ? '' : 'disabled'">
+                            <a class="page-link"
+                               th:href="@{/(page=${currentPage - 1}, size=${pageSize}, search=${searchQuery})}"
+                               aria-label="Página anterior">
+                                <i class="bi bi-chevron-left"></i>
+                            </a>
+                        </li>
+                        <li class="page-item"
+                            th:each="p : ${pageNumbers}"
+                            th:classappend="${p == currentPage} ? 'active'">
+                            <a class="page-link"
+                               th:href="@{/(page=${p}, size=${pageSize}, search=${searchQuery})}"
+                               th:text="${p + 1}">1</a>
+                        </li>
+                        <li class="page-item" th:classappend="${hasNext} ? '' : 'disabled'">
+                            <a class="page-link"
+                               th:href="@{/(page=${currentPage + 1}, size=${pageSize}, search=${searchQuery})}"
+                               aria-label="Página siguiente">
+                                <i class="bi bi-chevron-right"></i>
+                            </a>
+                        </li>
+                    </ul>
+                </nav>
+
+                <div class="d-flex align-items-center gap-2">
+                    <label class="small text-muted mb-0" for="pageSizeSelect">Filas por página:</label>
+                    <select id="pageSizeSelect" class="form-select form-select-sm" style="width: auto;"
+                            onchange="if (this.value) { window.location.href = this.value; }">
+                        <option th:each="s : ${pageSizes}"
+                                th:value="@{/(page=0, size=${s}, search=${searchQuery})}"
+                                th:text="${s}"
+                                th:selected="${pageSize == s}">10</option>
+                    </select>
+                </div>
+            </div>
         </div>
     </div>
 

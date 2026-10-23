@@ -10,6 +10,7 @@ import com.shiparrival.repository.ShipmentRepository;
 import com.shiparrival.service.dto.BatchImportSummary;
 import com.shiparrival.service.dto.ExcelImportResult;
 import com.shiparrival.service.dto.ExcelShipmentRow;
+import com.shiparrival.service.dto.ShipmentStats;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -17,6 +18,10 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 
 import java.io.InputStream;
 import java.time.LocalDate;
@@ -175,5 +180,40 @@ class ShipmentServiceTest {
 
         // Debe haber guardado el log de cambio de ETA
         verify(shipmentEventLogRepository, times(1)).save(any(ShipmentEventLog.class));
+    }
+
+    @Test
+    @DisplayName("Debe consultar embarques visibles con paginación y patrón de búsqueda")
+    void shouldQueryVisibleShipmentsWithPagination() {
+        Pageable pageable = PageRequest.of(0, 10);
+        Page<Shipment> page = new PageImpl<>(List.of(new Shipment()));
+        when(shipmentRepository.findVisibleShipments(
+                any(LocalDateTime.class), eq(ShipmentStatus.ARRIVED), eq("%test%"), eq(pageable)))
+                .thenReturn(page);
+
+        Page<Shipment> result = shipmentService.getVisibleShipments("TEST", pageable);
+
+        assertThat(result).isSameAs(page);
+        verify(shipmentRepository).findVisibleShipments(
+                any(LocalDateTime.class), eq(ShipmentStatus.ARRIVED), eq("%test%"), eq(pageable));
+    }
+
+    @Test
+    @DisplayName("Debe calcular las estadísticas de los embarques visibles")
+    void shouldCalculateVisibleShipmentStats() {
+        when(shipmentRepository.countVisibleByStatus(
+                any(LocalDateTime.class), eq(ShipmentStatus.ARRIVED), eq("%")))
+                .thenReturn(List.of(
+                        new Object[]{ShipmentStatus.IN_TRANSIT, 5L},
+                        new Object[]{ShipmentStatus.NEAR_ARRIVAL, 2L},
+                        new Object[]{ShipmentStatus.ARRIVED, 1L},
+                        new Object[]{ShipmentStatus.PENDING_FIRST_CHECK, 3L}));
+
+        ShipmentStats stats = shipmentService.getVisibleShipmentStats(null);
+
+        assertThat(stats.total()).isEqualTo(11);
+        assertThat(stats.inTransit()).isEqualTo(5);
+        assertThat(stats.nearArrival()).isEqualTo(2);
+        assertThat(stats.arrived()).isEqualTo(1);
     }
 }
