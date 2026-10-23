@@ -1,0 +1,116 @@
+{
+  "IsSuccess": true,
+  "Data": {
+    "TrackingType": "Bill Of Lading",
+    "TrackingTitle": "BILL OF LADING:",
+    "TrackingNumber": "TESTMSC0002",
+    "CurrentDate": "23/10/2026",
+    "BillOfLadings": [
+      {
+        "BillOfLadingNumber": "TESTMSC0002",
+        "NumberOfContainers": 2,
+        "GeneralTrackingInfo": {
+          "ShippedFrom": "SHEKOU, CN",
+          "ShippedTo": "MEXICO CITY, MX",
+          "PortOfLoad": "SHEKOU, CN",
+          "PortOfDischarge": "MANZANILLO, MX",
+          "Transshipments": [],
+          "PriceCalculationDate": "02/10/2026",
+          "FinalPodEtaDate": "07/11/2026"
+        },
+        "ContainersInfo": [
+          {
+            "Events": [
+              {
+                "Order": 3,
+                "Date": "07/11/2026",
+                "Location": "MANZANILLO, MX",
+                "UnLocationCode": "MXZLO",
+                "Description": "Estimated Time of Arrival",
+                "Detail": [
+                  "MSC VALENTINA",
+                  "FA639A"
+                ],
+                "EquipmentHandling": {
+                  "Bic": null,
+                  "CodeType": null,
+                  "Code": "",
+                  "Name": "CONTECON MANZANILLO, S.A. DE C.V.",
+                  "Smdg": "CMSA"
+                },
+                "Vessel": {
+                  "IMO": "9946855",
+                  "Built": "2023",
+                  "Flag": "LR",
+                  "FlagName": "LIBERIA"
+                },
+                "IntermediaryPortCalls": [
+                  {
+                    "LocationName": "BUSAN",
+                    "Country": "KR",
+                    "Etd": "22/10/2026 04:24",
+                    "Eta": "19/10/2026 22:48"
+                  }
+                ]
+              },
+              {
+                "Order": 2,
+                "Date": "07/10/2026",
+                "Location": "SHEKOU, CN",
+                "UnLocationCode": "CNSHK",
+                "Description": "Export Loaded on Vessel",
+                "Detail": [
+                  "MSC VALENTINA",
+                  "FA639A"
+                ],
+                "EquipmentHandling": {
+                  "Bic": null,
+                  "CodeType": null,
+                  "Code": "",
+                  "Name": "CHIWAN CONTAINER TERMINAL (CCT)",
+                  "Smdg": "CCT"
+                },
+                "Vessel": {
+                  "IMO": "9946855",
+                  "Built": "2023",
+                  "Flag": "LR",
+                  "FlagName": "LIBERIA"
+                },
+                "IntermediaryPortCalls": null
+              },
+              {
+                "Order": 1,
+                "Date": "01/10/2026",
+                "Location": "SHEKOU, CN",
+                "UnLocationCode": "CNSHK",
+                "Description": "Export received at CY",
+                "Detail": [
+                  "LADEN"
+                ],
+                "EquipmentHandling": {
+                  "Bic": null,
+                  "CodeType": null,
+                  "Code": "",
+                  "Name": "CHIWAN CONTAINER TERMINAL (CCT)",
+                  "Smdg": "CCT"
+                },
+                "Vessel": {
+                  "IMO": "",
+                  "Built": "",
+                  "Flag": "",
+                  "FlagName": ""
+                },
+                "IntermediaryPortCalls": null
+              }
+            ],
+            "Delivered": false,
+            "ContainerNumber": "TESTU7654321",
+            "PodEtaDate": "07/11/2026",
+            "ContainerType": "20' DRY VAN",
+            "LatestMove": "SHEKOU, CN"
+          }
+        ]
+      }
+    ]
+  }
+}

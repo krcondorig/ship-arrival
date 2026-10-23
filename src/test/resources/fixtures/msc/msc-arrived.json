@@ -1,0 +1,133 @@
+{
+  "IsSuccess": true,
+  "Data": {
+    "TrackingType": "Bill Of Lading",
+    "TrackingTitle": "BILL OF LADING:",
+    "TrackingNumber": "TESTMSC0001",
+    "CurrentDate": "23/10/2026",
+    "BillOfLadings": [
+      {
+        "BillOfLadingNumber": "TESTMSC0001",
+        "NumberOfContainers": 2,
+        "GeneralTrackingInfo": {
+          "ShippedFrom": "QINGDAO, CN",
+          "ShippedTo": "GUADALAJARA, MX",
+          "PortOfLoad": "QINGDAO, CN",
+          "PortOfDischarge": "MANZANILLO, MX",
+          "Transshipments": [],
+          "PriceCalculationDate": "30/08/2026",
+          "FinalPodEtaDate": ""
+        },
+        "ContainersInfo": [
+          {
+            "Events": [
+              {
+                "Order": 4,
+                "Date": "22/10/2026",
+                "Location": "MANZANILLO, MX",
+                "UnLocationCode": "MXZLO",
+                "Description": "Import Loaded on Rail",
+                "Detail": [
+                  "LADEN"
+                ],
+                "EquipmentHandling": {
+                  "Bic": null,
+                  "CodeType": null,
+                  "Code": "",
+                  "Name": "CONTECON MANZANILLO, S.A. DE C.V.",
+                  "Smdg": "CMSA"
+                },
+                "Vessel": {
+                  "IMO": "",
+                  "Built": "",
+                  "Flag": "",
+                  "FlagName": ""
+                },
+                "IntermediaryPortCalls": null
+              },
+              {
+                "Order": 3,
+                "Date": "14/10/2026",
+                "Location": "MANZANILLO, MX",
+                "UnLocationCode": "MXZLO",
+                "Description": "Import Discharged from Vessel",
+                "Detail": [
+                  "MSC LAUSANNE VI",
+                  "QM639R"
+                ],
+                "EquipmentHandling": {
+                  "Bic": null,
+                  "CodeType": null,
+                  "Code": "",
+                  "Name": "CONTECON MANZANILLO, S.A. DE C.V.",
+                  "Smdg": "CMSA"
+                },
+                "Vessel": {
+                  "IMO": "9320398",
+                  "Built": "2005",
+                  "Flag": "LR",
+                  "FlagName": "LIBERIA"
+                },
+                "IntermediaryPortCalls": null
+              },
+              {
+                "Order": 2,
+                "Date": "09/09/2026",
+                "Location": "QINGDAO, CN",
+                "UnLocationCode": "CNTAO",
+                "Description": "Export Loaded on Vessel",
+                "Detail": [
+                  "MSC LAUSANNE VI",
+                  "QM635A"
+                ],
+                "EquipmentHandling": {
+                  "Bic": null,
+                  "CodeType": null,
+                  "Code": "",
+                  "Name": "QINGDAO QIANWAN CONTAINER TERMINAL",
+                  "Smdg": "QQCTX"
+                },
+                "Vessel": {
+                  "IMO": "9320398",
+                  "Built": "2005",
+                  "Flag": "LR",
+                  "FlagName": "LIBERIA"
+                },
+                "IntermediaryPortCalls": null
+              },
+              {
+                "Order": 1,
+                "Date": "07/09/2026",
+                "Location": "QINGDAO, CN",
+                "UnLocationCode": "CNTAO",
+                "Description": "Export received at CY",
+                "Detail": [
+                  "LADEN"
+                ],
+                "EquipmentHandling": {
+                  "Bic": null,
+                  "CodeType": null,
+                  "Code": "",
+                  "Name": "QINGDAO QIANWAN CONTAINER TERMINAL",
+                  "Smdg": "QQCTX"
+                },
+                "Vessel": {
+                  "IMO": "",
+                  "Built": "",
+                  "Flag": "",
+                  "FlagName": ""
+                },
+                "IntermediaryPortCalls": null
+              }
+            ],
+            "Delivered": false,
+            "ContainerNumber": "TESTU1234567",
+            "PodEtaDate": "",
+            "ContainerType": "20' DRY VAN",
+            "LatestMove": "MANZANILLO, MX"
+          }
+        ]
+      }
+    ]
+  }
+}

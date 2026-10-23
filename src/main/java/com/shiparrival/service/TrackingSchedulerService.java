@@ -203,6 +203,11 @@ public class TrackingSchedulerService {
                 }
             }
         } finally {
+            try {
+                adapterFactory.releaseResources();
+            } catch (Exception ex) {
+                log.warn("No se pudieron liberar los recursos de los adaptadores de rastreo: {}", ex.getMessage());
+            }
             long duration = System.currentTimeMillis() - startTime;
             finishStatus(processed, total, updated, failed, alerts, duration, details);
         }

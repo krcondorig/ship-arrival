@@ -6,8 +6,8 @@ Este archivo sirve como referencia central para cualquier agente o desarrollador
 
 ## 1. Estado Actual del Proyecto
 
-- **Fase actual:** Implementación de las 9 tareas del plan completada al 100% con suite de pruebas pasando (21 tests).
-- **Repositorio Git:** Rama `feature/ship-arrival-monitoring`, con Maven Wrapper autónomo y suite de tests verde.
+- **Fase actual:** Implementación completa con soporte para ONE y MSC; suite de pruebas pasando (55 tests, 1 omitido por requerir navegador real).
+- **Repositorio Git:** Rama `master`, con Maven Wrapper autónomo y suite de tests verde.
 - **Entorno de ejecución:** 
   - Sistema Operativo: Windows (win32)
   - Java: Java 21 LTS (`21.0.11`)
@@ -29,8 +29,8 @@ Aplicación web monolítica ligera en **Java 21** con **Spring Boot 3**, que per
 ### 2.2 Patrones y Principios Clave
 - **Patrón Adapter / Strategy (`CarrierTrackingAdapter`):** 
   - Desacopla la lógica de rastreo del proveedor naviero.
-  - Se inicia con la implementación para **ONE (*Ocean Network Express*)**.
-  - Permite agregar a futuro MSC, Maersk o portales gubernamentales mexicanos (ej. ASIPONA) creando nuevos adaptadores sin tocar el resto de la aplicación.
+  - Implementaciones actuales: **ONE (*Ocean Network Express*)** mediante su API v2 y **MSC** mediante la API interna de su portal, invocada desde Chrome headless para superar la protección de Akamai.
+  - Permite agregar a futuro Maersk o portales gubernamentales mexicanos (ej. ASIPONA) creando nuevos adaptadores sin tocar el resto de la aplicación.
 - **Persistencia Embebida y Local:** H2 Database en modo archivo (`./data/shiparrival_db`), garantizando persistencia entre reinicios a coste cero y sin requerir la instalación de motores de base de datos externos.
 - **Control de Rate-Limiting:** Consultas en bloque con pausas de cortesía y reintentos para evitar bloqueos por parte de los portales web navieros.
 
@@ -42,7 +42,8 @@ Aplicación web monolítica ligera en **Java 21** con **Spring Boot 3**, que per
 | **Persistencia** | H2 Database (File mode) + Hibernate |
 | **Procesamiento Excel** | Apache POI (`poi-ooxml`) |
 | **Frontend / UI** | Thymeleaf + Tailwind CSS / Bootstrap 5 |
-| **Notificaciones** | Telegram Bot API (HTTP REST gratuito) |
+| **Notificaciones** | Telegram Bot API + Discord Webhook (HTTP REST gratuito) |
+| **Rastreo MSC** | Selenium + Chrome headless (portal protegido por Akamai) |
 | **Build Tool** | Maven Wrapper (`mvnw`) |
 
 ---
@@ -92,11 +93,12 @@ Aplicación web monolítica ligera en **Java 21** con **Spring Boot 3**, que per
 - [x] Implementar repositorios `ShipmentRepository` y `ShipmentEventLogRepository`.
 - [x] Pruebas unitarias y de integración para la persistencia.
 
-### Fase 4: Adaptador de Rastreo ONE
+### Fase 4: Adaptadores de Rastreo (ONE y MSC)
 - [x] Diseñar interfaz `CarrierTrackingAdapter` y modelo `TrackingResult`.
 - [x] Implementar `OneLineTrackingAdapter` (cliente HTTP resiliente para consultar guías y extraer ETA, buque, viaje, puerto y estatus).
-- [x] Factoría `CarrierTrackingAdapterFactory`.
-- [x] Pruebas unitarias con respuestas simuladas (mocked JSON/HTML) y validación de extracción de datos.
+- [x] Implementar `MscTrackingAdapter` y `SeleniumMscTrackingClient` (Chrome headless para obtener las cookies de Akamai y consultar la API interna de MSC).
+- [x] Factoría `CarrierTrackingAdapterFactory` con liberación de recursos al finalizar cada ciclo.
+- [x] Pruebas unitarias con respuestas simuladas (JSON/HTML) y prueba de integración real opcional con `MSC_BROWSER_TEST=true`.
 
 ### Fase 5: Servicios de Negocio e Importación Excel
 - [x] Implementar `ExcelImportService` para procesar archivos `.xlsx` y extraer guías.

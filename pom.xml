@@ -52,6 +52,13 @@
 			<version>${poi.version}</version>
 		</dependency>
 
+		<!-- Selenium para consultar el portal de MSC (protegido por Akamai) -->
+		<dependency>
+			<groupId>org.seleniumhq.selenium</groupId>
+			<artifactId>selenium-java</artifactId>
+			<version>4.51.0</version>
+		</dependency>
+
 		<!-- Lombok -->
 		<dependency>
 			<groupId>org.projectlombok</groupId>

@@ -1,0 +1,8 @@
+{
+  "IsSuccess": true,
+  "Data": {
+    "TrackingType": "Bill Of Lading",
+    "TrackingNumber": "TESTMSC0003",
+    "BillOfLadings": []
+  }
+}
