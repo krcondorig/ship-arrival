@@ -19,7 +19,7 @@
             <i class="bi bi-water me-2 text-info"></i>ShipArrival
         </a>
         <span class="navbar-text text-light-50 small d-none d-md-inline">
-            Monitoreo Desatendido de Arribo de Buques (ONE / MSC / MAERSK)
+            Monitoreo Desatendido de Arribo de Buques (ONE / MSC / MAERSK / HAPAG-LLOYD)
         </span>
         <div class="ms-auto d-flex align-items-center gap-2">
             <form th:action="@{/shipments/track-now}" method="post" class="m-0" id="trackNowForm">
@@ -181,7 +181,7 @@
                     </div>
                     <div class="col-12">
                         <div class="form-text">
-                            Opcional: agrega una columna <strong>NAVIERA</strong> (ONE, MSC, MAERSK o UNKNOWN)
+                            Opcional: agrega una columna <strong>NAVIERA</strong> (ONE, MSC, MAERSK, HAPAG_LLOYD o UNKNOWN)
                             para asignar la naviera fila por fila. Si está vacía, se usa la naviera predeterminada.
                         </div>
                     </div>

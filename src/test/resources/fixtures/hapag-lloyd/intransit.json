@@ -1,0 +1,122 @@
+{
+  "trackingNumber": "HLCUNG12608BMJY0",
+  "containers": [
+    {
+      "containerNumber": "TEMU 1610106",
+      "containerType": "22GP",
+      "status": "Vessel departed",
+      "date": "2026-10-06",
+      "place": "BUSAN",
+      "movements": [
+        {
+          "status": "Gate out empty",
+          "place": "QINGDAO",
+          "date": "2026-09-20",
+          "time": "10:00",
+          "transport": "Truck",
+          "voyageNumber": null,
+          "actual": true
+        },
+        {
+          "status": "Arrival in",
+          "place": "QINGDAO",
+          "date": "2026-09-22",
+          "time": "08:00",
+          "transport": "Truck",
+          "voyageNumber": null,
+          "actual": true
+        },
+        {
+          "status": "Loaded",
+          "place": "QINGDAO",
+          "date": "2026-09-25",
+          "time": "12:00",
+          "transport": "IQUIQUE EXPRESS",
+          "voyageNumber": "2640E",
+          "actual": true
+        },
+        {
+          "status": "Vessel departed",
+          "place": "QINGDAO",
+          "date": "2026-09-25",
+          "time": "18:00",
+          "transport": "IQUIQUE EXPRESS",
+          "voyageNumber": "2640E",
+          "actual": true
+        },
+        {
+          "status": "Vessel arrived",
+          "place": "BUSAN",
+          "date": "2026-09-28",
+          "time": "06:00",
+          "transport": "IQUIQUE EXPRESS",
+          "voyageNumber": "2640E",
+          "actual": true
+        },
+        {
+          "status": "Discharged",
+          "place": "BUSAN",
+          "date": "2026-09-29",
+          "time": "02:00",
+          "transport": "IQUIQUE EXPRESS",
+          "voyageNumber": "2640E",
+          "actual": true
+        },
+        {
+          "status": "Loaded",
+          "place": "BUSAN",
+          "date": "2026-10-05",
+          "time": "04:00",
+          "transport": "IQUIQUE EXPRESS",
+          "voyageNumber": "2640E",
+          "actual": true
+        },
+        {
+          "status": "Vessel departed",
+          "place": "BUSAN",
+          "date": "2026-10-06",
+          "time": "09:00",
+          "transport": "IQUIQUE EXPRESS",
+          "voyageNumber": "2640E",
+          "actual": true
+        },
+        {
+          "status": "Vessel arrived",
+          "place": "MANZANILLO, COL (MX)",
+          "date": "2026-10-26",
+          "time": "08:00",
+          "transport": "IQUIQUE EXPRESS",
+          "voyageNumber": "2640E",
+          "actual": false
+        },
+        {
+          "status": "Discharged",
+          "place": "MANZANILLO, COL (MX)",
+          "date": "2026-10-27",
+          "time": "10:00",
+          "transport": "IQUIQUE EXPRESS",
+          "voyageNumber": "2640E",
+          "actual": false
+        },
+        {
+          "status": "Departure from",
+          "place": "MANZANILLO, COL (MX)",
+          "date": "",
+          "time": "",
+          "transport": "Rail",
+          "voyageNumber": null,
+          "actual": false
+        },
+        {
+          "status": "Arrival in",
+          "place": "GUADALAJARA, JAL",
+          "date": "",
+          "time": "",
+          "transport": "Rail",
+          "voyageNumber": null,
+          "actual": false
+        }
+      ]
+    }
+  ]
+}

@@ -40,3 +40,7 @@ data/
 .superpowers/
 .agents/
 skills-lock.json
+
+### Archivos temporales de Excel ###
+~$*
+guias_prueba.xlsx

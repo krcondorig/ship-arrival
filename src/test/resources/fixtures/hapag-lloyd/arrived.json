@@ -1,0 +1,140 @@
+{
+  "trackingNumber": "HLCUNG12607EKZE0",
+  "containers": [
+    {
+      "containerNumber": "HLBU 2959982",
+      "containerType": "22GP",
+      "status": "Vessel arrived",
+      "date": "2026-10-21",
+      "place": "MANZANILLO, COL (MX)",
+      "movements": [
+        {
+          "status": "Gate out empty",
+          "place": "QINGDAO",
+          "date": "2026-08-22",
+          "time": "14:30",
+          "transport": "Truck",
+          "voyageNumber": null,
+          "actual": true
+        },
+        {
+          "status": "Arrival in",
+          "place": "QINGDAO",
+          "date": "2026-09-03",
+          "time": "04:01",
+          "transport": "Truck",
+          "voyageNumber": null,
+          "actual": true
+        },
+        {
+          "status": "Loaded",
+          "place": "QINGDAO",
+          "date": "2026-09-06",
+          "time": "18:11",
+          "transport": "POSORJA EXPRESS",
+          "voyageNumber": "2633E",
+          "actual": true
+        },
+        {
+          "status": "Vessel departed",
+          "place": "QINGDAO",
+          "date": "2026-09-06",
+          "time": "23:54",
+          "transport": "POSORJA EXPRESS",
+          "voyageNumber": "2633E",
+          "actual": true
+        },
+        {
+          "status": "Vessel arrived",
+          "place": "BUSAN",
+          "date": "2026-09-09",
+          "time": "14:54",
+          "transport": "POSORJA EXPRESS",
+          "voyageNumber": "2633E",
+          "actual": true
+        },
+        {
+          "status": "Discharged",
+          "place": "BUSAN",
+          "date": "2026-09-10",
+          "time": "06:14",
+          "transport": "POSORJA EXPRESS",
+          "voyageNumber": "2633E",
+          "actual": true
+        },
+        {
+          "status": "Loaded",
+          "place": "BUSAN",
+          "date": "2026-09-24",
+          "time": "00:50",
+          "transport": "IQUIQUE EXPRESS",
+          "voyageNumber": "2636E",
+          "actual": true
+        },
+        {
+          "status": "Vessel departed",
+          "place": "BUSAN",
+          "date": "2026-09-25",
+          "time": "03:43",
+          "transport": "IQUIQUE EXPRESS",
+          "voyageNumber": "2636E",
+          "actual": true
+        },
+        {
+          "status": "Vessel arrived",
+          "place": "MANZANILLO, COL (MX)",
+          "date": "2026-10-21",
+          "time": "15:00",
+          "transport": "IQUIQUE EXPRESS",
+          "voyageNumber": "2636E",
+          "actual": true
+        },
+        {
+          "status": "Discharged",
+          "place": "MANZANILLO, COL (MX)",
+          "date": "2026-10-22",
+          "time": "20:38",
+          "transport": "IQUIQUE EXPRESS",
+          "voyageNumber": "2636E",
+          "actual": true
+        },
+        {
+          "status": "Departure from",
+          "place": "MANZANILLO, COL (MX)",
+          "date": "",
+          "time": "",
+          "transport": "Rail",
+          "voyageNumber": null,
+          "actual": false
+        },
+        {
+          "status": "Arrival in",
+          "place": "GUADALAJARA, JAL",
+          "date": "",
+          "time": "",
+          "transport": "Rail",
+          "voyageNumber": null,
+          "actual": false
+        },
+        {
+          "status": "Departure from",
+          "place": "GUADALAJARA, JAL",
+          "date": "",
+          "time": "",
+          "transport": "Truck",
+          "voyageNumber": null,
+          "actual": false
+        },
+        {
+          "status": "Arrival in",
+          "place": "GUADALAJARA, JAL",
+          "date": "",
+          "time": "",
+          "transport": "Truck",
+          "voyageNumber": null,
+          "actual": false
+        }
+      ]
+    }
+  ]
+}

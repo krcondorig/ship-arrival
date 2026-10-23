@@ -6,7 +6,7 @@ Este archivo sirve como referencia central para cualquier agente o desarrollador
 
 ## 1. Estado Actual del Proyecto
 
-- **Fase actual:** Implementación completa con soporte para ONE, MSC y MAERSK; suite de pruebas pasando (65 tests, 2 omitidos por requerir navegador real).
+- **Fase actual:** Implementación completa con soporte para ONE, MSC, MAERSK y HAPAG-LLOYD; suite de pruebas pasando (75 tests, 3 omitidos por requerir navegador real).
 - **Repositorio Git:** Rama `master`, con Maven Wrapper autónomo y suite de tests verde.
 - **Entorno de ejecución:** 
   - Sistema Operativo: Windows (win32)
@@ -29,7 +29,8 @@ Aplicación web monolítica ligera en **Java 21** con **Spring Boot 3**, que per
 ### 2.2 Patrones y Principios Clave
 - **Patrón Adapter / Strategy (`CarrierTrackingAdapter`):** 
   - Desacopla la lógica de rastreo del proveedor naviero.
-  - Implementaciones actuales: **ONE (*Ocean Network Express*)** mediante su API v2, **MSC** mediante la API interna de su portal y **MAERSK** mediante la API interna de su portal. MSC y MAERSK se consultan desde Chrome headless para superar la protección de Akamai; en MAERSK se abre un navegador nuevo por guía porque Akamai solo permite una consulta por sesión.
+  - Implementaciones actuales: **ONE (*Ocean Network Express*)** mediante su API v2, **MSC** mediante la API interna de su portal, **MAERSK** mediante la API interna de su portal y **HAPAG-LLOYD** mediante las tablas públicas de su portal. MSC y MAERSK se consultan desde Chrome headless para superar la protección de Akamai; en MAERSK se abre un navegador nuevo por guía porque Akamai solo permite una consulta por sesión.
+  - **HAPAG-LLOYD** no requiere credenciales de API: usa Chrome normal fuera de pantalla con un perfil persistente y control por CDP (Chrome DevTools Protocol), sin ChromeDriver. Cloudflare bloquea peticiones directas, Chrome headless y la adhesión de Selenium, por lo que el navegador se lanza primero con la URL `?blno=<B/L>`, se espera el título final y solo después se evalúa JavaScript por CDP. El perfil se conserva en `data/hapag-chrome-profile` para reutilizar la cookie de Cloudflare entre ciclos.
   - Permite agregar a futuro portales gubernamentales mexicanos (ej. ASIPONA) creando nuevos adaptadores sin tocar el resto de la aplicación.
 - **Persistencia Embebida y Local:** H2 Database en modo archivo (`./data/shiparrival_db`), garantizando persistencia entre reinicios a coste cero y sin requerir la instalación de motores de base de datos externos. El dialecto `ShipmentH2Dialect` desactiva las restricciones CHECK automáticas de los enums para que agregar navieras no requiera migrar la base de datos.
 - **Control de Rate-Limiting:** Consultas en bloque con pausas de cortesía y reintentos para evitar bloqueos por parte de los portales web navieros.
@@ -44,6 +45,7 @@ Aplicación web monolítica ligera en **Java 21** con **Spring Boot 3**, que per
 | **Frontend / UI** | Thymeleaf + Tailwind CSS / Bootstrap 5 |
 | **Notificaciones** | Telegram Bot API + Discord Webhook (HTTP REST gratuito) |
 | **Rastreo MSC / MAERSK** | Selenium + Chrome headless (portales protegidos por Akamai) |
+| **Rastreo HAPAG-LLOYD** | Chrome normal fuera de pantalla + CDP (portal protegido por Cloudflare, sin credenciales) |
 | **Build Tool** | Maven Wrapper (`mvnw`) |
 
 ---
@@ -53,7 +55,7 @@ Aplicación web monolítica ligera en **Java 21** con **Spring Boot 3**, que per
 - **`Shipment`:**
   - `id` (Long, PK)
   - `trackingNumber` (String, ej. "TESTBL900001")
-  - `carrier` (Enum: `ONE`, `MSC`, `MAERSK`, `UNKNOWN`), persistido como `VARCHAR(32)` para permitir nuevas navieras sin migrar el tipo de columna.
+  - `carrier` (Enum: `ONE`, `MSC`, `MAERSK`, `HAPAG_LLOYD`, `UNKNOWN`), persistido como `VARCHAR(32)` para permitir nuevas navieras sin migrar el tipo de columna.
   - `containerNumber` (String)
   - `vesselName` (String)
   - `voyageNumber` (String)
@@ -93,13 +95,14 @@ Aplicación web monolítica ligera en **Java 21** con **Spring Boot 3**, que per
 - [x] Implementar repositorios `ShipmentRepository` y `ShipmentEventLogRepository`.
 - [x] Pruebas unitarias y de integración para la persistencia.
 
-### Fase 4: Adaptadores de Rastreo (ONE, MSC y MAERSK)
+### Fase 4: Adaptadores de Rastreo (ONE, MSC, MAERSK y HAPAG-LLOYD)
 - [x] Diseñar interfaz `CarrierTrackingAdapter` y modelo `TrackingResult`.
 - [x] Implementar `OneLineTrackingAdapter` (cliente HTTP resiliente para consultar guías y extraer ETA, buque, viaje, puerto y estatus).
 - [x] Implementar `MscTrackingAdapter` y `SeleniumMscTrackingClient` (Chrome headless para obtener las cookies de Akamai y consultar la API interna de MSC).
 - [x] Implementar `MaerskTrackingAdapter` y `SeleniumMaerskTrackingClient` (Chrome headless con interceptor de `fetch`, un navegador nuevo por guía para evitar el bloqueo de Akamai a la segunda consulta).
+- [x] Implementar `HapagLloydTrackingAdapter` y `ChromeHapagLloydTrackingClient` (Chrome normal fuera de pantalla con perfil persistente y CDP; extrae el primer contenedor, el último movimiento real del buque y el arribo/descarga).
 - [x] Factoría `CarrierTrackingAdapterFactory` con liberación de recursos al finalizar cada ciclo.
-- [x] Pruebas unitarias con respuestas simuladas (JSON/HTML) y pruebas de integración reales opcionales con `MSC_BROWSER_TEST=true` y `MAERSK_BROWSER_TEST=true`.
+- [x] Pruebas unitarias con respuestas simuladas (JSON/HTML) y pruebas de integración reales opcionales con `MSC_BROWSER_TEST=true`, `MAERSK_BROWSER_TEST=true` y `HAPAG_LLOYD_BROWSER_TEST=true`.
 
 ### Fase 5: Servicios de Negocio e Importación Excel
 - [x] Implementar `ExcelImportService` para procesar archivos `.xlsx` y extraer guías.
@@ -114,6 +117,7 @@ Aplicación web monolítica ligera en **Java 21** con **Spring Boot 3**, que per
 ### Fase 7: Programador de Tareas (Scheduler)
 - [x] Implementar `TrackingSchedulerService` (`@Scheduled` a las 08:00 AM) para iterar sobre embarques activos con pausas entre peticiones.
 - [x] Soporte para ejecución manual asíncrona ("Monitorear Ahora").
+- [x] Suprimir la alerta de arribo cuando el ATA es anterior a la fecha de registro del embarque (arribo histórico), evitando notificaciones tardías.
 
 ### Fase 8: Interfaz Web (Thymeleaf)
 - [x] Vista principal (dashboard) con tabla de embarques, filtros e insignias de estado (colores según proximidad).
@@ -124,3 +128,5 @@ Aplicación web monolítica ligera en **Java 21** con **Spring Boot 3**, que per
 
 ### Fase 9: Pruebas E2E y Verificación Final
 - [x] Probar flujo completo: Carga manual/Excel -> Rastreo -> Actualización de datos -> Disparo de alerta -> Visualización web.
+- [x] Verificar HAPAG-LLOYD con las guías reales `HLCUNG12607EKZE0` y `HLCUNG12608BMJY0`: datos de buque, viaje, puerto y arribo, historial de ETA y supresión de alertas históricas.
+- [x] Suite final: 75 tests, 0 fallos, 3 omitidos (pruebas reales de navegador MSC, MAERSK y HAPAG-LLOYD).
