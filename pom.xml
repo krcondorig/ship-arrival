@@ -52,7 +52,7 @@
 			<version>${poi.version}</version>
 		</dependency>
 
-		<!-- Selenium para consultar el portal de MSC (protegido por Akamai) -->
+		<!-- Selenium para consultar los portales de MSC y MAERSK (protegidos por Akamai) -->
 		<dependency>
 			<groupId>org.seleniumhq.selenium</groupId>
 			<artifactId>selenium-java</artifactId>

@@ -2,6 +2,8 @@ package com.shiparrival.domain;
 
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.time.LocalDateTime;
 
@@ -24,8 +26,11 @@ public class Shipment {
     @Column(nullable = false, unique = true, length = 64)
     private String trackingNumber;
 
+    // Se guarda como VARCHAR (no como ENUM de H2) para poder agregar nuevas
+    // navieras sin migrar el tipo de columna en bases de datos existentes.
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 32)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
+    @Column(nullable = false, length = 32, columnDefinition = "varchar(32)")
     private Carrier carrier;
 
     @Column(length = 64)

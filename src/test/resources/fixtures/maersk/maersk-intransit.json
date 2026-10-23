@@ -1,0 +1,265 @@
+{
+  "tpdoc_num": "TESTMAE0002",
+  "has_import_shipment": false,
+  "is_container_search": false,
+  "is_split_combine_part_load": false,
+  "is_cancelled_shipment": false,
+  "unassigned_containers": 0,
+  "last_update_time": "2026-10-21T17:46:21.000Z",
+  "activity_plan_tasks": [
+    {
+      "task_name": "Arrange Cargo Release",
+      "closed": false
+    }
+  ],
+  "origin": {
+    "terminal": "QINGDAO QIANWAN CONTAINER CO LTD",
+    "geo_site": "2TK5NLOD7R0O6",
+    "city": "QINGDAO",
+    "state": "37",
+    "country": "CHINA",
+    "country_code": "CN",
+    "geoid_city": "2TK5NLOD7R0O6",
+    "site_type": "TERMINAL",
+    "location_code": "CNTSTQQ"
+  },
+  "destination": {
+    "terminal": null,
+    "geo_site": "3F74KKRVQKRJZ",
+    "city": "MEXICO CITY",
+    "state": "CX",
+    "country": "MEXICO",
+    "country_code": "MX",
+    "geoid_city": "3F74KKRVQKRJZ",
+    "site_type": "CITY",
+    "location_code": "MXMEX"
+  },
+  "containers": [
+    {
+      "container_num": "TESTU7654321",
+      "container_size": "20",
+      "container_type": "DRY",
+      "iso_code": "22G1",
+      "shipment_num": "TESTMAE0002",
+      "operator": "MAEU",
+      "is_shipper_owned": false,
+      "is_truck_details_available": false,
+      "is_appointment_available": false,
+      "seals": [
+        {
+          "seal_type": "CARRIER_SEAL",
+          "seal_number": "TESTSEAL0001"
+        }
+      ],
+      "origin": {
+        "terminal": "QINGDAO QIANWAN CONTAINER CO LTD",
+        "geo_site": "2TK5NLOD7R0O6",
+        "city": "QINGDAO",
+        "state": "37",
+        "country": "CHINA",
+        "country_code": "CN",
+        "geoid_city": "2TK5NLOD7R0O6",
+        "site_type": "TERMINAL",
+        "location_code": "CNTSTQQ"
+      },
+      "destination": {
+        "terminal": null,
+        "geo_site": "3F74KKRVQKRJZ",
+        "city": "MEXICO CITY",
+        "state": "CX",
+        "country": "MEXICO",
+        "country_code": "MX",
+        "geoid_city": "3F74KKRVQKRJZ",
+        "site_type": "CITY",
+        "location_code": "MXMEX"
+      },
+      "locations": [
+        {
+          "terminal": "Smart International Logistics Co",
+          "geo_site": "3EX9JNNVZSYV2",
+          "city": "Qingdao",
+          "state": "Asia Pacific Region",
+          "country": "China",
+          "country_code": "CN",
+          "geoid_city": "3EX9JNNVZSYV2",
+          "site_type": "Off-hire depot",
+          "location_code": "CNTSTIN",
+          "events": [
+            {
+              "eventId": "d05a28c0-8f94-3706-9554-c24a57df7753",
+              "activity": "GATE-OUT",
+              "type": "EQUIPMENT",
+              "locationCode": "CNTSTIN",
+              "stempty": true,
+              "actfor": "EXP",
+              "event_time": "2026-09-15T18:35:00.000",
+              "event_time_type": "ACTUAL"
+            }
+          ]
+        },
+        {
+          "terminal": "QINGDAO QIANWAN CONTAINER CO LTD",
+          "geo_site": "2TK5NLOD7R0O6",
+          "city": "QINGDAO",
+          "state": "37",
+          "country": "CHINA",
+          "country_code": "CN",
+          "geoid_city": "2TK5NLOD7R0O6",
+          "site_type": "TERMINAL",
+          "location_code": "CNTSTQQ",
+          "events": [
+            {
+              "eventId": "55eda00e-8f61-3add-9178-2852423f1f2f",
+              "activity": "GATE-IN",
+              "type": "EQUIPMENT",
+              "locationCode": "CNTSTQQ",
+              "stempty": false,
+              "actfor": "EXP",
+              "event_time": "2026-09-17T14:57:00.000",
+              "event_time_type": "ACTUAL"
+            },
+            {
+              "eventId": "94ddd83a-be92-3eaa-b512-fb11ac06718d",
+              "activity": "LOAD",
+              "type": "EQUIPMENT",
+              "locationCode": "CNTSTQQ",
+              "stempty": false,
+              "actfor": "",
+              "vessel_name": "MAERSK EDINBURGH",
+              "voyage_num": "638E",
+              "vessel_num": "80A",
+              "transport_mode": "MVS",
+              "event_time": "2026-09-19T01:50:00.000",
+              "event_time_type": "ACTUAL"
+            },
+            {
+              "eventId": "9bf716c9-dce8-34e8-9920-5206ca37b602",
+              "activity": "CONTAINER DEPARTURE",
+              "type": "EQUIPMENT",
+              "locationCode": "CNTSTQQ",
+              "stempty": false,
+              "actfor": "",
+              "vessel_name": "MAERSK EDINBURGH",
+              "voyage_num": "638E",
+              "vessel_num": "80A",
+              "transport_mode": "MVS",
+              "event_time": "2026-09-19T23:25:00.000",
+              "event_time_type": "ACTUAL",
+              "event_date_time_change_code": "78",
+              "event_time_original": "2026-09-08T07:00:00.000",
+              "event_time_updated_on": "2026-08-28T05:41:19.443",
+              "is_etd_updated": true,
+              "last_date_time": "2026-09-19T22:30:00.000",
+              "last_vessel_name": "MAERSK EVORA",
+              "original_vessel_name": "MAERSK EVORA"
+            }
+          ]
+        },
+        {
+          "terminal": "SSA MEXICO",
+          "geo_site": "PID8RE9AJECY8",
+          "city": "MANZANILLO",
+          "state": "CL",
+          "country": "MEXICO",
+          "country_code": "MX",
+          "geoid_city": "PID8RE9AJECY8",
+          "site_type": "TERMINAL",
+          "location_code": "MXZLOSM",
+          "events": [
+            {
+              "eventId": "b0d8185d-c6f3-3285-99e2-bd5af011fa61",
+              "activity": "CONTAINER ARRIVAL",
+              "type": "EQUIPMENT",
+              "locationCode": "MXZLOSM",
+              "stempty": false,
+              "vessel_name": "MAERSK EDINBURGH",
+              "voyage_num": "638E",
+              "vessel_num": "80A",
+              "transport_mode": "MVS",
+              "event_time": "2026-10-23T05:00:00.000",
+              "event_time_type": "EXPECTED",
+              "event_date_time_change_code": "78",
+              "event_time_original": "2026-10-07T04:00:00.000",
+              "event_time_updated_on": "2026-08-28T05:41:19.443",
+              "is_eta_updated": true,
+              "last_date_time": "2026-10-23T02:00:00.000",
+              "last_vessel_name": "MAERSK EVORA",
+              "original_vessel_name": "MAERSK EVORA"
+            },
+            {
+              "eventId": "67437415-30e8-31a9-b400-1b3de05b35a1",
+              "activity": "RAIL_DEPARTURE",
+              "type": "EQUIPMENT",
+              "locationCode": "MXZLOSM",
+              "stempty": false,
+              "transport_mode": "RR",
+              "event_time": "2026-10-25T18:00:00.000",
+              "event_time_type": "EXPECTED"
+            }
+          ]
+        },
+        {
+          "terminal": "MEXICO CITY RAIL TERMINAL (PANTACO)",
+          "geo_site": "1TFI8S45QMAV3",
+          "city": "MEXICO CITY",
+          "state": "CX",
+          "country": "MEXICO",
+          "country_code": "MX",
+          "geoid_city": "1TFI8S45QMAV3",
+          "site_type": "RAIL TERMINAL",
+          "location_code": "MXMEXSP",
+          "events": [
+            {
+              "eventId": "d70919e9-69bc-3d52-8a8a-c2dcaa5812b2",
+              "activity": "RAIL_ARRIVAL_AT_DESTINATION",
+              "type": "EQUIPMENT",
+              "locationCode": "MXMEXSP",
+              "stempty": false,
+              "transport_mode": "RR",
+              "event_time": "2026-11-02T18:00:00.000",
+              "event_time_type": "EXPECTED"
+            },
+            {
+              "eventId": "4a0b69c5-6b33-35f5-871f-095859380865",
+              "activity": "GATE-OUT",
+              "type": "EQUIPMENT",
+              "locationCode": "MXMEXSP",
+              "stempty": false,
+              "transport_mode": "TRK",
+              "event_time": "2026-11-02T18:00:00.000",
+              "event_time_type": "EXPECTED"
+            }
+          ]
+        },
+        {
+          "terminal": null,
+          "geo_site": "3F74KKRVQKRJZ",
+          "city": "MEXICO CITY",
+          "state": "CX",
+          "country": "MEXICO",
+          "country_code": "MX",
+          "geoid_city": "3F74KKRVQKRJZ",
+          "site_type": "CITY",
+          "location_code": "MXMEX",
+          "events": [
+            {
+              "eventId": "43b20874-af95-3248-a499-9c9754d9cf37",
+              "activity": "GATE-IN",
+              "type": "EQUIPMENT",
+              "locationCode": "MXMEX",
+              "stempty": false,
+              "transport_mode": "TRK",
+              "event_time": "2026-11-02T23:00:00.000",
+              "event_time_type": "EXPECTED"
+            }
+          ]
+        }
+      ],
+      "eta_final_delivery": "2026-11-02T23:00:00.000",
+      "status": "IN_PROGRESS",
+      "last_update_time": "2026-10-21T17:46:21Z",
+      "service_type_origin": "CONTAINER_YARD",
+      "service_type_destination": "STORE_DOOR"
+    }
+  ]
+}

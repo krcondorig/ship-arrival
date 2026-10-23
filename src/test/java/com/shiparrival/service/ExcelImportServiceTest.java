@@ -101,6 +101,10 @@ class ExcelImportServiceTest {
             row5.createCell(0).setCellValue("TESTBL900005");
             row5.createCell(1).setCellValue("UNKNOWN");
 
+            Row row6 = sheet.createRow(6);
+            row6.createCell(0).setCellValue("TESTBL900006");
+            row6.createCell(1).setCellValue("HAPAG");
+
             workbook.write(out);
         }
 
@@ -113,8 +117,9 @@ class ExcelImportServiceTest {
                         tuple("TESTBL900001", Carrier.ONE),
                         tuple("TESTBL900002", Carrier.MSC),
                         tuple("TESTBL900003", null),
+                        tuple("TESTBL900004", Carrier.MAERSK),
                         tuple("TESTBL900005", Carrier.UNKNOWN));
         assertThat(result.getInvalidRows())
-                .containsExactly("Fila 5: naviera inválida 'MAERSK'");
+                .containsExactly("Fila 7: naviera inválida 'HAPAG'");
     }
 }

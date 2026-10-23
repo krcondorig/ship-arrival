@@ -6,7 +6,7 @@ Este archivo sirve como referencia central para cualquier agente o desarrollador
 
 ## 1. Estado Actual del Proyecto
 
-- **Fase actual:** Implementación completa con soporte para ONE y MSC; suite de pruebas pasando (55 tests, 1 omitido por requerir navegador real).
+- **Fase actual:** Implementación completa con soporte para ONE, MSC y MAERSK; suite de pruebas pasando (65 tests, 2 omitidos por requerir navegador real).
 - **Repositorio Git:** Rama `master`, con Maven Wrapper autónomo y suite de tests verde.
 - **Entorno de ejecución:** 
   - Sistema Operativo: Windows (win32)
@@ -23,15 +23,15 @@ Aplicación web monolítica ligera en **Java 21** con **Spring Boot 3**, que per
 1. Registrar guías de conocimiento (*Bills of Lading* - B/L) tanto manualmente como mediante carga masiva de archivos Excel (`.xlsx`).
 2. Consultar y extraer automáticamente el estado, buque, viaje, puerto y fecha estimada de arribo (ETA) desde las navieras.
 3. Monitorear los embarques de manera desatendida mediante una tarea programada diaria a las **08:00 AM** y con opción de disparo manual bajo demanda.
-4. Enviar alertas gratuitas a través de un **Bot de Telegram** cuando un buque esté a **≤ 3 días** de arribar a puerto (ej. Manzanillo, México) o cuando confirme su arribo final.
+4. Enviar alertas gratuitas a través de un **Bot de Telegram** y/o un **Webhook de Discord** cuando un buque esté a **≤ 3 días** de arribar a puerto (ej. Manzanillo, México) o cuando confirme su arribo final.
 5. Gestionar todo desde un dashboard web limpio en `http://localhost:8080`.
 
 ### 2.2 Patrones y Principios Clave
 - **Patrón Adapter / Strategy (`CarrierTrackingAdapter`):** 
   - Desacopla la lógica de rastreo del proveedor naviero.
-  - Implementaciones actuales: **ONE (*Ocean Network Express*)** mediante su API v2 y **MSC** mediante la API interna de su portal, invocada desde Chrome headless para superar la protección de Akamai.
-  - Permite agregar a futuro Maersk o portales gubernamentales mexicanos (ej. ASIPONA) creando nuevos adaptadores sin tocar el resto de la aplicación.
-- **Persistencia Embebida y Local:** H2 Database en modo archivo (`./data/shiparrival_db`), garantizando persistencia entre reinicios a coste cero y sin requerir la instalación de motores de base de datos externos.
+  - Implementaciones actuales: **ONE (*Ocean Network Express*)** mediante su API v2, **MSC** mediante la API interna de su portal y **MAERSK** mediante la API interna de su portal. MSC y MAERSK se consultan desde Chrome headless para superar la protección de Akamai; en MAERSK se abre un navegador nuevo por guía porque Akamai solo permite una consulta por sesión.
+  - Permite agregar a futuro portales gubernamentales mexicanos (ej. ASIPONA) creando nuevos adaptadores sin tocar el resto de la aplicación.
+- **Persistencia Embebida y Local:** H2 Database en modo archivo (`./data/shiparrival_db`), garantizando persistencia entre reinicios a coste cero y sin requerir la instalación de motores de base de datos externos. El dialecto `ShipmentH2Dialect` desactiva las restricciones CHECK automáticas de los enums para que agregar navieras no requiera migrar la base de datos.
 - **Control de Rate-Limiting:** Consultas en bloque con pausas de cortesía y reintentos para evitar bloqueos por parte de los portales web navieros.
 
 ### 2.3 Stack Tecnológico (100% Gratuito)
@@ -43,7 +43,7 @@ Aplicación web monolítica ligera en **Java 21** con **Spring Boot 3**, que per
 | **Procesamiento Excel** | Apache POI (`poi-ooxml`) |
 | **Frontend / UI** | Thymeleaf + Tailwind CSS / Bootstrap 5 |
 | **Notificaciones** | Telegram Bot API + Discord Webhook (HTTP REST gratuito) |
-| **Rastreo MSC** | Selenium + Chrome headless (portal protegido por Akamai) |
+| **Rastreo MSC / MAERSK** | Selenium + Chrome headless (portales protegidos por Akamai) |
 | **Build Tool** | Maven Wrapper (`mvnw`) |
 
 ---
@@ -53,7 +53,7 @@ Aplicación web monolítica ligera en **Java 21** con **Spring Boot 3**, que per
 - **`Shipment`:**
   - `id` (Long, PK)
   - `trackingNumber` (String, ej. "TESTBL900001")
-  - `carrier` (Enum: `ONE`, `MSC`, etc.)
+  - `carrier` (Enum: `ONE`, `MSC`, `MAERSK`, `UNKNOWN`), persistido como `VARCHAR(32)` para permitir nuevas navieras sin migrar el tipo de columna.
   - `containerNumber` (String)
   - `vesselName` (String)
   - `voyageNumber` (String)
@@ -93,20 +93,22 @@ Aplicación web monolítica ligera en **Java 21** con **Spring Boot 3**, que per
 - [x] Implementar repositorios `ShipmentRepository` y `ShipmentEventLogRepository`.
 - [x] Pruebas unitarias y de integración para la persistencia.
 
-### Fase 4: Adaptadores de Rastreo (ONE y MSC)
+### Fase 4: Adaptadores de Rastreo (ONE, MSC y MAERSK)
 - [x] Diseñar interfaz `CarrierTrackingAdapter` y modelo `TrackingResult`.
 - [x] Implementar `OneLineTrackingAdapter` (cliente HTTP resiliente para consultar guías y extraer ETA, buque, viaje, puerto y estatus).
 - [x] Implementar `MscTrackingAdapter` y `SeleniumMscTrackingClient` (Chrome headless para obtener las cookies de Akamai y consultar la API interna de MSC).
+- [x] Implementar `MaerskTrackingAdapter` y `SeleniumMaerskTrackingClient` (Chrome headless con interceptor de `fetch`, un navegador nuevo por guía para evitar el bloqueo de Akamai a la segunda consulta).
 - [x] Factoría `CarrierTrackingAdapterFactory` con liberación de recursos al finalizar cada ciclo.
-- [x] Pruebas unitarias con respuestas simuladas (JSON/HTML) y prueba de integración real opcional con `MSC_BROWSER_TEST=true`.
+- [x] Pruebas unitarias con respuestas simuladas (JSON/HTML) y pruebas de integración reales opcionales con `MSC_BROWSER_TEST=true` y `MAERSK_BROWSER_TEST=true`.
 
 ### Fase 5: Servicios de Negocio e Importación Excel
 - [x] Implementar `ExcelImportService` para procesar archivos `.xlsx` y extraer guías.
 - [x] Implementar `ShipmentService` (creación individual, deduplicación, actualización de estado e historial).
 - [x] Implementar regla de detección de proximidad (ETA ≤ 3 días).
 
-### Fase 6: Servicio de Notificaciones Telegram
+### Fase 6: Servicios de Notificaciones (Telegram y Discord)
 - [x] Implementar `TelegramNotificationService` para enviar mensajes formateados vía Telegram Bot API.
+- [x] Implementar `DiscordNotificationService` mediante Webhook, configurado con variables de entorno privadas (`.env`).
 - [x] Control de envío único por estado para evitar spam repetitivo.
 
 ### Fase 7: Programador de Tareas (Scheduler)

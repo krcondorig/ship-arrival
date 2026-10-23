@@ -1,0 +1,221 @@
+{
+  "tpdoc_num": "TESTMAE0001",
+  "has_import_shipment": false,
+  "is_container_search": false,
+  "is_split_combine_part_load": false,
+  "is_cancelled_shipment": false,
+  "unassigned_containers": 0,
+  "last_update_time": "2026-10-22T19:14:41.000Z",
+  "activity_plan_tasks": [
+    {
+      "task_name": "Arrange Cargo Release",
+      "closed": false
+    }
+  ],
+  "origin": {
+    "terminal": "QINGDAO QIANWAN CONTAINER CO LTD",
+    "geo_site": "2TK5NLOD7R0O6",
+    "city": "QINGDAO",
+    "state": "37",
+    "country": "CHINA",
+    "country_code": "CN",
+    "geoid_city": "2TK5NLOD7R0O6",
+    "site_type": "TERMINAL",
+    "location_code": "CNTSTQQ"
+  },
+  "destination": {
+    "terminal": null,
+    "geo_site": "3F74KKRVQKRJZ",
+    "city": "MEXICO CITY",
+    "state": "CX",
+    "country": "MEXICO",
+    "country_code": "MX",
+    "geoid_city": "3F74KKRVQKRJZ",
+    "site_type": "CITY",
+    "location_code": "MXMEX"
+  },
+  "containers": [
+    {
+      "container_num": "TESTU1234567",
+      "container_size": "20",
+      "container_type": "DRY",
+      "iso_code": "22G1",
+      "shipment_num": "TESTMAE0001",
+      "operator": "MAEU",
+      "is_shipper_owned": false,
+      "is_truck_details_available": false,
+      "is_appointment_available": false,
+      "seals": [
+        {
+          "seal_type": "CARRIER_SEAL",
+          "seal_number": "TESTSEAL0001"
+        }
+      ],
+      "origin": {
+        "terminal": "QINGDAO QIANWAN CONTAINER CO LTD",
+        "geo_site": "2TK5NLOD7R0O6",
+        "city": "QINGDAO",
+        "state": "37",
+        "country": "CHINA",
+        "country_code": "CN",
+        "geoid_city": "2TK5NLOD7R0O6",
+        "site_type": "TERMINAL",
+        "location_code": "CNTSTQQ"
+      },
+      "destination": {
+        "terminal": null,
+        "geo_site": "3F74KKRVQKRJZ",
+        "city": "MEXICO CITY",
+        "state": "CX",
+        "country": "MEXICO",
+        "country_code": "MX",
+        "geoid_city": "3F74KKRVQKRJZ",
+        "site_type": "CITY",
+        "location_code": "MXMEX"
+      },
+      "locations": [
+        {
+          "terminal": "Smart International Logistics Co",
+          "geo_site": "3EX9JNNVZSYV2",
+          "city": "Qingdao",
+          "state": "Asia Pacific Region",
+          "country": "China",
+          "country_code": "CN",
+          "geoid_city": "3EX9JNNVZSYV2",
+          "site_type": "Off-hire depot",
+          "location_code": "CNTSTIN",
+          "events": [
+            {
+              "eventId": "65ec4765-7980-3498-ab7b-51d6d63d626d",
+              "activity": "GATE-OUT",
+              "type": "EQUIPMENT",
+              "locationCode": "CNTSTIN",
+              "stempty": true,
+              "actfor": "EXP",
+              "event_time": "2026-08-30T08:55:00.000",
+              "event_time_type": "ACTUAL"
+            }
+          ]
+        },
+        {
+          "terminal": "QINGDAO QIANWAN CONTAINER CO LTD",
+          "geo_site": "2TK5NLOD7R0O6",
+          "city": "QINGDAO",
+          "state": "37",
+          "country": "CHINA",
+          "country_code": "CN",
+          "geoid_city": "2TK5NLOD7R0O6",
+          "site_type": "TERMINAL",
+          "location_code": "CNTSTQQ",
+          "events": [
+            {
+              "eventId": "28767069-2171-3996-a172-5decb3535271",
+              "activity": "GATE-IN",
+              "type": "EQUIPMENT",
+              "locationCode": "CNTSTQQ",
+              "stempty": false,
+              "actfor": "EXP",
+              "event_time": "2026-09-03T15:32:00.000",
+              "event_time_type": "ACTUAL"
+            },
+            {
+              "eventId": "3a2c2caf-c073-36aa-9482-cf697a8db941",
+              "activity": "LOAD",
+              "type": "EQUIPMENT",
+              "locationCode": "CNTSTQQ",
+              "stempty": false,
+              "actfor": "",
+              "vessel_name": "MAERSK EL ALTO",
+              "voyage_num": "636E",
+              "vessel_num": "V5K",
+              "transport_mode": "MVS",
+              "event_time": "2026-09-04T02:20:00.000",
+              "event_time_type": "ACTUAL"
+            },
+            {
+              "eventId": "a41af70a-bce8-3742-9a9c-7cb8ee01d0fe",
+              "activity": "CONTAINER DEPARTURE",
+              "type": "EQUIPMENT",
+              "locationCode": "CNTSTQQ",
+              "stempty": false,
+              "actfor": "",
+              "vessel_name": "MAERSK EL ALTO",
+              "voyage_num": "636E",
+              "vessel_num": "V5K",
+              "transport_mode": "MVS",
+              "event_time": "2026-09-05T08:15:00.000",
+              "event_time_type": "ACTUAL",
+              "event_date_time_change_code": "82",
+              "event_time_original": "2026-09-06T03:30:00.000",
+              "event_time_updated_on": "2026-08-27T05:03:14.548",
+              "is_etd_updated": true,
+              "last_date_time": "2026-09-05T12:00:00.000"
+            }
+          ]
+        },
+        {
+          "terminal": "SSA MEXICO",
+          "geo_site": "PID8RE9AJECY8",
+          "city": "MANZANILLO",
+          "state": "CL",
+          "country": "MEXICO",
+          "country_code": "MX",
+          "geoid_city": "PID8RE9AJECY8",
+          "site_type": "TERMINAL",
+          "location_code": "MXZLOSM",
+          "events": [
+            {
+              "eventId": "90e2ca27-241e-3b36-8560-c087003dfb76",
+              "activity": "CONTAINER ARRIVAL",
+              "type": "EQUIPMENT",
+              "locationCode": "MXZLOSM",
+              "stempty": false,
+              "actfor": "",
+              "vessel_name": "MAERSK EL ALTO",
+              "voyage_num": "636E",
+              "vessel_num": "V5K",
+              "transport_mode": "MVS",
+              "event_time": "2026-10-06T12:28:00.000",
+              "event_time_type": "ACTUAL",
+              "event_date_time_change_code": "82",
+              "event_time_original": "2026-09-30T04:00:00.000",
+              "event_time_updated_on": "2026-08-27T05:03:14.548",
+              "is_eta_updated": true,
+              "last_date_time": "2026-10-06T07:00:00.000"
+            },
+            {
+              "eventId": "0f00a1e0-1c45-3d5d-b87b-59c0dc782e75",
+              "activity": "DISCHARG",
+              "type": "EQUIPMENT",
+              "locationCode": "MXZLOSM",
+              "stempty": false,
+              "actfor": "",
+              "vessel_name": "MAERSK EL ALTO",
+              "voyage_num": "636E",
+              "vessel_num": "V5K",
+              "transport_mode": "MVS",
+              "event_time": "2026-10-06T23:14:00.000",
+              "event_time_type": "ACTUAL"
+            },
+            {
+              "eventId": "15513914994",
+              "activity": "ON-RAIL",
+              "type": "EQUIPMENT",
+              "locationCode": "MXZLOSM",
+              "stempty": false,
+              "actfor": "IMP",
+              "transport_mode": "RR",
+              "event_time": "2026-10-22T06:14:00.000",
+              "event_time_type": "ACTUAL"
+            }
+          ]
+        }
+      ],
+      "eta_final_delivery": "2026-10-22T06:14:00.000",
+      "status": "IN_PROGRESS",
+      "last_update_time": "2026-10-22T19:14:41Z",
+      "service_type_origin": "CONTAINER_YARD",
+      "service_type_destination": "STORE_DOOR"
+    }
+  ]
+}

@@ -63,6 +63,8 @@ class ExcelImportIntegrationTest {
         assertThat(shipmentRepository.findByTrackingNumber("TESTMIX0003").orElseThrow().getCarrier())
                 .isEqualTo(Carrier.ONE);
         assertThat(shipmentRepository.findByTrackingNumber("TESTMIX0004")).isEmpty();
+        assertThat(shipmentRepository.findByTrackingNumber("TESTMIX0005").orElseThrow().getCarrier())
+                .isEqualTo(Carrier.MAERSK);
     }
 
     private byte[] createWorkbook() throws IOException {
@@ -77,7 +79,8 @@ class ExcelImportIntegrationTest {
             addRow(sheet, 1, "TESTMIX0001", "ONE");
             addRow(sheet, 2, "TESTMIX0002", "msc");
             addRow(sheet, 3, "TESTMIX0003", "");
-            addRow(sheet, 4, "TESTMIX0004", "MAERSK");
+            addRow(sheet, 4, "TESTMIX0004", "HAPAG");
+            addRow(sheet, 5, "TESTMIX0005", "MAERSK");
 
             workbook.write(out);
         }
