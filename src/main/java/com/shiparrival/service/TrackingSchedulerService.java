@@ -30,6 +30,7 @@ public class TrackingSchedulerService {
     private final ShipmentRepository shipmentRepository;
     private final CarrierTrackingAdapterFactory adapterFactory;
     private final TelegramNotificationService telegramNotificationService;
+    private final DiscordNotificationService discordNotificationService;
     private final TaskExecutor trackingTaskExecutor;
     private final long delayMs;
 
@@ -38,15 +39,17 @@ public class TrackingSchedulerService {
 
     @Autowired
     public TrackingSchedulerService(ShipmentService shipmentService,
-                                    ShipmentRepository shipmentRepository,
-                                    CarrierTrackingAdapterFactory adapterFactory,
-                                    TelegramNotificationService telegramNotificationService,
-                                    @Qualifier("trackingTaskExecutor") TaskExecutor trackingTaskExecutor,
-                                    @Value("${tracking.request.delay-ms:2000}") long delayMs) {
+                                     ShipmentRepository shipmentRepository,
+                                     CarrierTrackingAdapterFactory adapterFactory,
+                                     TelegramNotificationService telegramNotificationService,
+                                     DiscordNotificationService discordNotificationService,
+                                     @Qualifier("trackingTaskExecutor") TaskExecutor trackingTaskExecutor,
+                                     @Value("${tracking.request.delay-ms:2000}") long delayMs) {
         this.shipmentService = shipmentService;
         this.shipmentRepository = shipmentRepository;
         this.adapterFactory = adapterFactory;
         this.telegramNotificationService = telegramNotificationService;
+        this.discordNotificationService = discordNotificationService;
         this.trackingTaskExecutor = trackingTaskExecutor;
         this.delayMs = delayMs;
     }
@@ -278,8 +281,9 @@ public class TrackingSchedulerService {
         if (shipment.getStatus() == ShipmentStatus.NEAR_ARRIVAL && !shipment.isAlertSent3Days()) {
             Long days = shipmentService.calculateDaysRemaining(shipment, LocalDate.now());
             long daysRemaining = days != null ? days : 0;
-            boolean success = telegramNotificationService.sendNearArrivalAlert(shipment, daysRemaining);
-            if (success) {
+            boolean tgSent = telegramNotificationService.sendNearArrivalAlert(shipment, daysRemaining);
+            boolean dcSent = discordNotificationService.sendNearArrivalAlert(shipment, daysRemaining);
+            if (tgSent || dcSent) {
                 shipment.setAlertSent3Days(true);
                 shipmentRepository.save(shipment);
                 sent = true;
@@ -288,8 +292,9 @@ public class TrackingSchedulerService {
 
         // Caso 2: Buque arribó a puerto
         if (shipment.getStatus() == ShipmentStatus.ARRIVED && !shipment.isAlertSentArrived()) {
-            boolean success = telegramNotificationService.sendArrivedAlert(shipment);
-            if (success) {
+            boolean tgSent = telegramNotificationService.sendArrivedAlert(shipment);
+            boolean dcSent = discordNotificationService.sendArrivedAlert(shipment);
+            if (tgSent || dcSent) {
                 shipment.setAlertSentArrived(true);
                 shipmentRepository.save(shipment);
                 sent = true;

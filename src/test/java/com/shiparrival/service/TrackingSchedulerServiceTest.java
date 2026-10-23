@@ -46,6 +46,9 @@ class TrackingSchedulerServiceTest {
     @Mock
     private TelegramNotificationService telegramService;
 
+    @Mock
+    private DiscordNotificationService discordService;
+
     private TrackingSchedulerService schedulerService;
 
     @BeforeEach
@@ -59,6 +62,7 @@ class TrackingSchedulerServiceTest {
                 shipmentRepository,
                 adapterFactory,
                 telegramService,
+                discordService,
                 executor,
                 0 // 0 delay en tests para velocidad
         );

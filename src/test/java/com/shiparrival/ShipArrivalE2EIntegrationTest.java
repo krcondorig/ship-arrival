@@ -8,6 +8,7 @@ import com.shiparrival.domain.ShipmentEventLog;
 import com.shiparrival.domain.ShipmentStatus;
 import com.shiparrival.repository.ShipmentEventLogRepository;
 import com.shiparrival.repository.ShipmentRepository;
+import com.shiparrival.service.DiscordNotificationService;
 import com.shiparrival.service.TelegramNotificationService;
 import com.shiparrival.service.TrackingSchedulerService;
 import org.junit.jupiter.api.DisplayName;
@@ -58,6 +59,9 @@ class ShipArrivalE2EIntegrationTest {
     private TelegramNotificationService telegramNotificationService;
 
     @MockitoBean
+    private DiscordNotificationService discordNotificationService;
+
+    @MockitoBean
     private OneLineTrackingAdapter oneLineTrackingAdapter;
 
     @Test
@@ -66,6 +70,7 @@ class ShipArrivalE2EIntegrationTest {
         LocalDateTime etaTwoDaysAhead = LocalDateTime.now().plusDays(2).withHour(9).withMinute(0).withSecond(0).withNano(0);
 
         when(telegramNotificationService.sendNearArrivalAlert(any(), anyLong())).thenReturn(true);
+        when(discordNotificationService.sendNearArrivalAlert(any(), anyLong())).thenReturn(true);
         when(oneLineTrackingAdapter.supports(Carrier.ONE)).thenReturn(true);
         when(oneLineTrackingAdapter.track("TESTBL900001")).thenReturn(TrackingResult.builder()
                 .success(true)
@@ -104,8 +109,9 @@ class ShipArrivalE2EIntegrationTest {
         assertThat(updated.getStatus()).isEqualTo(ShipmentStatus.NEAR_ARRIVAL);
         assertThat(updated.isAlertSent3Days()).isTrue();
 
-        // Verificar que se disparó la alerta de Telegram
+        // Verificar que se disparó la alerta de Telegram y Discord
         verify(telegramNotificationService).sendNearArrivalAlert(any(Shipment.class), anyLong());
+        verify(discordNotificationService).sendNearArrivalAlert(any(Shipment.class), anyLong());
 
         // Verificar que se registró el evento de actualización de ETA
         List<ShipmentEventLog> logs = shipmentEventLogRepository.findByShipmentIdOrderByRecordedAtDesc(updated.getId());
