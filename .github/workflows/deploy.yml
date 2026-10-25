@@ -2,8 +2,8 @@ name: ShipArrival - Daily Tracking Worker & CI
 
 on:
   schedule:
-    - cron: '0 8 * * *'
-  workflow_dispatch:
+    - cron: '0 8 * * *' # Todos los días a las 08:00 UTC (03:00 AM Perú)
+  workflow_dispatch: # Permite disparar el monitoreo manualmente desde la pestaña Actions en GitHub
 
 jobs:
   run-tracking:
@@ -29,6 +29,6 @@ jobs:
       - name: Grant execution permission to Maven wrapper
         run: chmod +x mvnw
 
-      - name: Run Spring Boot app in CI-safe mode
+      - name: Run Spring Boot app using the default local H2 configuration
         run: |
           bash ./mvnw spring-boot:run -Dspring-boot.run.args="--run-tracking"
