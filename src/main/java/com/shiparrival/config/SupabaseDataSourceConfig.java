@@ -29,10 +29,6 @@ public class SupabaseDataSourceConfig {
                     url = "jdbc:" + url;
                 }
             }
-            // Supabase strictly requires SSL for external connections
-            if (!url.contains("sslmode=")) {
-                url += (url.contains("?") ? "&" : "?") + "sslmode=require";
-            }
         }
 
         String driver = env.getProperty("spring.datasource.driverClassName", "org.postgresql.Driver");
