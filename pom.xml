@@ -45,13 +45,6 @@
 			<scope>runtime</scope>
 		</dependency>
 
-		<!-- PostgreSQL Database (Supabase / Production) -->
-		<dependency>
-			<groupId>org.postgresql</groupId>
-			<artifactId>postgresql</artifactId>
-			<scope>runtime</scope>
-		</dependency>
-
 		<!-- Apache POI for Excel (.xlsx) processing -->
 		<dependency>
 			<groupId>org.apache.poi</groupId>
