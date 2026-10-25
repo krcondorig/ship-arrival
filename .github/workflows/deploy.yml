@@ -29,6 +29,33 @@ jobs:
       - name: Grant execution permission to Maven wrapper
         run: chmod +x mvnw
 
+      - name: Validate Supabase connection
+        env:
+          SPRING_DATASOURCE_URL: ${{ secrets.SPRING_DATASOURCE_URL }}
+        run: |
+          echo "URL set? ${SPRING_DATASOURCE_URL:+yes}"
+          python3 - <<'PY'
+          import os, re, socket
+          url = os.environ.get("SPRING_DATASOURCE_URL", "")
+          print("starts_with_jdbc_postgresql =", url.startswith("jdbc:postgresql://"))
+          print("starts_with_postgresql =", url.startswith("postgresql://"))
+          print("starts_with_postgres =", url.startswith("postgres://"))
+          print("contains_sslmode =", "sslmode" in url.lower())
+          m = re.search(r'://([^:/]+):(\d+)', url)
+          if m:
+              host, port = m.group(1), int(m.group(2))
+              print(f"host = {host}")
+              print(f"port = {port}")
+              try:
+                  s = socket.create_connection((host, port), timeout=10)
+                  s.close()
+                  print(f"TCP connection to {host}:{port} = OK")
+              except Exception as e:
+                  print(f"TCP connection to {host}:{port} = FAILED: {e}")
+          else:
+              print("host_port_parse = FAILED - URL format may be wrong")
+          PY
+
       - name: Run Spring Boot Tracking Worker (Supabase + Chrome)
         env:
           SPRING_DATASOURCE_URL: ${{ secrets.SPRING_DATASOURCE_URL }}
