@@ -40,4 +40,4 @@ jobs:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
           DISCORD_ENABLED: ${{ secrets.DISCORD_ENABLED }}
         run: |
-          ./mvnw spring-boot:run -Dspring-boot.run.profiles=prod -Dspring-boot.run.args="--run-tracking"
+          bash ./mvnw spring-boot:run -Dspring-boot.run.profiles=prod -Dspring-boot.run.args="--run-tracking"
