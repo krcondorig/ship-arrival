@@ -26,6 +26,9 @@ jobs:
           key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
           restore-keys: ${{ runner.os }}-m2
 
+      - name: Grant execution permission to Maven wrapper
+        run: chmod +x mvnw
+
       - name: Run Spring Boot Tracking Worker (Supabase + Chrome)
         env:
           SPRING_DATASOURCE_URL: ${{ secrets.SPRING_DATASOURCE_URL }}
