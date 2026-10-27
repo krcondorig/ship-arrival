@@ -1,0 +1,27 @@
+services:
+  - type: web
+    name: ship-arrival-dashboard
+    env: docker
+    region: oregon
+    plan: free
+    branch: master
+    autoDeploy: true
+    envVars:
+      - key: SPRING_PROFILES_ACTIVE
+        value: prod
+      - key: SUPABASE_DB_HOST
+        sync: false
+      - key: SUPABASE_DB_PORT
+        value: 5432
+      - key: SUPABASE_DB_NAME
+        value: postgres
+      - key: SUPABASE_DB_USER
+        sync: false
+      - key: SUPABASE_DB_PASSWORD
+        sync: false
+      - key: TELEGRAM_ENABLED
+        value: "false"
+      - key: DISCORD_ENABLED
+        value: "true"
+      - key: DISCORD_WEBHOOK_URL
+        sync: false
