@@ -373,4 +373,31 @@ class TrackingSchedulerServiceTest {
         assertThat(status.getUpdated()).isEqualTo(100);
         assertThat(status.isRunning()).isFalse();
     }
+
+    @Test
+    @DisplayName("Al terminar el ciclo se ejecuta la limpieza de retención")
+    void shouldRunRetentionAfterCycle() {
+        ShipmentRetentionService retention = mock(ShipmentRetentionService.class);
+        schedulerService.setRetentionService(retention);
+        when(shipmentService.getActiveShipments()).thenReturn(List.of());
+
+        schedulerService.runTrackingCycle();
+
+        verify(retention).purgeExpired(any(LocalDateTime.class));
+    }
+
+    @Test
+    @DisplayName("Si la limpieza falla, el ciclo se reporta igual")
+    void shouldSurviveRetentionFailure() {
+        ShipmentRetentionService retention = mock(ShipmentRetentionService.class);
+        schedulerService.setRetentionService(retention);
+        when(shipmentService.getActiveShipments()).thenReturn(List.of());
+        doThrow(new IllegalStateException("base caída"))
+                .when(retention).purgeExpired(any(LocalDateTime.class));
+
+        TrackingExecutionSummary summary = schedulerService.runTrackingCycle();
+
+        assertThat(summary.getErrorMessage()).isNull();
+        assertThat(summary.getTotalProcessed()).isZero();
+    }
 }

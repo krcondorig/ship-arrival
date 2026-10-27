@@ -43,6 +43,12 @@ public class TrackingSchedulerService {
      */
     private TrackingProgressService progressService;
 
+    /**
+     * Colaborador opcional: la limpieza de retención. Si no está (por ejemplo en
+     * pruebas unitarias del ciclo), el monitoreo funciona igual y no borra nada.
+     */
+    private ShipmentRetentionService retentionService;
+
     private volatile String runId;
     private volatile String origin;
 
@@ -70,6 +76,11 @@ public class TrackingSchedulerService {
     @Autowired(required = false)
     public void setProgressService(TrackingProgressService progressService) {
         this.progressService = progressService;
+    }
+
+    @Autowired(required = false)
+    public void setRetentionService(ShipmentRetentionService retentionService) {
+        this.retentionService = retentionService;
     }
 
     /**
@@ -243,6 +254,8 @@ public class TrackingSchedulerService {
             finishStatus(processed, total, updated, failed, alerts, duration, details);
         }
 
+        purgeExpiredShipments();
+
         long duration = System.currentTimeMillis() - startTime;
         log.info("Ciclo de monitoreo finalizado. Procesados: {}, Actualizados: {}, Fallidos: {}, Alertas enviadas: {} en {} ms",
                 processed, updated, failed, alerts, duration);
@@ -255,6 +268,21 @@ public class TrackingSchedulerService {
                 .executionDurationMs(duration)
                 .details(details)
                 .build();
+    }
+
+    /**
+     * La limpieza nunca debe tumbar el ciclo: si falla, se registra y el
+     * monitoreo se reporta igual.
+     */
+    private void purgeExpiredShipments() {
+        if (retentionService == null) {
+            return;
+        }
+        try {
+            retentionService.purgeExpired(LocalDateTime.now());
+        } catch (Exception ex) {
+            log.warn("No se pudo ejecutar la limpieza de retención: {}", ex.getMessage());
+        }
     }
 
     private synchronized void markQueued() {
