@@ -1,7 +1,7 @@
 name: Test Mobile Proxy via Tailscale
 
 on:
-  workflow_dispatch: # Permite disparar la prueba manualmente con un clic en GitHub
+  workflow_dispatch:
 
 jobs:
   test-proxy:
@@ -10,6 +10,16 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Playwright
+        run: |
+          pip install playwright
+          playwright install chromium --with-deps
+
       - name: Connect to Tailscale
         uses: tailscale/github-action@v3
         with:
@@ -17,14 +27,51 @@ jobs:
 
       - name: Test Connection to Phone Proxy
         run: |
-          echo "=== 1. Probando ping al celular por Tailscale ==="
-          tailscale ping -c 3 100.77.93.94 || echo "Ping ICMP no respondió, probando HTTP directo..."
+          echo "=== 1. Ping al celular por Tailscale ==="
+          tailscale ping -c 2 100.77.93.94
 
-          echo "=== 2. Verificando la IP publica que ve internet a traves del celular ==="
+          echo "=== 2. IP publica a traves del celular ==="
           curl -s --max-time 15 -x http://100.77.93.94:8080 https://ifconfig.me/ip
           echo ""
 
-          echo "=== 3. Probando conexion real a MSC a traves del celular ==="
-          curl -s --max-time 20 -x http://100.77.93.94:8080 \
-            -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36" \
-            https://www.msc.com/en/track-a-shipment | grep -i "<title>" || echo "No se pudo obtener el titulo de MSC"
+          echo "=== 3. Probando MSC con Navegador Real (Playwright + Proxy Celular) ==="
+          python3 - << 'EOF'
+          import asyncio
+          from playwright.async_api import async_playwright
+
+          async def run():
+              async with async_playwright() as p:
+                  # Lanzamos navegador Chromium pasando por el proxy del celular
+                  browser = await p.chromium.launch(
+                      headless=True,
+                      args=[
+                          "--no-sandbox",
+                          "--disable-dev-shm-usage",
+                          "--disable-blink-features=AutomationControlled"
+                      ],
+                      proxy={"server": "http://100.77.93.94:8080"}
+                  )
+                  context = await browser.new_context(
+                      user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36",
+                      viewport={"width": 1920, "height": 1080}
+                  )
+                  await context.add_init_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined});")
+                  page = await context.new_page()
+
+                  print("Navegando a MSC...")
+                  try:
+                      await page.goto("https://www.msc.com/en/track-a-shipment", wait_until="domcontentloaded", timeout=45000)
+                      await page.wait_for_timeout(5000)
+                      title = await page.title()
+                      print(f"TITULO MSC: {title}")
+                      if "Access Denied" in title:
+                          print("RESULTADO: MSC Bloqueado por Akamai")
+                      else:
+                          print("RESULTADO: ¡EXITO TOTAL! MSC permitió el acceso con navegador real.")
+                  except Exception as e:
+                      print(f"ERROR: {e}")
+                  finally:
+                      await browser.close()
+
+          asyncio.run(run())
+          EOF
