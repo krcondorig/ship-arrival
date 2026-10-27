@@ -37,6 +37,15 @@ public class TrackingSchedulerService {
     private final AtomicBoolean trackingInProgress = new AtomicBoolean(false);
     private TrackingStatus trackingStatus = TrackingStatus.idle();
 
+    /**
+     * Colaborador opcional: si no está (por ejemplo en pruebas unitarias del
+     * ciclo), el monitoreo funciona igual y simplemente no publica avance.
+     */
+    private TrackingProgressService progressService;
+
+    private volatile String runId;
+    private volatile String origin;
+
     @Autowired
     public TrackingSchedulerService(ShipmentService shipmentService,
                                      ShipmentRepository shipmentRepository,
@@ -56,6 +65,25 @@ public class TrackingSchedulerService {
 
     public boolean isTrackingInProgress() {
         return trackingInProgress.get();
+    }
+
+    @Autowired(required = false)
+    public void setProgressService(TrackingProgressService progressService) {
+        this.progressService = progressService;
+    }
+
+    /**
+     * Identifica la ejecución cuyo avance se publicará en la base compartida.
+     * Se llama justo antes de disparar el ciclo; sin contexto no se publica nada.
+     */
+    public void setRunContext(String runId, String origin) {
+        this.runId = runId;
+        this.origin = origin;
+    }
+
+    private void clearRunContext() {
+        this.runId = null;
+        this.origin = null;
     }
 
     public void setTrackingInProgress(boolean inProgress) {
@@ -116,6 +144,7 @@ public class TrackingSchedulerService {
             return doRunTrackingCycle();
         } finally {
             trackingInProgress.set(false);
+            clearRunContext();
         }
     }
 
@@ -129,6 +158,7 @@ public class TrackingSchedulerService {
                     System.currentTimeMillis() - startTime);
         } finally {
             trackingInProgress.set(false);
+            clearRunContext();
         }
     }
 
@@ -157,6 +187,7 @@ public class TrackingSchedulerService {
         List<String> details = new ArrayList<>();
 
         startStatus(total);
+        publishStart(total);
         log.info("Comenzando ciclo de monitoreo para {} embarques activos", total);
 
         try {
@@ -189,7 +220,7 @@ public class TrackingSchedulerService {
                 }
 
                 processed = i + 1;
-                updateProgress(processed, updated, failed, alerts);
+                updateProgress(total, processed, updated, failed, alerts);
 
                 // Pausa de cortesía entre peticiones para evitar bloqueos por rate-limiting
                 if (delayMs > 0 && i < total - 1) {
@@ -249,11 +280,12 @@ public class TrackingSchedulerService {
         trackingStatus.setCurrentTrackingNumber(trackingNumber);
     }
 
-    private synchronized void updateProgress(int processed, int updated, int failed, int alerts) {
+    private synchronized void updateProgress(int total, int processed, int updated, int failed, int alerts) {
         trackingStatus.setProcessed(processed);
         trackingStatus.setUpdated(updated);
         trackingStatus.setFailed(failed);
         trackingStatus.setAlertsSent(alerts);
+        publishUpdate(total, processed, updated, failed);
     }
 
     private synchronized void finishStatus(int processed, int total, int updated, int failed, int alerts,
@@ -269,6 +301,7 @@ public class TrackingSchedulerService {
         trackingStatus.setDurationMs(durationMs);
         trackingStatus.setMessage(failed > 0 ? "Monitoreo finalizado con fallos" : "Monitoreo finalizado");
         trackingStatus.setDetails(new ArrayList<>(details));
+        publishComplete(processed, total, updated, failed);
     }
 
     private synchronized void finishWithError(String message, long durationMs) {
@@ -277,6 +310,52 @@ public class TrackingSchedulerService {
         trackingStatus.setFinishedAt(LocalDateTime.now());
         trackingStatus.setDurationMs(durationMs);
         trackingStatus.setMessage(message);
+        publishFail(message);
+    }
+
+    private void publishStart(int total) {
+        if (progressService == null || runId == null) {
+            return;
+        }
+        try {
+            progressService.start(runId, origin);
+            progressService.update(runId, total, 0, 0, 0);
+        } catch (Exception ex) {
+            log.warn("No se pudo publicar el inicio de la ejecución {}: {}", runId, ex.getMessage());
+        }
+    }
+
+    private void publishUpdate(int total, int processed, int updated, int failed) {
+        if (progressService == null || runId == null) {
+            return;
+        }
+        try {
+            progressService.update(runId, total, processed, updated, failed);
+        } catch (Exception ex) {
+            log.warn("No se pudo publicar el avance de la ejecución {}: {}", runId, ex.getMessage());
+        }
+    }
+
+    private void publishComplete(int processed, int total, int updated, int failed) {
+        if (progressService == null || runId == null) {
+            return;
+        }
+        try {
+            progressService.complete(runId, total, processed, updated, failed);
+        } catch (Exception ex) {
+            log.warn("No se pudo publicar el fin de la ejecución {}: {}", runId, ex.getMessage());
+        }
+    }
+
+    private void publishFail(String message) {
+        if (progressService == null || runId == null) {
+            return;
+        }
+        try {
+            progressService.fail(runId, message);
+        } catch (Exception ex) {
+            log.warn("No se pudo publicar el fallo de la ejecución {}: {}", runId, ex.getMessage());
+        }
     }
 
     private boolean checkAndSendAlerts(Shipment shipment) {
