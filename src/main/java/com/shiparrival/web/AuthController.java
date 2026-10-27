@@ -51,6 +51,7 @@ public class AuthController {
         Optional<AppUser> user = userService.authenticate(username, password);
         if (user.isEmpty()) {
             loginAttemptService.recordFailure(username);
+            log.warn("Intento de acceso fallido para el usuario {}", username);
             model.addAttribute("errorMessage", "Usuario o contraseña incorrectos.");
             model.addAttribute("redirect", redirect);
             return "login";
@@ -61,6 +62,7 @@ public class AuthController {
 
         HttpSession session = request.getSession(true);
         session.setAttribute(AuthFilter.SESSION_USER_ID, user.get().getId());
+        session.setAttribute(AuthFilter.SESSION_EPOCH, user.get().getSessionEpoch());
         // Rotar el identificador evita que una cookie capturada antes del login
         // sirva después de autenticarse.
         request.changeSessionId();
@@ -79,8 +81,9 @@ public class AuthController {
     }
 
     /**
-     * Solo se aceptan rutas internas. Cualquier destino absoluto o de protocolo
-     * relativo se descarta para no convertir el login en un trampolín.
+     * Solo se aceptan rutas internas. Cualquier destino absoluto, de protocolo
+     * relativo o con barras invertidas se descarta para no convertir el login en
+     * un trampolín.
      */
     private String safeRedirect(String redirect) {
         if (redirect == null || redirect.isBlank()) {
@@ -90,9 +93,12 @@ public class AuthController {
         if (!candidate.startsWith("/") || candidate.startsWith("//")) {
             return "/";
         }
-        int slash = candidate.indexOf('/');
-        int colon = candidate.indexOf(':');
-        if (colon >= 0 && colon < slash) {
+        // Una barra invertida la normalizan algunos navegadores a "/", lo que
+        // convertiría "/\evil.example" en "//evil.example".
+        if (candidate.indexOf('\\') >= 0
+                || candidate.indexOf(':') >= 0
+                || candidate.indexOf('\n') >= 0
+                || candidate.indexOf('\r') >= 0) {
             return "/";
         }
         return candidate;

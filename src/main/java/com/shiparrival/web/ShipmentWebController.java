@@ -124,7 +124,10 @@ public class ShipmentWebController {
     @PostMapping("/shipments")
     public String registerShipment(@RequestParam String trackingNumber,
                                    @RequestParam(defaultValue = "ONE") Carrier carrier,
+                                   @RequestAttribute(value = AuthFilter.CURRENT_USER_ATTRIBUTE, required = false)
+                                   CurrentUser currentUser,
                                    RedirectAttributes redirectAttributes) {
+        requireAdmin(currentUser);
         try {
             boolean alreadyRegistered = shipmentService.existsByTrackingNumber(trackingNumber);
             Shipment registered = shipmentService.registerShipment(trackingNumber, carrier);
@@ -146,7 +149,10 @@ public class ShipmentWebController {
     @PostMapping("/shipments/upload-excel")
     public String uploadExcel(@RequestParam("file") MultipartFile file,
                               @RequestParam(defaultValue = "ONE") Carrier carrier,
+                              @RequestAttribute(value = AuthFilter.CURRENT_USER_ATTRIBUTE, required = false)
+                              CurrentUser currentUser,
                               RedirectAttributes redirectAttributes) {
+        requireAdmin(currentUser);
         if (file.isEmpty()) {
             redirectAttributes.addFlashAttribute("errorMessage", "Debe seleccionar un archivo Excel (.xlsx)");
             return "redirect:/";
@@ -176,9 +182,7 @@ public class ShipmentWebController {
                            CurrentUser currentUser,
                            RedirectAttributes redirectAttributes) {
 
-        if (currentUser != null && !currentUser.isAdmin()) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN);
-        }
+        requireAdmin(currentUser);
 
         if (!gitHubActionsClient.isEnabled()) {
             return startLocalCycle(redirectAttributes);
@@ -194,13 +198,24 @@ public class ShipmentWebController {
         Optional<Long> runId = gitHubActionsClient.dispatch();
         if (runId.isEmpty()) {
             redirectAttributes.addFlashAttribute("errorMessage",
-                    "No se pudo enviar el monitoreo: el token de GitHub no tiene permiso para ejecutar workflows.");
+                    "No se pudo confirmar el envío del monitoreo. Revisa el token de GitHub o vuelve a intentarlo.");
             return "redirect:/";
         }
 
         redirectAttributes.addFlashAttribute("infoMessage",
                 "Monitoreo enviado a la nube. El avance aparecerá en unos segundos.");
         return "redirect:/?runId=" + runId.get();
+    }
+
+    /**
+     * Registrar, importar y eliminar son tareas de administración; un usuario
+     * normal solo consulta. La ausencia del atributo significa que la autenticación
+     * está desactivada (desarrollo local), y entonces se permite trabajar como antes.
+     */
+    private void requireAdmin(CurrentUser currentUser) {
+        if (currentUser != null && !currentUser.isAdmin()) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN);
+        }
     }
 
     private String startLocalCycle(RedirectAttributes redirectAttributes) {
@@ -253,7 +268,10 @@ public class ShipmentWebController {
                                  @RequestParam(defaultValue = "0") int page,
                                  @RequestParam(defaultValue = "10") int size,
                                  @RequestParam(required = false) String search,
+                                 @RequestAttribute(value = AuthFilter.CURRENT_USER_ATTRIBUTE, required = false)
+                                 CurrentUser currentUser,
                                  RedirectAttributes redirectAttributes) {
+        requireAdmin(currentUser);
         try {
             shipmentService.deleteShipment(id);
             redirectAttributes.addFlashAttribute("successMessage", "Embarque eliminado correctamente.");

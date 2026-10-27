@@ -76,7 +76,9 @@ class RemoteTrackingControllerTest {
         when(gitHubActionsClient.isEnabled()).thenReturn(true);
         when(gitHubActionsClient.findRun(987654L)).thenReturn(Optional.of(
                 new GitHubRunState(987654L, "completed", "failure",
-                        "https://github.com/x/y/actions/runs/987654", "Activate Phone Exit Node")));
+                        "https://github.com/x/y/actions/runs/987654", null)));
+        when(gitHubActionsClient.findFailedStep(987654L))
+                .thenReturn(Optional.of("Activate Phone Exit Node"));
 
         mockMvc.perform(get("/shipments/live-status").param("runId", "987654")
                         .sessionAttr(AuthFilter.SESSION_USER_ID, admin.getId()))
@@ -129,6 +131,32 @@ class RemoteTrackingControllerTest {
                 .role(UserRole.USER).enabled(true).build());
 
         mockMvc.perform(post("/shipments/track-now")
+                        .sessionAttr(AuthFilter.SESSION_USER_ID, user.getId()))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("Un usuario normal no puede registrar guías")
+    void shouldForbidRegularUserFromRegistering() throws Exception {
+        AppUser user = repository.save(AppUser.builder()
+                .username("beto").passwordHash(passwordEncoder.encode("claveSegura1"))
+                .role(UserRole.USER).enabled(true).build());
+
+        mockMvc.perform(post("/shipments")
+                        .sessionAttr(AuthFilter.SESSION_USER_ID, user.getId())
+                        .param("trackingNumber", "TESTBL900099")
+                        .param("carrier", "ONE"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("Un usuario normal no puede eliminar embarques")
+    void shouldForbidRegularUserFromDeleting() throws Exception {
+        AppUser user = repository.save(AppUser.builder()
+                .username("carla").passwordHash(passwordEncoder.encode("claveSegura1"))
+                .role(UserRole.USER).enabled(true).build());
+
+        mockMvc.perform(post("/shipments/1/delete")
                         .sessionAttr(AuthFilter.SESSION_USER_ID, user.getId()))
                 .andExpect(status().isForbidden());
     }

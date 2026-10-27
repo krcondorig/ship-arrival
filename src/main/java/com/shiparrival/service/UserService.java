@@ -71,6 +71,7 @@ public class UserService {
         validatePassword(rawPassword);
         AppUser target = require(targetId);
         target.setPasswordHash(passwordEncoder.encode(rawPassword));
+        target.setSessionEpoch(target.getSessionEpoch() + 1);
         repository.save(target);
     }
 

@@ -30,10 +30,6 @@ public class LiveTrackingStatusService {
     static final String GENERIC_FAILURE_MESSAGE =
             "El monitoreo falló en la nube. Revisa el detalle en GitHub Actions.";
 
-    private static final List<String> PHONE_STEPS = List.of(
-            "Activate Phone Exit Node",
-            "Connect to Tailscale (Phone Exit Node)");
-
     private final TrackingProgressService progressService;
     private final GitHubActionsClient gitHubActionsClient;
     private final TrackingSchedulerService trackingSchedulerService;
@@ -62,7 +58,10 @@ public class LiveTrackingStatusService {
             GitHubRunState state = run.get();
 
             if (state.isFailure()) {
-                if (isPhoneStep(state.failedStepName())) {
+                String failedStep = state.failedStepName() != null
+                        ? state.failedStepName()
+                        : gitHubActionsClient.findFailedStep(state.id()).orElse(null);
+                if (isPhoneStep(failedStep)) {
                     return failed(PHONE_OFFLINE_MESSAGE, runUrl, progress);
                 }
                 return failed(GENERIC_FAILURE_MESSAGE, runUrl, progress);
@@ -80,7 +79,7 @@ public class LiveTrackingStatusService {
 
         if (progress.isPresent()) {
             TrackingRunProgress row = progress.get();
-            if (row.getStatus() == TrackingRunStatus.RUNNING && run.isEmpty() && isStale(row)) {
+            if (row.getStatus() == TrackingRunStatus.RUNNING && isStale(row)) {
                 return failed("El monitoreo no reporta avance desde hace más de " + staleMinutes
                         + " minutos. Revisa que el teléfono esté encendido y con Tailscale activo.",
                         runUrl, progress);
@@ -151,11 +150,13 @@ public class LiveTrackingStatusService {
     }
 
     private boolean isPhoneStep(String step) {
-        return step != null && PHONE_STEPS.contains(step);
+        return step != null && (step.contains("Tailscale") || step.contains("Exit Node"));
     }
 
     private boolean isStale(TrackingRunProgress row) {
-        return row.getStartedAt() != null
-                && row.getStartedAt().isBefore(LocalDateTime.now().minusMinutes(staleMinutes));
+        LocalDateTime reference = row.getLastHeartbeatAt() != null
+                ? row.getLastHeartbeatAt()
+                : row.getStartedAt();
+        return reference != null && reference.isBefore(LocalDateTime.now().minusMinutes(staleMinutes));
     }
 }

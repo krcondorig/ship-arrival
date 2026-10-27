@@ -98,6 +98,30 @@ class TrackingProgressServiceTest {
     }
 
     @Test
+    @DisplayName("Cada avance refresca el latido para no confundir una ejecución lenta con una perdida")
+    void shouldRefreshHeartbeatOnUpdate() {
+        TrackingRunProgress run = TrackingRunProgress.builder()
+                .runId("run-1").status(TrackingRunStatus.RUNNING).total(4).build();
+        when(repository.findByRunId("run-1")).thenReturn(Optional.of(run));
+
+        service.update("run-1", 4, 2, 1, 1);
+
+        assertThat(run.getLastHeartbeatAt()).isNotNull();
+    }
+
+    @Test
+    @DisplayName("Marcar el fin también actualiza el latido")
+    void shouldRefreshHeartbeatOnComplete() {
+        TrackingRunProgress run = TrackingRunProgress.builder()
+                .runId("run-1").status(TrackingRunStatus.RUNNING).build();
+        when(repository.findByRunId("run-1")).thenReturn(Optional.of(run));
+
+        service.complete("run-1", 4, 4, 4, 0);
+
+        assertThat(run.getLastHeartbeatAt()).isNotNull();
+    }
+
+    @Test
     @DisplayName("Consultar una ejecución inexistente no falla")
     void shouldReturnEmptyForUnknownRun() {
         when(repository.findByRunId("desconocida")).thenReturn(Optional.empty());

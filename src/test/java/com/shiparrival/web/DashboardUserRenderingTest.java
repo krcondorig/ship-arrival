@@ -49,6 +49,26 @@ class DashboardUserRenderingTest {
     }
 
     @Test
+    @DisplayName("Un usuario normal no ve los formularios de administración")
+    void shouldHideAdminFormsFromRegularUsers() throws Exception {
+        AppUser user = repository.save(AppUser.builder()
+                .username("beto").passwordHash("h").role(UserRole.USER).enabled(true).build());
+
+        mockMvc.perform(get("/").sessionAttr(AuthFilter.SESSION_USER_ID, user.getId()))
+                .andExpect(status().isOk())
+                .andExpect(content().string(not(containsString("id=\"trackNowForm\""))))
+                .andExpect(content().string(not(containsString("Registrar Embarque Individual"))));
+
+        AppUser admin = repository.save(AppUser.builder()
+                .username("jefa2").passwordHash("h").role(UserRole.ADMIN).enabled(true).build());
+
+        mockMvc.perform(get("/").sessionAttr(AuthFilter.SESSION_USER_ID, admin.getId()))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("id=\"trackNowForm\"")))
+                .andExpect(content().string(containsString("Registrar Embarque Individual")));
+    }
+
+    @Test
     @DisplayName("El nombre del usuario aparece en la barra superior")
     void shouldShowCurrentUsername() throws Exception {
         AppUser user = repository.save(AppUser.builder()

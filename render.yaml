@@ -37,3 +37,5 @@ services:
         value: "true"
       - key: GITHUB_TOKEN
         sync: false
+      - key: SESSION_COOKIE_SECURE
+        value: "true"

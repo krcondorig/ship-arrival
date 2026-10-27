@@ -63,5 +63,7 @@ public class TrackingRunProgress {
 
     private LocalDateTime startedAt;
 
+    private LocalDateTime lastHeartbeatAt;
+
     private LocalDateTime finishedAt;
 }

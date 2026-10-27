@@ -7,6 +7,10 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -54,5 +58,16 @@ class AdminBootstrapTest {
 
         verify(userService, never()).createUser(org.mockito.ArgumentMatchers.anyString(),
                 org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    @DisplayName("Una contraseña inicial inválida no impide que la aplicación arranque")
+    void shouldNotFailStartupWhenCredentialsAreInvalid() {
+        when(repository.count()).thenReturn(0L);
+        doThrow(new IllegalArgumentException("La contraseña debe tener al menos 8 caracteres"))
+                .when(userService).createUser(anyString(), anyString(), any());
+
+        assertThatCode(() -> new AdminBootstrap(repository, userService, "admin", "corta").run(null))
+                .doesNotThrowAnyException();
     }
 }

@@ -64,7 +64,8 @@ class AuthControllerTest {
                         .param("password", "claveSegura1"))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/"))
-                .andExpect(request().sessionAttribute(AuthFilter.SESSION_USER_ID, notNullValue()));
+                .andExpect(request().sessionAttribute(AuthFilter.SESSION_USER_ID, notNullValue()))
+                .andExpect(request().sessionAttribute(AuthFilter.SESSION_EPOCH, 0L));
     }
 
     @Test
@@ -116,6 +117,27 @@ class AuthControllerTest {
                         .param("password", "claveSegura1")
                         .param("redirect", "//sitio-malicioso.example"))
                 .andExpect(redirectedUrl("/"));
+
+        // Los navegadores normalizan "\" a "/", así que "/\sitio.example" acabaría
+        // siendo "//sitio.example".
+        mockMvc.perform(post("/login")
+                        .param("username", "dario")
+                        .param("password", "claveSegura1")
+                        .param("redirect", "/\\sitio-malicioso.example"))
+                .andExpect(redirectedUrl("/"));
+
+        mockMvc.perform(post("/login")
+                        .param("username", "dario")
+                        .param("password", "claveSegura1")
+                        .param("redirect", "javascript:alert(1)"))
+                .andExpect(redirectedUrl("/"));
+
+        // Un destino interno sí se respeta.
+        mockMvc.perform(post("/login")
+                        .param("username", "dario")
+                        .param("password", "claveSegura1")
+                        .param("redirect", "/users"))
+                .andExpect(redirectedUrl("/users"));
     }
 
     @Test

@@ -113,5 +113,6 @@ class UserServiceTest {
         userService.resetPassword(2L, 1L, "nuevaClave1");
 
         assertThat(new BCryptPasswordEncoder().matches("nuevaClave1", stored.getPasswordHash())).isTrue();
+        assertThat(stored.getSessionEpoch()).isEqualTo(1L);
     }
 }

@@ -66,4 +66,27 @@ class AuthFilterIntegrationTest {
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/login"));
     }
+
+    @Test
+    @DisplayName("Cambiar la contraseña invalida las sesiones abiertas con la anterior")
+    void shouldRejectSessionOpenedBeforePasswordReset() throws Exception {
+        AppUser user = repository.save(AppUser.builder()
+                .username("carla").passwordHash("h").role(UserRole.USER).enabled(true).build());
+
+        // La sesión se abrió con la época 0; el administrador restablece la clave
+        // y la cuenta pasa a la época 1.
+        user.setSessionEpoch(1L);
+        repository.save(user);
+
+        mockMvc.perform(get("/")
+                        .sessionAttr(AuthFilter.SESSION_USER_ID, user.getId())
+                        .sessionAttr(AuthFilter.SESSION_EPOCH, 0L))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/login"));
+
+        mockMvc.perform(get("/")
+                        .sessionAttr(AuthFilter.SESSION_USER_ID, user.getId())
+                        .sessionAttr(AuthFilter.SESSION_EPOCH, 1L))
+                .andExpect(status().isOk());
+    }
 }

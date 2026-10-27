@@ -38,6 +38,7 @@ public class TrackingProgressService {
         run.setStatus(TrackingRunStatus.RUNNING);
         run.setOrigin(origin);
         run.setStartedAt(LocalDateTime.now());
+        run.setLastHeartbeatAt(LocalDateTime.now());
         run.setFinishedAt(null);
         run.setMessage(null);
         return repository.save(run);
@@ -50,6 +51,7 @@ public class TrackingProgressService {
             run.setProcessed(processed);
             run.setUpdated(updated);
             run.setFailed(failed);
+            run.setLastHeartbeatAt(LocalDateTime.now());
             repository.save(run);
         });
     }
@@ -63,6 +65,7 @@ public class TrackingProgressService {
             run.setFailed(failed);
             run.setStatus(TrackingRunStatus.COMPLETED);
             run.setFinishedAt(LocalDateTime.now());
+            run.setLastHeartbeatAt(LocalDateTime.now());
             run.setMessage(failed > 0 ? "Monitoreo finalizado con fallos" : "Monitoreo finalizado");
             repository.save(run);
         });
@@ -73,6 +76,7 @@ public class TrackingProgressService {
         repository.findByRunId(runId).ifPresent(run -> {
             run.setStatus(TrackingRunStatus.FAILED);
             run.setFinishedAt(LocalDateTime.now());
+            run.setLastHeartbeatAt(LocalDateTime.now());
             run.setMessage(truncate(message));
             repository.save(run);
         });

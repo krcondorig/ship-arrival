@@ -45,6 +45,6 @@ class DashboardLivePanelRenderingTest {
                         .sessionAttr(AuthFilter.SESSION_USER_ID, admin.getId()))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("data-live-status-url")))
-                .andExpect(content().string(containsString("987654")));
+                .andExpect(content().string(containsString("data-run-id=\"987654\"")));
     }
 }

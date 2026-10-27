@@ -56,6 +56,15 @@ public class AppUser {
 
     private LocalDateTime lastLoginAt;
 
+    /**
+     * Se incrementa al cambiar la contraseña. Las sesiones guardan el valor que
+     * tenían al iniciar sesión; si ya no coincide, el filtro las invalida. Así un
+     * restablecimiento de clave expulsa al intruso de inmediato.
+     */
+    @Column(nullable = false)
+    @Builder.Default
+    private long sessionEpoch = 0L;
+
     @PrePersist
     protected void onCreate() {
         if (createdAt == null) {

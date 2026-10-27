@@ -23,10 +23,11 @@ import java.util.Optional;
 public class AuthFilter extends OncePerRequestFilter {
 
     public static final String SESSION_USER_ID = "auth.userId";
+    public static final String SESSION_EPOCH = "auth.sessionEpoch";
     public static final String CURRENT_USER_ATTRIBUTE = "currentUser";
 
-    private static final List<String> PUBLIC_PATHS =
-            List.of("/login", "/css/", "/js/", "/favicon.ico", "/error");
+    private static final List<String> PUBLIC_PREFIXES = List.of("/css/", "/js/");
+    private static final List<String> PUBLIC_PATHS = List.of("/login", "/error", "/favicon.ico");
 
     private final AppUserRepository repository;
     private final boolean enabled;
@@ -51,7 +52,7 @@ public class AuthFilter extends OncePerRequestFilter {
 
         if (userId instanceof Long id) {
             Optional<AppUser> user = repository.findById(id);
-            if (user.isPresent() && user.get().isEnabled()) {
+            if (user.isPresent() && user.get().isEnabled() && epochMatches(session, user.get())) {
                 AppUser found = user.get();
                 request.setAttribute(CURRENT_USER_ATTRIBUTE,
                         new CurrentUser(found.getId(), found.getUsername(), found.getRole()));
@@ -68,6 +69,15 @@ public class AuthFilter extends OncePerRequestFilter {
 
     private boolean isPublic(HttpServletRequest request) {
         String path = request.getRequestURI().substring(request.getContextPath().length());
-        return PUBLIC_PATHS.stream().anyMatch(path::startsWith);
+        return PUBLIC_PATHS.contains(path) || PUBLIC_PREFIXES.stream().anyMatch(path::startsWith);
+    }
+
+    /**
+     * Una sesión anterior al último cambio de contraseña deja de valer.
+     */
+    private boolean epochMatches(HttpSession session, AppUser user) {
+        Object stored = session == null ? null : session.getAttribute(SESSION_EPOCH);
+        long sessionEpoch = stored instanceof Long value ? value : 0L;
+        return sessionEpoch == user.getSessionEpoch();
     }
 }

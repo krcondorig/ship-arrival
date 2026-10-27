@@ -46,8 +46,15 @@ public class AdminBootstrap implements ApplicationRunner {
             return;
         }
 
-        userService.createUser(username, password, UserRole.ADMIN);
-        log.info("Cuenta administradora inicial creada: {}", username.trim().toLowerCase());
+        try {
+            userService.createUser(username, password, UserRole.ADMIN);
+            log.info("Cuenta administradora inicial creada: {}", username.trim().toLowerCase());
+        } catch (RuntimeException ex) {
+            // Un ADMIN_PASSWORD demasiado corto o un ADMIN_USERNAME inválido no
+            // deben impedir que el dashboard arranque: sin app no hay ni siquiera
+            // forma de corregir la variable.
+            log.error("No se pudo crear la cuenta administradora inicial: {}", ex.getMessage());
+        }
     }
 
     private boolean isBlank(String value) {

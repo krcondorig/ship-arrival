@@ -29,7 +29,8 @@
                class="btn btn-outline-light btn-sm" th:href="@{/users}">
                 <i class="bi bi-people me-1"></i>Usuarios
             </a>
-            <form th:action="@{/shipments/track-now}" method="post" class="m-0" id="trackNowForm">
+            <form th:if="${currentUser == null or currentUser.isAdmin()}"
+                  th:action="@{/shipments/track-now}" method="post" class="m-0" id="trackNowForm">
                 <button type="submit" id="trackNowButton" class="btn btn-warning btn-sm fw-semibold" th:disabled="${isTrackingInProgress}">
                     <i class="bi bi-arrow-repeat me-1"></i>
                     <span id="trackNowButtonText" th:text="${isTrackingInProgress ? 'Monitoreando...' : 'Monitorear Ahora'}">Monitorear Ahora</span>
@@ -148,7 +149,7 @@
     <!-- Action Forms (Manual + Excel) -->
     <div class="row g-3 mb-4">
         <!-- Registro Manual -->
-        <div class="col-12 col-lg-6">
+        <div class="col-12 col-lg-6" th:if="${currentUser == null or currentUser.isAdmin()}">
             <div class="card card-stat bg-white p-3 h-100">
                 <h6 class="card-title fw-bold text-dark mb-3">
                     <i class="bi bi-plus-circle me-1 text-primary"></i>Registrar Embarque Individual
@@ -172,7 +173,7 @@
         </div>
 
         <!-- Carga Masiva Excel -->
-        <div class="col-12 col-lg-6">
+        <div class="col-12 col-lg-6" th:if="${currentUser == null or currentUser.isAdmin()}">
             <div class="card card-stat bg-white p-3 h-100">
                 <h6 class="card-title fw-bold text-dark mb-3">
                     <i class="bi bi-file-earmark-spreadsheet me-1 text-success"></i>Carga Masiva desde Excel (.xlsx)
@@ -304,7 +305,8 @@
                                    title="Ver Historial de Cambios">
                                     <i class="bi bi-clock-history"></i>
                                 </a>
-                                <form th:action="@{'/shipments/' + ${s.id} + '/delete'}" 
+                                <form th:if="${currentUser == null or currentUser.isAdmin()}"
+                                      th:action="@{'/shipments/' + ${s.id} + '/delete'}" 
                                       method="post" 
                                       style="display: inline;"
                                       onsubmit="return confirm('¿Estás seguro de eliminar el embarque ' + [[${s.trackingNumber}]] + '?');">
@@ -613,7 +615,9 @@
                 renderLiveStatus(status);
 
                 if (status.phase === 'COMPLETED') {
-                    // Recarga para que la tabla muestre los datos recién actualizados.
+                    // Quitar runId antes de recargar: si se mantiene, el panel vuelve
+                    // a consultar la ejecución terminada y recarga en bucle.
+                    window.history.replaceState(null, '', window.location.pathname);
                     setTimeout(function () { window.location.reload(); }, 3000);
                     return;
                 }

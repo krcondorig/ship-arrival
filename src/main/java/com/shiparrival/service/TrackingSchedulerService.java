@@ -143,8 +143,8 @@ public class TrackingSchedulerService {
         try {
             return doRunTrackingCycle();
         } finally {
-            trackingInProgress.set(false);
             clearRunContext();
+            trackingInProgress.set(false);
         }
     }
 
@@ -157,8 +157,8 @@ public class TrackingSchedulerService {
             finishWithError("Error inesperado en el monitoreo: " + ex.getMessage(),
                     System.currentTimeMillis() - startTime);
         } finally {
-            trackingInProgress.set(false);
             clearRunContext();
+            trackingInProgress.set(false);
         }
     }
 
