@@ -25,62 +25,32 @@ jobs:
         with:
           authkey: ${{ secrets.TAILSCALE_AUTHKEY }}
 
-      - name: Activate Phone Exit Node & Test MSC
+      - name: Activate Phone Exit Node & Test Navieras
         run: |
-          echo "=== 1. Verificando estado de Tailscale ==="
-          tailscale status
-
-          echo "=== 2. Enrutando todo el trafico a traves del celular Xiaomi ==="
+          echo "=== 1. Enrutando todo el trafico a traves del celular ==="
           sudo tailscale set --exit-node=100.77.93.94
 
-          echo "=== 3. Comprobando la IP publica del sistema (debe ser la del celular) ==="
+          echo "=== 2. IP publica del celular ==="
           curl -s --max-time 15 https://ifconfig.me/ip
           echo ""
 
-          echo "=== 4. Probando MSC con Google Chrome Oficial atraves del celular ==="
+          echo "=== 3. Probando ONE (Ocean Network Express) por el celular ==="
           python3 - << 'EOF'
           import asyncio
           from playwright.async_api import async_playwright
 
           async def run():
               async with async_playwright() as p:
-                  # Sin configurar proxy en el navegador: todo el sistema Linux ya navega por el celular
                   browser = await p.chromium.launch(
                       channel="chrome",
                       headless=True,
-                      args=[
-                          "--no-sandbox",
-                          "--disable-dev-shm-usage",
-                          "--disable-blink-features=AutomationControlled",
-                          "--disable-infobars",
-                          "--window-size=1920,1080"
-                      ]
+                      args=["--no-sandbox", "--disable-dev-shm-usage"]
                   )
-                  context = await browser.new_context(
-                      user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36",
-                      viewport={"width": 1920, "height": 1080},
-                      locale="en-US"
-                  )
-                  await context.add_init_script("""
-                      Object.defineProperty(navigator, 'webdriver', {get: () => undefined});
-                      window.chrome = { runtime: {}, loadTimes: function() {}, csi: function() {}, app: {} };
-                  """)
-                  page = await context.new_page()
-
-                  print("Navegando a MSC a través de la conexión del celular...")
-                  try:
-                      await page.goto("https://www.msc.com/en/track-a-shipment", wait_until="domcontentloaded", timeout=45000)
-                      await page.wait_for_timeout(6000)
-                      title = await page.title()
-                      print(f"TITULO MSC: {title}")
-                      if "Access Denied" in title:
-                          print("RESULTADO: MSC Bloqueado por Akamai")
-                      else:
-                          print("RESULTADO: ¡¡¡EXITO TOTAL!!! MSC permitió el acceso a través del celular.")
-                  except Exception as e:
-                      print(f"ERROR: {e}")
-                  finally:
-                      await browser.close()
+                  page = await browser.new_page()
+                  print("Consultando ONE...")
+                  await page.goto("https://ecomm.one-line.com/one-ecom/manage-shipment/cargo-tracking", timeout=30000)
+                  print("ONE cargado exitosamente. Titulo:", await page.title())
+                  await browser.close()
 
           asyncio.run(run())
           EOF
