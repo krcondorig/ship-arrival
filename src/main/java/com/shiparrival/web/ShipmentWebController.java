@@ -52,7 +52,9 @@ public class ShipmentWebController {
     public String dashboard(@RequestParam(required = false) String search,
                             @RequestParam(defaultValue = "0") int page,
                             @RequestParam(defaultValue = "10") int size,
+                            @RequestParam(required = false) String runId,
                             Model model) {
+        model.addAttribute("runId", runId);
         int safePage = Math.max(page, 0);
         int safeSize = Math.min(Math.max(size, 1), MAX_PAGE_SIZE);
         Pageable pageable = PageRequest.of(safePage, safeSize, Sort.by(Sort.Direction.DESC, "id"));

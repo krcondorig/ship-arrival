@@ -66,7 +66,7 @@
 
     <!-- Tracking Progress -->
     <div id="trackingProgress" class="card card-stat bg-white mb-4" style="display: none;"
-         th:attr="data-status-url=@{/shipments/track-status}">
+         th:attr="data-status-url=@{/shipments/track-status},data-live-status-url=@{/shipments/live-status},data-run-id=${runId != null ? runId : ''}">
         <div class="card-body">
             <div class="d-flex justify-content-between align-items-center mb-2">
                 <h6 class="fw-bold mb-0">
@@ -383,6 +383,8 @@
         if (!panel) return;
 
         const statusUrl = panel.dataset.statusUrl || '/shipments/track-status';
+        const liveStatusUrl = panel.dataset.liveStatusUrl || '';
+        const runId = panel.dataset.runId || '';
         const form = document.getElementById('trackNowForm');
         const button = document.getElementById('trackNowButton');
         const buttonText = document.getElementById('trackNowButtonText');
@@ -530,6 +532,101 @@
             }
         }
 
+        function renderLiveStatus(status) {
+            const phase = status.phase || 'UNKNOWN';
+            const total = Number(status.total) || 0;
+            const processed = Number(status.processed) || 0;
+            const updated = Number(status.updated) || 0;
+            const failed = Number(status.failed) || 0;
+
+            panel.style.display = '';
+            title.textContent = 'Monitoreo en la nube';
+            current.style.display = 'none';
+            details.style.display = 'none';
+            summary.style.display = 'none';
+
+            if (phase === 'QUEUED' || phase === 'PREPARING') {
+                bar.className = 'progress-bar progress-bar-striped progress-bar-animated bg-warning';
+                bar.style.width = '100%';
+                percentBadge.textContent = '...';
+                progressText.textContent = phase === 'QUEUED'
+                    ? 'En cola en GitHub Actions...'
+                    : 'Preparando: compilando y conectando';
+                counts.textContent = 'Sin datos de avance todavía';
+                return;
+            }
+
+            if (phase === 'RUNNING') {
+                const percent = total > 0 ? Math.min(100, Math.round((processed * 100) / total)) : 0;
+                bar.className = 'progress-bar progress-bar-striped progress-bar-animated bg-warning';
+                bar.style.width = percent + '%';
+                percentBadge.textContent = total > 0 ? percent + '%' : '...';
+                progressText.textContent = total > 0
+                    ? 'Procesando ' + processed + ' de ' + total + ' guías...'
+                    : (status.message || 'Monitoreando...');
+                counts.textContent = updated + ' actualizadas · ' + failed + ' fallidas';
+                return;
+            }
+
+            if (phase === 'COMPLETED') {
+                bar.className = 'progress-bar bg-success';
+                bar.style.width = '100%';
+                percentBadge.textContent = '100%';
+                progressText.textContent = status.message || 'Monitoreo finalizado';
+                counts.textContent = updated + ' actualizadas · ' + failed + ' fallidas';
+                summary.style.display = '';
+                summary.className = 'alert alert-success mt-3 mb-0';
+                summary.textContent = status.message || 'Monitoreo finalizado';
+                return;
+            }
+
+            bar.className = 'progress-bar bg-danger';
+            bar.style.width = '100%';
+            percentBadge.textContent = 'Error';
+            progressText.textContent = 'El monitoreo no terminó';
+            counts.textContent = updated + ' actualizadas · ' + failed + ' fallidas';
+            summary.style.display = '';
+            summary.className = 'alert alert-danger mt-3 mb-0';
+            summary.textContent = status.message || 'El monitoreo falló.';
+
+            if (status.runUrl) {
+                const link = document.createElement('a');
+                link.href = status.runUrl;
+                link.target = '_blank';
+                link.rel = 'noopener';
+                link.className = 'alert-link ms-1';
+                link.textContent = 'Ver en GitHub Actions';
+                summary.appendChild(document.createTextNode(' '));
+                summary.appendChild(link);
+            }
+        }
+
+        async function refreshLiveStatus() {
+            try {
+                const response = await fetch(
+                    liveStatusUrl + '?runId=' + encodeURIComponent(runId),
+                    {headers: {'Accept': 'application/json'}, cache: 'no-store'});
+                if (!response.ok) {
+                    throw new Error('HTTP ' + response.status);
+                }
+                const status = await response.json();
+                renderLiveStatus(status);
+
+                if (status.phase === 'COMPLETED') {
+                    // Recarga para que la tabla muestre los datos recién actualizados.
+                    setTimeout(function () { window.location.reload(); }, 3000);
+                    return;
+                }
+                if (status.phase === 'FAILED' || status.phase === 'UNKNOWN') {
+                    return;
+                }
+                setTimeout(refreshLiveStatus, 3000);
+            } catch (error) {
+                console.warn('No se pudo consultar el estado remoto:', error);
+                setTimeout(refreshLiveStatus, 5000);
+            }
+        }
+
         if (form) {
             form.addEventListener('submit', function () {
                 button.disabled = true;
@@ -537,7 +634,11 @@
             });
         }
 
-        refreshStatus();
+        if (runId && liveStatusUrl) {
+            refreshLiveStatus();
+        } else {
+            refreshStatus();
+        }
     })();
 </script>
 </body>
