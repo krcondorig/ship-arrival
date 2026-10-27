@@ -9,6 +9,8 @@ services:
     envVars:
       - key: SPRING_PROFILES_ACTIVE
         value: prod
+      - key: APP_TIMEZONE
+        value: America/Lima
       - key: SUPABASE_DB_HOST
         sync: false
       - key: SUPABASE_DB_PORT

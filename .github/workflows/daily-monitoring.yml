@@ -77,6 +77,7 @@ jobs:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
           DISCORD_ENABLED: ${{ secrets.DISCORD_ENABLED }}
           HAPAG_LLOYD_HEADLESS: "false"
+          APP_TIMEZONE: "America/Lima"
         run: |
           JAR=$(ls target/*.jar | head -n 1)
           echo "Ejecutando ciclo de monitoreo con $JAR"
