@@ -41,6 +41,9 @@ jobs:
           fi
           google-chrome --version
 
+      - name: Prepare Hapag-Lloyd Chrome profile directory
+        run: mkdir -p data/hapag-chrome-profile
+
       - name: Restore Hapag-Lloyd Chrome profile
         uses: actions/cache@v4
         with:

@@ -6,7 +6,7 @@ Este archivo sirve como referencia central para cualquier agente o desarrollador
 
 ## 1. Estado Actual del Proyecto
 
-- **Fase actual:** Implementación completa con soporte para ONE, MSC, MAERSK y HAPAG-LLOYD; suite de pruebas pasando (75 tests, 3 omitidos por requerir navegador real).
+- **Fase actual:** Implementación completa con soporte para ONE, MSC, MAERSK y HAPAG-LLOYD; suite de pruebas pasando (81 tests, 3 omitidos por requerir navegador real). Monitoreo desatendido en GitHub Actions y dashboard desplegable en Render.
 - **Repositorio Git:** Rama `master`, con Maven Wrapper autónomo y suite de tests verde.
 - **Entorno de ejecución:** 
   - Sistema Operativo: Windows (win32)
@@ -129,4 +129,12 @@ Aplicación web monolítica ligera en **Java 21** con **Spring Boot 3**, que per
 ### Fase 9: Pruebas E2E y Verificación Final
 - [x] Probar flujo completo: Carga manual/Excel -> Rastreo -> Actualización de datos -> Disparo de alerta -> Visualización web.
 - [x] Verificar HAPAG-LLOYD con las guías reales `HLCUNG12607EKZE0` y `HLCUNG12608BMJY0`: datos de buque, viaje, puerto y arribo, historial de ETA y supresión de alertas históricas.
-- [x] Suite final: 75 tests, 0 fallos, 3 omitidos (pruebas reales de navegador MSC, MAERSK y HAPAG-LLOYD).
+- [x] Suite final: 81 tests, 0 fallos, 3 omitidos (pruebas reales de navegador MSC, MAERSK y HAPAG-LLOYD).
+
+### Fase 10: Ejecución Desatendida en la Nube
+- [x] `TrackingRunOnceRunner`: ejecuta un único ciclo y termina el proceso; se activa con `--tracking.run-once=true`.
+- [x] Workflow `.github/workflows/daily-monitoring.yml`: monitoreo diario a las 13:00 UTC (08:00 AM Perú) y disparo manual, compilando el JAR y ejecutándolo sin interfaz web.
+- [x] Salida de las navieras mediante Tailscale: el runner enruta todo su tráfico por el `exit node` del teléfono Android, evitando los bloqueos de Akamai y Cloudflare sobre IPs de datacenter.
+- [x] Chrome + `xvfb` en el runner para HAPAG-LLOYD, con caché del perfil `data/hapag-chrome-profile` entre ejecuciones.
+- [x] Credenciales en GitHub Secrets (`SUPABASE_DB_*`, `TELEGRAM_*`, `DISCORD_*`, `TAILSCALE_AUTHKEY`); nunca en el repositorio.
+- [x] Dashboard desplegable en Render (`render.yaml` + `Dockerfile`) consumiendo la misma base PostgreSQL de Supabase.
