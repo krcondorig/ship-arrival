@@ -118,6 +118,7 @@ Aplicación web monolítica ligera en **Java 21** con **Spring Boot 3**, que per
 - [x] Implementar `TrackingSchedulerService` (`@Scheduled` a las 08:00 AM) para iterar sobre embarques activos con pausas entre peticiones.
 - [x] Soporte para ejecución manual asíncrona ("Monitorear Ahora").
 - [x] Suprimir la alerta de arribo cuando el ATA es anterior a la fecha de registro del embarque (arribo histórico), evitando notificaciones tardías.
+- [x] Retención de datos: al final de cada ciclo (`ShipmentRetentionService`) se borran definitivamente los embarques arribados hace más de 7 días junto con su historial, los cancelados, y los que quedaron en `ERROR_CHECKING` con la ETA ya vencida hace más de 7 días (una guía sin ETA se conserva: todavía puede llegar). Plazo configurable con `tracking.retention.days`; `0` desactiva la limpieza.
 
 ### Fase 8: Interfaz Web (Thymeleaf)
 - [x] Vista principal (dashboard) con tabla de embarques, filtros e insignias de estado (colores según proximidad).
