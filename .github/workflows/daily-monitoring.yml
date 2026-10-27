@@ -80,4 +80,25 @@ jobs:
         run: |
           JAR=$(ls target/*.jar | head -n 1)
           echo "Ejecutando ciclo de monitoreo con $JAR"
-          xvfb-run -a java -jar "$JAR" --tracking.run-once=true
+
+          # El pooler de Supabase en modo sesión admite 15 clientes en total y el
+          # dashboard en Render ya reserva parte de ese presupuesto. Este proceso
+          # es de un solo hilo, así que basta con 2 conexiones.
+          for attempt in 1 2 3; do
+            echo "--- Intento $attempt de 3 ---"
+            if xvfb-run -a java -jar "$JAR" \
+                --tracking.run-once=true \
+                --spring.datasource.hikari.maximum-pool-size=2 \
+                --spring.datasource.hikari.minimum-idle=1; then
+              echo "Monitoreo completado correctamente."
+              exit 0
+            fi
+            echo "El intento $attempt falló."
+            if [ "$attempt" -lt 3 ]; then
+              echo "Esperando 60 s antes de reintentar (el pooler puede tardar en liberar sesiones)..."
+              sleep 60
+            fi
+          done
+
+          echo "::error::El monitoreo falló tras 3 intentos."
+          exit 1
