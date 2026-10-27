@@ -49,6 +49,10 @@ la nube. Quiere, además, saber que está corriendo y cuánto falta.
 - Que se guarden credenciales de GitHub en el repositorio.
 - Que el sondeo del dashboard agote el pool de conexiones de Supabase (hoy
   limitado a 3 por proceso).
+- Incorporar Spring Security completo, que reconfiguraría todas las pruebas
+  existentes.
+- Guardar contraseñas en claro o en el repositorio.
+- Depender de un servicio de correo para recuperar contraseñas.
 
 ## 5. Restricciones
 
@@ -70,6 +74,9 @@ la nube. Quiere, además, saber que está corriendo y cuánto falta.
 - Basta con ver "ejecutando" mientras corre, más una barra de avance.
 - Si el teléfono está apagado o sin datos, debe mostrarse un mensaje claro.
 - El envío de alertas a Telegram y Discord se mantiene igual.
+- El acceso al dashboard será con **cuentas separadas por persona**, no una
+  contraseña compartida, para poder saber quién hizo qué y revocar a alguien sin
+  afectar a los demás.
 
 ## 7. Decisiones del constructor (mías)
 
@@ -92,6 +99,21 @@ Estas las propongo yo; quedan abiertas a revisión.
 - **Un solo ciclo a la vez.** Antes de disparar se verifica que no haya una
   ejecución en curso, para no duplicar trabajo ni consumir el presupuesto de
   conexiones.
+- **Solo se añade `spring-security-crypto`**, no Spring Security completo. Aporta
+  el algoritmo de hash de contraseñas (BCrypt) sin activar la cadena de filtros
+  automática, que obligaría a reconfigurar las 94 pruebas existentes.
+- **Dos roles.** `ADMIN` administra usuarios y dispara el monitoreo; `USER`
+  consulta el dashboard. Disparar consume datos móviles y minutos de Actions, así
+  que se reserva a administradores. Si se prefiere lo contrario, es un cambio de
+  una línea en la regla de autorización.
+- **El primer administrador nace de variables de entorno** (`ADMIN_USERNAME`,
+  `ADMIN_PASSWORD`) la primera vez que arranca contra una base sin usuarios. No
+  se escribe ninguna contraseña en el repositorio.
+- **Sin correo electrónico.** No hay servicio de email gratuito ni dominio
+  propio, así que no habrá "olvidé mi contraseña". Un administrador restablece la
+  clave desde la pantalla de usuarios.
+- **Auditoría mínima.** Cada ciclo de monitoreo registra quién lo disparó, y cada
+  usuario guarda su último acceso.
 
 ## 8. Cómo se arma
 
@@ -137,6 +159,28 @@ Estas las propongo yo; quedan abiertas a revisión.
 | Token inválido o sin permiso | "No se pudo enviar el monitoreo: el token de GitHub no tiene permiso para ejecutar workflows." |
 | Ya hay un monitoreo activo | "Ya hay un monitoreo en curso. Espera a que termine." |
 
+### 8.5 Acceso y usuarios
+
+- Entidad `AppUser` (tabla `app_users`): `username` único, `passwordHash`,
+  `role` (`ADMIN` / `USER`), `enabled`, `createdAt`, `lastLoginAt`.
+- Contraseñas con **BCrypt** (`spring-security-crypto`). Nunca se guarda ni se
+  registra la contraseña en claro.
+- Un filtro propio (`OncePerRequestFilter`) protege todas las rutas salvo
+  `/login`, `/css/**`, `/js/**` y los recursos estáticos. Sin sesión válida,
+  redirige a `/login` conservando la ruta solicitada.
+- Sesión en servidor con cookie `HttpOnly` y `SameSite=Lax`. Duración de 12 horas
+  sin "recordarme": es un panel de operaciones, no una red social.
+- Pantalla `/login` con usuario, contraseña y mensaje de error genérico (no se
+  revela si el usuario existe).
+- Freno a la fuerza bruta: tras 5 intentos fallidos para el mismo usuario, espera
+  creciente y bloqueo temporal de 15 minutos.
+- Pantalla `/usuarios` (solo `ADMIN`): listar, crear, cambiar rol, activar o
+  desactivar, restablecer contraseña y eliminar. Un administrador no puede
+  desactivarse ni eliminarse a sí mismo, para no quedarse fuera del sistema.
+- Botón "Salir" que invalida la sesión.
+- El monitoreo de las 08:00 AM no pasa por el login: corre en GitHub Actions sin
+  sesión.
+
 ## 9. Lo que queda a criterio de quien construya
 
 - Nombres exactos de clases, rutas y columnas.
@@ -157,3 +201,10 @@ Estas las propongo yo; quedan abiertas a revisión.
 6. La suite de pruebas sigue en verde y se agregan pruebas para el cliente de
    GitHub, el publicador de progreso y la selección de mensajes de error.
 7. El monitoreo programado de las 08:00 AM no cambia su funcionamiento.
+8. Sin sesión, cualquier ruta del dashboard redirige a `/login`; con sesión
+   válida se accede normalmente.
+9. Un `USER` no puede entrar a `/usuarios` ni disparar el monitoreo; un `ADMIN`
+   sí. Un administrador no puede desactivarse ni eliminarse a sí mismo.
+10. Las contraseñas se guardan con hash BCrypt y nunca aparecen en logs ni en el
+    repositorio.
+11. Tras 5 intentos fallidos, el acceso queda bloqueado temporalmente.
