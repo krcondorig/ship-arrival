@@ -54,4 +54,5 @@ jobs:
         run: |
           echo "=== Iniciando aplicacion Spring Boot para rastreo masivo ==="
           # Ejecutamos un test o una tarea Java que dispare el TrackingSchedulerService
+          chmod +x mvnw
           ./mvnw test -Dtest=ShipArrivalE2EIntegrationTest
