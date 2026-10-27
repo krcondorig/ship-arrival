@@ -31,7 +31,7 @@ class GitHubActionsClientTest {
         restTemplate = new RestTemplate();
         server = MockRestServiceServer.bindTo(restTemplate).build();
         return new GitHubActionsClient(enabled, token, "krcondorig", "ship-arrival",
-                "daily-monitoring.yml", "master", restTemplate);
+                "daily-monitoring.yml", "master", restTemplate, millis -> { });
     }
 
     @Test
@@ -41,7 +41,7 @@ class GitHubActionsClientTest {
 
         assertThat(client.isEnabled()).isFalse();
         assertThat(client.findLatestRun()).isEmpty();
-        assertThat(client.dispatch("run-1")).isFalse();
+        assertThat(client.dispatch()).isEmpty();
         server.verify();
     }
 
@@ -99,17 +99,27 @@ class GitHubActionsClientTest {
     }
 
     @Test
-    @DisplayName("Dispara el workflow con el identificador de ejecución")
+    @DisplayName("Dispara el workflow y descubre el identificador de la nueva ejecución")
     void shouldDispatchWorkflow() {
         GitHubActionsClient client = client(true, "ghp_token");
+
+        server.expect(once(), requestTo(RUNS_URL))
+                .andRespond(withSuccess("""
+                        {"workflow_runs":[{"id": 8000, "status": "completed", "conclusion": "success"}]}
+                        """, MediaType.APPLICATION_JSON));
 
         server.expect(once(), requestTo(
                         "https://api.github.com/repos/krcondorig/ship-arrival/actions/workflows/daily-monitoring.yml/dispatches"))
                 .andExpect(method(HttpMethod.POST))
-                .andExpect(content().json("{\"ref\":\"master\",\"inputs\":{\"run_id\":\"run-1\"}}"))
+                .andExpect(content().json("{\"ref\":\"master\"}"))
                 .andRespond(withStatus(HttpStatus.NO_CONTENT));
 
-        assertThat(client.dispatch("run-1")).isTrue();
+        server.expect(once(), requestTo(RUNS_URL))
+                .andRespond(withSuccess("""
+                        {"workflow_runs":[{"id": 9001, "status": "queued"}]}
+                        """, MediaType.APPLICATION_JSON));
+
+        assertThat(client.dispatch()).contains(9001L);
         server.verify();
     }
 

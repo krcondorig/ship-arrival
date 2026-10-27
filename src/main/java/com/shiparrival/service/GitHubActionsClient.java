@@ -34,6 +34,8 @@ import java.util.Optional;
 public class GitHubActionsClient {
 
     private static final String API = "https://api.github.com";
+    private static final int DISPATCH_POLL_ATTEMPTS = 5;
+    private static final long DISPATCH_POLL_INTERVAL_MS = 1500L;
 
     private final boolean enabled;
     private final String token;
@@ -42,6 +44,7 @@ public class GitHubActionsClient {
     private final String workflowFile;
     private final String ref;
     private final RestTemplate restTemplate;
+    private final Sleeper sleeper;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Autowired
@@ -52,7 +55,8 @@ public class GitHubActionsClient {
                                @Value("${github.dispatch.workflow-file:daily-monitoring.yml}") String workflowFile,
                                @Value("${github.dispatch.ref:master}") String ref,
                                RestTemplateBuilder restTemplateBuilder) {
-        this(enabled, token, owner, repo, workflowFile, ref, restTemplateBuilder.build());
+        this(enabled, token, owner, repo, workflowFile, ref,
+                restTemplateBuilder.build(), Thread::sleep);
     }
 
     GitHubActionsClient(boolean enabled,
@@ -62,6 +66,17 @@ public class GitHubActionsClient {
                         String workflowFile,
                         String ref,
                         RestTemplate restTemplate) {
+        this(enabled, token, owner, repo, workflowFile, ref, restTemplate, Thread::sleep);
+    }
+
+    GitHubActionsClient(boolean enabled,
+                        String token,
+                        String owner,
+                        String repo,
+                        String workflowFile,
+                        String ref,
+                        RestTemplate restTemplate,
+                        Sleeper sleeper) {
         this.enabled = enabled;
         this.token = token;
         this.owner = owner;
@@ -69,6 +84,7 @@ public class GitHubActionsClient {
         this.workflowFile = workflowFile;
         this.ref = ref;
         this.restTemplate = restTemplate;
+        this.sleeper = sleeper;
     }
 
     public boolean isEnabled() {
@@ -134,28 +150,47 @@ public class GitHubActionsClient {
     }
 
     /**
-     * Dispara el workflow pasando el identificador con el que el runner publicará
-     * su avance.
+     * Dispara el workflow y espera a que GitHub registre la ejecución.
+     *
+     * <p>La API de {@code dispatches} responde 204 sin cuerpo, así que el
+     * identificador solo se obtiene consultando la lista de ejecuciones hasta que
+     * aparece una nueva.</p>
+     *
+     * @return el identificador de la ejecución recién creada, si se pudo averiguar.
      */
-    public boolean dispatch(String runId) {
+    public Optional<Long> dispatch() {
         if (!isEnabled()) {
-            return false;
+            return Optional.empty();
         }
+
+        long previousId = findLatestRun().map(GitHubRunState::id).orElse(0L);
+
         try {
             HttpHeaders headers = headers();
             headers.setContentType(MediaType.APPLICATION_JSON);
-            Map<String, Object> body = Map.of(
-                    "ref", ref,
-                    "inputs", Map.of("run_id", runId));
-
             restTemplate.exchange(API + "/repos/" + owner + "/" + repo
                             + "/actions/workflows/" + workflowFile + "/dispatches",
-                    HttpMethod.POST, new HttpEntity<>(body, headers), String.class);
-            return true;
+                    HttpMethod.POST, new HttpEntity<>(Map.of("ref", ref), headers), String.class);
         } catch (Exception ex) {
             log.warn("No se pudo disparar el workflow de GitHub: {}", ex.getMessage());
-            return false;
+            return Optional.empty();
         }
+
+        try {
+            for (int attempt = 0; attempt < DISPATCH_POLL_ATTEMPTS; attempt++) {
+                Optional<GitHubRunState> latest = findLatestRun();
+                if (latest.isPresent() && latest.get().id() != previousId) {
+                    return Optional.of(latest.get().id());
+                }
+                sleeper.sleep(DISPATCH_POLL_INTERVAL_MS);
+            }
+        } catch (InterruptedException ex) {
+            Thread.currentThread().interrupt();
+            log.warn("Se interrumpió la espera del identificador de la ejecución");
+        }
+
+        log.warn("El workflow se disparó pero GitHub no reportó la nueva ejecución a tiempo");
+        return Optional.empty();
     }
 
     private JsonNode get(String url) throws Exception {
@@ -177,11 +212,20 @@ public class GitHubActionsClient {
                 run.path("id").asLong(),
                 text(run, "status"),
                 text(run, "conclusion"),
-                text(run, "html_url"));
+                text(run, "html_url"),
+                null);
     }
 
     private String text(JsonNode node, String field) {
         JsonNode value = node.path(field);
         return value.isMissingNode() || value.isNull() ? null : value.asText();
+    }
+
+    /**
+     * Permite sustituir la espera real por una nula en las pruebas.
+     */
+    @FunctionalInterface
+    interface Sleeper {
+        void sleep(long millis) throws InterruptedException;
     }
 }

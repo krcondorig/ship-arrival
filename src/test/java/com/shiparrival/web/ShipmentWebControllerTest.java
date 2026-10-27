@@ -4,6 +4,8 @@ import com.shiparrival.domain.Carrier;
 import com.shiparrival.domain.Shipment;
 import com.shiparrival.domain.ShipmentEventLog;
 import com.shiparrival.domain.ShipmentStatus;
+import com.shiparrival.service.GitHubActionsClient;
+import com.shiparrival.service.LiveTrackingStatusService;
 import com.shiparrival.service.ShipmentService;
 import com.shiparrival.service.TrackingSchedulerService;
 import com.shiparrival.service.dto.BatchImportSummary;
@@ -46,6 +48,12 @@ class ShipmentWebControllerTest {
 
     @MockitoBean
     private TrackingSchedulerService trackingSchedulerService;
+
+    @MockitoBean
+    private GitHubActionsClient gitHubActionsClient;
+
+    @MockitoBean
+    private LiveTrackingStatusService liveTrackingStatusService;
 
     @Test
     @DisplayName("GET / debe renderizar la vista dashboard con la lista de embarques")
