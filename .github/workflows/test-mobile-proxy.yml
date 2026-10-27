@@ -1,0 +1,30 @@
+name: Test Mobile Proxy via Tailscale
+
+on:
+  workflow_dispatch: # Permite disparar la prueba manualmente con un clic en GitHub
+
+jobs:
+  test-proxy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Connect to Tailscale
+        uses: tailscale/github-action@v3
+        with:
+          authkey: ${{ secrets.TAILSCALE_AUTHKEY }}
+
+      - name: Test Connection to Phone Proxy
+        run: |
+          echo "=== 1. Probando ping al celular por Tailscale ==="
+          tailscale ping -c 3 100.77.93.94 || echo "Ping ICMP no respondió, probando HTTP directo..."
+
+          echo "=== 2. Verificando la IP publica que ve internet a traves del celular ==="
+          curl -s --max-time 15 -x http://100.77.93.94:8080 https://ifconfig.me/ip
+          echo ""
+
+          echo "=== 3. Probando conexion real a MSC a traves del celular ==="
+          curl -s --max-time 20 -x http://100.77.93.94:8080 \
+            -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36" \
+            https://www.msc.com/en/track-a-shipment | grep -i "<title>" || echo "No se pudo obtener el titulo de MSC"
