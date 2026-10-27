@@ -58,11 +58,14 @@ public class AuthController {
         }
 
         loginAttemptService.recordSuccess(username);
-        userService.touchLastLogin(user.get().getId());
-
+        if (!userService.startSession(user.get().getUsername(), java.time.LocalDateTime.now())) {
+            model.addAttribute("errorMessage", "Esta cuenta ya tiene una sesión abierta. Cierra sesión en el otro dispositivo o pide a un administrador que la libere.");
+            model.addAttribute("redirect", redirect);
+            return "login";
+        }
         HttpSession session = request.getSession(true);
         session.setAttribute(AuthFilter.SESSION_USER_ID, user.get().getId());
-        session.setAttribute(AuthFilter.SESSION_EPOCH, user.get().getSessionEpoch());
+        session.setAttribute(AuthFilter.SESSION_EPOCH, user.get().getSessionEpoch() + 1);
         // Rotar el identificador evita que una cookie capturada antes del login
         // sirva después de autenticarse.
         request.changeSessionId();
@@ -75,6 +78,11 @@ public class AuthController {
     public String logout(HttpServletRequest request) {
         HttpSession session = request.getSession(false);
         if (session != null) {
+            Object userId = session.getAttribute(AuthFilter.SESSION_USER_ID);
+            Object epoch = session.getAttribute(AuthFilter.SESSION_EPOCH);
+            if (userId instanceof Long id && epoch instanceof Long value) {
+                userService.endSession(id, value);
+            }
             session.invalidate();
         }
         return "redirect:/login";

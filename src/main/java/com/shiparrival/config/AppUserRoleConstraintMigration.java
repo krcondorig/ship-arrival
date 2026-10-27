@@ -34,6 +34,8 @@ public class AppUserRoleConstraintMigration implements ApplicationRunner {
 
     private static final String DROP_ROLE_CHECK =
             "ALTER TABLE app_users DROP CONSTRAINT IF EXISTS app_users_role_check";
+    private static final String ADD_SESSION_EXPIRY =
+            "ALTER TABLE app_users ADD COLUMN IF NOT EXISTS active_session_expires_at TIMESTAMP NULL";
 
     private final DataSource dataSource;
     private final JdbcTemplate jdbcTemplate;
@@ -50,7 +52,8 @@ public class AppUserRoleConstraintMigration implements ApplicationRunner {
         }
         try {
             jdbcTemplate.execute(DROP_ROLE_CHECK);
-            log.info("Restricción de roles de app_users liberada: los roles nuevos no exigen migración.");
+            jdbcTemplate.execute(ADD_SESSION_EXPIRY);
+            log.info("Restricción de roles de app_users liberada y columna de expiración de sesión verificada.");
         } catch (DataAccessException ex) {
             // No detener el arranque: sin aplicación no hay forma de corregir nada.
             log.warn("No se pudo liberar la restricción de roles de app_users: {}", ex.getMessage());

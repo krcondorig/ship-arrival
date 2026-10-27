@@ -72,6 +72,7 @@ public class UserService {
         AppUser target = require(targetId);
         target.setPasswordHash(passwordEncoder.encode(rawPassword));
         target.setSessionEpoch(target.getSessionEpoch() + 1);
+        target.setActiveSessionExpiresAt(null);
         repository.save(target);
     }
 
@@ -85,6 +86,10 @@ public class UserService {
             guardLastAdmin(target);
         }
         target.setEnabled(enabled);
+        if (!enabled) {
+            target.setActiveSessionExpiresAt(null);
+            target.setSessionEpoch(target.getSessionEpoch() + 1);
+        }
         repository.save(target);
     }
 
@@ -119,6 +124,36 @@ public class UserService {
     @Transactional(readOnly = true)
     public Optional<AppUser> findById(Long id) {
         return repository.findById(id);
+    }
+
+    @Transactional
+    public boolean startSession(String username, LocalDateTime now) {
+        AppUser user = repository.findByUsernameForUpdate(normalizeUsername(username)).orElseThrow();
+        if (user.getActiveSessionExpiresAt() != null && user.getActiveSessionExpiresAt().isAfter(now)) {
+            return false;
+        }
+        user.setSessionEpoch(user.getSessionEpoch() + 1);
+        user.setActiveSessionExpiresAt(now.plusHours(12));
+        user.setLastLoginAt(now);
+        repository.save(user);
+        return true;
+    }
+
+    @Transactional
+    public void releaseSession(Long id) {
+        AppUser user = require(id);
+        user.setActiveSessionExpiresAt(null);
+        user.setSessionEpoch(user.getSessionEpoch() + 1);
+        repository.save(user);
+    }
+
+    @Transactional
+    public void endSession(Long id, long epoch) {
+        repository.findById(id).filter(user -> user.getSessionEpoch() == epoch)
+                .ifPresent(user -> {
+                    user.setActiveSessionExpiresAt(null);
+                    repository.save(user);
+                });
     }
 
     @Transactional

@@ -44,7 +44,8 @@ class UserAdminControllerTest {
     private AppUser givenUser(String username, UserRole role) {
         return repository.save(AppUser.builder()
                 .username(username).passwordHash(passwordEncoder.encode("claveSegura1"))
-                .role(role).enabled(true).build());
+                .role(role).enabled(true)
+                .activeSessionExpiresAt(java.time.LocalDateTime.now().plusHours(1)).build());
     }
 
     @Test
@@ -144,5 +145,24 @@ class UserAdminControllerTest {
                 .andExpect(status().is3xxRedirection());
 
         assertThat(repository.findById(target.getId())).isEmpty();
+    }
+
+    @Test
+    @DisplayName("Un administrador puede liberar la sesión activa de una cuenta")
+    void shouldReleaseActiveSession() throws Exception {
+        AppUser admin = givenUser("root6", UserRole.ADMIN);
+        AppUser target = givenUser("sesionada", UserRole.USER);
+        target.setActiveSessionExpiresAt(java.time.LocalDateTime.now().plusHours(5));
+        repository.save(target);
+
+        mockMvc.perform(post("/users/" + target.getId() + "/release-session")
+                        .sessionAttr(AuthFilter.SESSION_USER_ID, admin.getId())
+                        .sessionAttr(AuthFilter.SESSION_EPOCH, admin.getSessionEpoch()))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/users"));
+
+        AppUser released = repository.findById(target.getId()).orElseThrow();
+        assertThat(released.getActiveSessionExpiresAt()).isNull();
+        assertThat(released.getSessionEpoch()).isEqualTo(1L);
     }
 }

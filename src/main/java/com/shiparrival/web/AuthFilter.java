@@ -52,7 +52,9 @@ public class AuthFilter extends OncePerRequestFilter {
 
         if (userId instanceof Long id) {
             Optional<AppUser> user = repository.findById(id);
-            if (user.isPresent() && user.get().isEnabled() && epochMatches(session, user.get())) {
+            if (user.isPresent() && user.get().isEnabled() && epochMatches(session, user.get())
+                    && user.get().getActiveSessionExpiresAt() != null
+                    && user.get().getActiveSessionExpiresAt().isAfter(java.time.LocalDateTime.now())) {
                 AppUser found = user.get();
                 request.setAttribute(CURRENT_USER_ATTRIBUTE,
                         new CurrentUser(found.getId(), found.getUsername(), found.getRole()));

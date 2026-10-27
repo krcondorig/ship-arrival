@@ -59,17 +59,21 @@ class RemoteTrackingControllerTest {
     private GitHubActionsClient gitHubActionsClient;
 
     private AppUser givenAdmin() {
-        return repository.findByUsernameIgnoreCase("root").orElseGet(() ->
+        AppUser user = repository.findByUsernameIgnoreCase("root").orElseGet(() ->
                 repository.save(AppUser.builder()
                         .username("root").passwordHash(passwordEncoder.encode("claveSegura1"))
                         .role(UserRole.ADMIN).enabled(true).build()));
+        user.setActiveSessionExpiresAt(java.time.LocalDateTime.now().plusHours(1));
+        return repository.save(user);
     }
 
     private AppUser givenOperator() {
-        return repository.findByUsernameIgnoreCase("oper").orElseGet(() ->
+        AppUser user = repository.findByUsernameIgnoreCase("oper").orElseGet(() ->
                 repository.save(AppUser.builder()
                         .username("oper").passwordHash(passwordEncoder.encode("claveSegura1"))
                         .role(UserRole.OPERADOR).enabled(true).build()));
+        user.setActiveSessionExpiresAt(java.time.LocalDateTime.now().plusHours(1));
+        return repository.save(user);
     }
 
     @Test
@@ -144,7 +148,8 @@ class RemoteTrackingControllerTest {
     void shouldForbidRegularUser() throws Exception {
         AppUser user = repository.save(AppUser.builder()
                 .username("ana").passwordHash(passwordEncoder.encode("claveSegura1"))
-                .role(UserRole.USER).enabled(true).build());
+                .role(UserRole.USER).enabled(true)
+                .activeSessionExpiresAt(java.time.LocalDateTime.now().plusHours(1)).build());
 
         mockMvc.perform(post("/shipments/track-now")
                         .sessionAttr(AuthFilter.SESSION_USER_ID, user.getId()))
@@ -156,7 +161,8 @@ class RemoteTrackingControllerTest {
     void shouldForbidRegularUserFromRegistering() throws Exception {
         AppUser user = repository.save(AppUser.builder()
                 .username("beto").passwordHash(passwordEncoder.encode("claveSegura1"))
-                .role(UserRole.USER).enabled(true).build());
+                .role(UserRole.USER).enabled(true)
+                .activeSessionExpiresAt(java.time.LocalDateTime.now().plusHours(1)).build());
 
         mockMvc.perform(post("/shipments")
                         .sessionAttr(AuthFilter.SESSION_USER_ID, user.getId())
@@ -170,7 +176,8 @@ class RemoteTrackingControllerTest {
     void shouldForbidRegularUserFromDeleting() throws Exception {
         AppUser user = repository.save(AppUser.builder()
                 .username("carla").passwordHash(passwordEncoder.encode("claveSegura1"))
-                .role(UserRole.USER).enabled(true).build());
+                .role(UserRole.USER).enabled(true)
+                .activeSessionExpiresAt(java.time.LocalDateTime.now().plusHours(1)).build());
 
         mockMvc.perform(post("/shipments/1/delete")
                         .sessionAttr(AuthFilter.SESSION_USER_ID, user.getId()))

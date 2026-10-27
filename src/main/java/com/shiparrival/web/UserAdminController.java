@@ -100,6 +100,20 @@ public class UserAdminController {
         return "redirect:/users";
     }
 
+    @PostMapping("/{id}/release-session")
+    public String releaseSession(@PathVariable Long id,
+                                 HttpServletRequest request,
+                                 RedirectAttributes redirectAttributes) {
+        requireAdmin(request);
+        try {
+            userService.releaseSession(id);
+            redirectAttributes.addFlashAttribute("successMessage", "Sesión liberada.");
+        } catch (IllegalArgumentException e) {
+            redirectAttributes.addFlashAttribute("errorMessage", e.getMessage());
+        }
+        return "redirect:/users";
+    }
+
     @PostMapping("/{id}/delete")
     public String delete(@PathVariable Long id,
                          HttpServletRequest request,

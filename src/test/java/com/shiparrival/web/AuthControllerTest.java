@@ -65,7 +65,29 @@ class AuthControllerTest {
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/"))
                 .andExpect(request().sessionAttribute(AuthFilter.SESSION_USER_ID, notNullValue()))
-                .andExpect(request().sessionAttribute(AuthFilter.SESSION_EPOCH, 0L));
+                .andExpect(request().sessionAttribute(AuthFilter.SESSION_EPOCH, 1L));
+
+        assertThat(repository.findByUsernameIgnoreCase("ana").orElseThrow().getActiveSessionExpiresAt())
+                .isAfter(java.time.LocalDateTime.now().plusHours(11));
+    }
+
+    @Test
+    @DisplayName("Rechaza otro inicio cuando ya existe una sesión vigente")
+    void shouldRejectLoginWhenAnotherSessionIsActive() throws Exception {
+        AppUser user = repository.save(AppUser.builder()
+                .username("ana-activa").passwordHash(passwordEncoder.encode("claveSegura1"))
+                .role(UserRole.USER).enabled(true)
+                .activeSessionExpiresAt(java.time.LocalDateTime.now().plusHours(11)).build());
+
+        mockMvc.perform(post("/login")
+                        .param("username", "ana-activa")
+                        .param("password", "claveSegura1"))
+                .andExpect(status().isOk())
+                .andExpect(view().name("login"))
+                .andExpect(model().attribute("errorMessage",
+                        "Esta cuenta ya tiene una sesión abierta. Cierra sesión en el otro dispositivo o pide a un administrador que la libere."));
+
+        assertThat(repository.findById(user.getId()).orElseThrow().getSessionEpoch()).isZero();
     }
 
     @Test
@@ -105,14 +127,17 @@ class AuthControllerTest {
     @DisplayName("Rechaza redirecciones a sitios externos")
     void shouldRejectOpenRedirect() throws Exception {
         givenUser("dario", "claveSegura1", UserRole.USER);
+        org.springframework.mock.web.MockHttpSession currentSession = new org.springframework.mock.web.MockHttpSession();
 
-        mockMvc.perform(post("/login")
+        mockMvc.perform(post("/login").session(currentSession)
                         .param("username", "dario")
                         .param("password", "claveSegura1")
                         .param("redirect", "https://sitio-malicioso.example"))
                 .andExpect(redirectedUrl("/"));
 
-        mockMvc.perform(post("/login")
+        mockMvc.perform(post("/logout").session(currentSession));
+        currentSession = new org.springframework.mock.web.MockHttpSession();
+        mockMvc.perform(post("/login").session(currentSession)
                         .param("username", "dario")
                         .param("password", "claveSegura1")
                         .param("redirect", "//sitio-malicioso.example"))
@@ -120,20 +145,26 @@ class AuthControllerTest {
 
         // Los navegadores normalizan "\" a "/", así que "/\sitio.example" acabaría
         // siendo "//sitio.example".
-        mockMvc.perform(post("/login")
+        mockMvc.perform(post("/logout").session(currentSession));
+        currentSession = new org.springframework.mock.web.MockHttpSession();
+        mockMvc.perform(post("/login").session(currentSession)
                         .param("username", "dario")
                         .param("password", "claveSegura1")
                         .param("redirect", "/\\sitio-malicioso.example"))
                 .andExpect(redirectedUrl("/"));
 
-        mockMvc.perform(post("/login")
+        mockMvc.perform(post("/logout").session(currentSession));
+        currentSession = new org.springframework.mock.web.MockHttpSession();
+        mockMvc.perform(post("/login").session(currentSession)
                         .param("username", "dario")
                         .param("password", "claveSegura1")
                         .param("redirect", "javascript:alert(1)"))
                 .andExpect(redirectedUrl("/"));
 
-        // Un destino interno sí se respeta.
-        mockMvc.perform(post("/login")
+        // Un destino interno sí se respeta tras cerrar la sesión anterior.
+        mockMvc.perform(post("/logout").session(currentSession));
+        currentSession = new org.springframework.mock.web.MockHttpSession();
+        mockMvc.perform(post("/login").session(currentSession)
                         .param("username", "dario")
                         .param("password", "claveSegura1")
                         .param("redirect", "/users"))
@@ -160,15 +191,20 @@ class AuthControllerTest {
     @DisplayName("Cerrar sesión invalida la sesión y vuelve al login")
     void shouldLogout() throws Exception {
         givenUser("fabi", "claveSegura1", UserRole.USER);
+        AppUser user = repository.findByUsernameIgnoreCase("fabi").orElseThrow();
+        user.setActiveSessionExpiresAt(java.time.LocalDateTime.now().plusHours(2));
+        repository.save(user);
         Long userId = repository.findByUsernameIgnoreCase("fabi").orElseThrow().getId();
 
         MockHttpSession session = new MockHttpSession();
         session.setAttribute(AuthFilter.SESSION_USER_ID, userId);
+        session.setAttribute(AuthFilter.SESSION_EPOCH, user.getSessionEpoch());
 
         mockMvc.perform(post("/logout").session(session))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/login"));
 
         assertThat(session.isInvalid()).isTrue();
+        assertThat(repository.findById(userId).orElseThrow().getActiveSessionExpiresAt()).isNull();
     }
 }

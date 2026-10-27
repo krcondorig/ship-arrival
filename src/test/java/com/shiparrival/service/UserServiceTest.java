@@ -104,6 +104,20 @@ class UserServiceTest {
     }
 
     @Test
+    @DisplayName("Iniciar sesión registra exactamente 12 horas y rechaza un segundo acceso")
+    void shouldReserveOneSessionForTwelveHours() {
+        AppUser user = AppUser.builder().id(9L).username("ana").passwordHash("h")
+                .role(UserRole.USER).enabled(true).build();
+        when(repository.findByUsernameForUpdate("ana")).thenReturn(Optional.of(user));
+        java.time.LocalDateTime now = java.time.LocalDateTime.of(2026, 10, 27, 12, 0);
+
+        assertThat(userService.startSession("ana", now)).isTrue();
+        assertThat(user.getActiveSessionExpiresAt()).isEqualTo(java.time.LocalDateTime.of(2026, 10, 28, 0, 0));
+        org.mockito.Mockito.verify(repository).save(user);
+        assertThat(userService.startSession("ana", now.plusMinutes(1))).isFalse();
+    }
+
+    @Test
     @DisplayName("Restablecer la contraseña cambia el hash")
     void shouldResetPassword() {
         AppUser stored = AppUser.builder()

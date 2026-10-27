@@ -39,7 +39,8 @@ class DashboardLivePanelRenderingTest {
     void shouldExposeLiveStatusUrl() throws Exception {
         AppUser admin = repository.save(AppUser.builder()
                 .username("root").passwordHash(passwordEncoder.encode("claveSegura1"))
-                .role(UserRole.ADMIN).enabled(true).build());
+                .role(UserRole.ADMIN).enabled(true)
+                .activeSessionExpiresAt(java.time.LocalDateTime.now().plusHours(1)).build());
 
         mockMvc.perform(get("/").param("runId", "987654")
                         .sessionAttr(AuthFilter.SESSION_USER_ID, admin.getId()))
