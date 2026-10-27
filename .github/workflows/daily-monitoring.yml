@@ -2,12 +2,19 @@ name: Daily Ship Arrival Monitoring
 
 on:
   schedule:
-    - cron: '0 8 * * *' # Todos los dias a las 08:00 AM UTC (03:00 AM Peru, o ajustable segun necesidad)
-  workflow_dispatch: # Permite disparar manualmente en cualquier momento desde la app de GitHub o la web
+    # GitHub Actions usa UTC. 13:00 UTC = 08:00 AM en Peru (UTC-5).
+    - cron: '0 13 * * *'
+  workflow_dispatch: # Permite disparar el monitoreo manualmente en cualquier momento
+
+# Evita que dos monitoreos se pisen sobre la misma base de datos.
+concurrency:
+  group: daily-monitoring
+  cancel-in-progress: false
 
 jobs:
   monitor:
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -19,15 +26,28 @@ jobs:
           distribution: 'temurin'
           cache: 'maven'
 
-      - name: Set up Python for Playwright
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
+      - name: Make Maven wrapper executable
+        run: chmod +x mvnw
 
-      - name: Install Playwright and Chrome
+      - name: Build application
+        run: ./mvnw -B -DskipTests package
+
+      - name: Ensure Google Chrome is available
         run: |
-          pip install playwright
-          playwright install chrome --with-deps
+          if ! command -v google-chrome >/dev/null 2>&1; then
+            echo "Google Chrome no encontrado; instalando..."
+            sudo apt-get update
+            sudo apt-get install -y google-chrome-stable
+          fi
+          google-chrome --version
+
+      - name: Restore Hapag-Lloyd Chrome profile
+        uses: actions/cache@v4
+        with:
+          path: data/hapag-chrome-profile
+          key: hapag-chrome-profile-${{ github.run_id }}
+          restore-keys: |
+            hapag-chrome-profile-
 
       - name: Connect to Tailscale (Phone Exit Node)
         uses: tailscale/github-action@v3
@@ -37,8 +57,11 @@ jobs:
       - name: Activate Phone Exit Node
         run: |
           sudo tailscale set --exit-node=100.77.93.94
+          echo "IP publica visible para las navieras:"
+          curl -s --max-time 20 https://ifconfig.me/ip
+          echo ""
 
-      - name: Run Spring Boot Tracking Application
+      - name: Run tracking cycle once
         env:
           SUPABASE_DB_HOST: ${{ secrets.SUPABASE_DB_HOST }}
           SUPABASE_DB_PORT: ${{ secrets.SUPABASE_DB_PORT }}
@@ -52,7 +75,6 @@ jobs:
           DISCORD_ENABLED: ${{ secrets.DISCORD_ENABLED }}
           HAPAG_LLOYD_HEADLESS: "false"
         run: |
-          echo "=== Iniciando aplicacion Spring Boot para rastreo masivo ==="
-          # Ejecutamos un test o una tarea Java que dispare el TrackingSchedulerService
-          chmod +x mvnw
-          ./mvnw test -Dtest=ShipArrivalE2EIntegrationTest
+          JAR=$(ls target/*.jar | head -n 1)
+          echo "Ejecutando ciclo de monitoreo con $JAR"
+          xvfb-run -a java -jar "$JAR" --tracking.run-once=true
