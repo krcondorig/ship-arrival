@@ -125,6 +125,12 @@
                                 </button>
                             </form>
 
+                            <form th:action="@{/users/{id}/release-session(id=${u.id})}" method="post" class="mb-0">
+                                <button type="submit" class="btn btn-sm btn-outline-warning" title="Liberar sesión activa">
+                                    <i class="bi bi-unlock"></i>
+                                </button>
+                            </form>
+
                             <button type="button" class="btn btn-sm btn-outline-secondary" title="Restablecer contraseña"
                                     data-bs-toggle="modal" th:attr="data-bs-target='#pwd-' + ${u.id}">
                                 <i class="bi bi-key"></i>

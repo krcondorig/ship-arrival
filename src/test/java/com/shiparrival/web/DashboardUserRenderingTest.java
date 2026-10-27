@@ -41,9 +41,11 @@ class DashboardUserRenderingTest {
     @DisplayName("Solo el administrador ve el enlace a la administración de usuarios")
     void shouldShowUsersLinkOnlyForAdmins() throws Exception {
         AppUser admin = repository.save(AppUser.builder()
-                .username("jefa").passwordHash("h").role(UserRole.ADMIN).enabled(true).build());
+                .username("jefa").passwordHash("h").role(UserRole.ADMIN).enabled(true)
+                .activeSessionExpiresAt(java.time.LocalDateTime.now().plusHours(1)).build());
         AppUser user = repository.save(AppUser.builder()
-                .username("analista").passwordHash("h").role(UserRole.USER).enabled(true).build());
+                .username("analista").passwordHash("h").role(UserRole.USER).enabled(true)
+                .activeSessionExpiresAt(java.time.LocalDateTime.now().plusHours(1)).build());
 
         mockMvc.perform(get("/").sessionAttr(AuthFilter.SESSION_USER_ID, admin.getId()))
                 .andExpect(status().isOk())
@@ -58,7 +60,8 @@ class DashboardUserRenderingTest {
     @DisplayName("Un usuario normal no ve los formularios de administración")
     void shouldHideAdminFormsFromRegularUsers() throws Exception {
         AppUser user = repository.save(AppUser.builder()
-                .username("beto").passwordHash("h").role(UserRole.USER).enabled(true).build());
+                .username("beto").passwordHash("h").role(UserRole.USER).enabled(true)
+                .activeSessionExpiresAt(java.time.LocalDateTime.now().plusHours(1)).build());
 
         mockMvc.perform(get("/").sessionAttr(AuthFilter.SESSION_USER_ID, user.getId()))
                 .andExpect(status().isOk())
@@ -66,7 +69,8 @@ class DashboardUserRenderingTest {
                 .andExpect(content().string(not(containsString("Registrar Embarque Individual"))));
 
         AppUser admin = repository.save(AppUser.builder()
-                .username("jefa2").passwordHash("h").role(UserRole.ADMIN).enabled(true).build());
+                .username("jefa2").passwordHash("h").role(UserRole.ADMIN).enabled(true)
+                .activeSessionExpiresAt(java.time.LocalDateTime.now().plusHours(1)).build());
 
         mockMvc.perform(get("/").sessionAttr(AuthFilter.SESSION_USER_ID, admin.getId()))
                 .andExpect(status().isOk())
@@ -78,7 +82,8 @@ class DashboardUserRenderingTest {
     @DisplayName("El nombre del usuario aparece en la barra superior")
     void shouldShowCurrentUsername() throws Exception {
         AppUser user = repository.save(AppUser.builder()
-                .username("carla").passwordHash("h").role(UserRole.USER).enabled(true).build());
+                .username("carla").passwordHash("h").role(UserRole.USER).enabled(true)
+                .activeSessionExpiresAt(java.time.LocalDateTime.now().plusHours(1)).build());
 
         mockMvc.perform(get("/").sessionAttr(AuthFilter.SESSION_USER_ID, user.getId()))
                 .andExpect(status().isOk())
@@ -89,7 +94,8 @@ class DashboardUserRenderingTest {
     @DisplayName("El operador ve registro, importación, monitoreo y borrado, pero no la administración de cuentas")
     void shouldShowOperationalActionsToOperator() throws Exception {
         AppUser operator = repository.save(AppUser.builder()
-                .username("operador").passwordHash("h").role(UserRole.OPERADOR).enabled(true).build());
+                .username("operador").passwordHash("h").role(UserRole.OPERADOR).enabled(true)
+                .activeSessionExpiresAt(java.time.LocalDateTime.now().plusHours(1)).build());
         Shipment shipment = shipmentRepository.save(Shipment.builder()
                 .trackingNumber("TESTBL700001").carrier(Carrier.ONE).build());
 

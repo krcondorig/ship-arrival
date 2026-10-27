@@ -7,6 +7,7 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.Version;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
@@ -68,6 +69,12 @@ public class AppUser {
     @Column(nullable = false, columnDefinition = "bigint default 0")
     @Builder.Default
     private long sessionEpoch = 0L;
+
+    @Column(name = "active_session_expires_at")
+    private LocalDateTime activeSessionExpiresAt;
+
+    @Version
+    private long version;
 
     @PrePersist
     protected void onCreate() {

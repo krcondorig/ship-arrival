@@ -48,7 +48,8 @@ class AuthFilterIntegrationTest {
     @DisplayName("Con sesión válida se accede al dashboard")
     void shouldAllowAuthenticatedUser() throws Exception {
         AppUser user = repository.save(AppUser.builder()
-                .username("ana").passwordHash("h").role(UserRole.USER).enabled(true).build());
+                .username("ana").passwordHash("h").role(UserRole.USER).enabled(true)
+                .activeSessionExpiresAt(java.time.LocalDateTime.now().plusHours(1)).build());
 
         mockMvc.perform(get("/").sessionAttr(AuthFilter.SESSION_USER_ID, user.getId()))
                 .andExpect(status().isOk())
@@ -71,7 +72,8 @@ class AuthFilterIntegrationTest {
     @DisplayName("Cambiar la contraseña invalida las sesiones abiertas con la anterior")
     void shouldRejectSessionOpenedBeforePasswordReset() throws Exception {
         AppUser user = repository.save(AppUser.builder()
-                .username("carla").passwordHash("h").role(UserRole.USER).enabled(true).build());
+                .username("carla").passwordHash("h").role(UserRole.USER).enabled(true)
+                .activeSessionExpiresAt(java.time.LocalDateTime.now().plusHours(1)).build());
 
         // La sesión se abrió con la época 0; el administrador restablece la clave
         // y la cuenta pasa a la época 1.
