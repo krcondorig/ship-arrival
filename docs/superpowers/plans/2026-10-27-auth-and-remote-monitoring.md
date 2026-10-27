@@ -1,6 +1,6 @@
 # Acceso con usuarios y monitoreo remoto — Plan de implementación
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Proteger el dashboard con cuentas por persona y hacer que el botón "Monitorear Ahora" dispare el monitoreo en GitHub Actions, mostrando su avance real.
 
@@ -49,7 +49,7 @@ Los cinco modos de fallo que el spec implica y que más daño harían:
 - Produces: `AppUser` con campos `Long id`, `String username`, `String passwordHash`, `UserRole role`, `boolean enabled`, `LocalDateTime createdAt`, `LocalDateTime lastLoginAt`
 - Produces: `AppUserRepository extends JpaRepository<AppUser, Long>` con `Optional<AppUser> findByUsernameIgnoreCase(String username)`, `boolean existsByUsernameIgnoreCase(String username)`, `long countByRoleAndEnabledTrue(UserRole role)`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```java
 @DataJpaTest
@@ -93,23 +93,23 @@ class AppUserRepositoryTest {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `.\mvnw.cmd test -Dtest=AppUserRepositoryTest`
 Expected: FAIL — no compila, `AppUser` no existe.
 
-- [ ] **Step 3: Implementar**
+- [x] **Step 3: Implementar**
 
 `AppUser`: `@Entity @Table(name = "app_users")`, `@Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder`, `id` con `@GeneratedValue(strategy = GenerationType.IDENTITY)`, `username` con `@Column(nullable = false, unique = true, length = 32)`, `passwordHash` con `@Column(nullable = false, length = 100)`, `role` con `@Enumerated(EnumType.STRING) @Column(nullable = false, length = 16)`, `enabled` con `@Builder.Default true`, `createdAt` con `@PrePersist`.
 
 `AppUserRepository`: extiende `JpaRepository` y declara los tres métodos de arriba.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `.\mvnw.cmd test -Dtest=AppUserRepositoryTest`
 Expected: PASS, 3 tests.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/main/java/com/shiparrival/domain/UserRole.java src/main/java/com/shiparrival/domain/AppUser.java src/main/java/com/shiparrival/repository/AppUserRepository.java src/test/java/com/shiparrival/repository/AppUserRepositoryTest.java
@@ -142,7 +142,7 @@ git commit -m "feat: add AppUser entity and repository"
 
 Reglas: el nombre se normaliza con `trim().toLowerCase(Locale.ROOT)`; debe medir entre 3 y 32 caracteres y coincidir con `[a-z0-9._-]+`. La contraseña debe tener al menos 8 caracteres. Las violaciones lanzan `IllegalArgumentException`; los bloqueos de seguridad lanzan `IllegalStateException`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```java
 class UserServiceTest {
@@ -246,12 +246,12 @@ class UserServiceTest {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `.\mvnw.cmd test -Dtest=UserServiceTest`
 Expected: FAIL — `UserService` no existe.
 
-- [ ] **Step 3: Implementar**
+- [x] **Step 3: Implementar**
 
 Añadir al `pom.xml`:
 
@@ -266,12 +266,12 @@ Añadir al `pom.xml`:
 
 `UserService`: `@Service` con inyección por constructor de `AppUserRepository` y `PasswordEncoder`. La comprobación del último administrador cuenta `countByRoleAndEnabledTrue(UserRole.ADMIN) <= 1` y el usuario objetivo es `ADMIN`.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `.\mvnw.cmd test -Dtest=UserServiceTest`
 Expected: PASS, 9 tests.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pom.xml src/main/java/com/shiparrival/config/PasswordEncoderConfig.java src/main/java/com/shiparrival/service/UserService.java src/test/java/com/shiparrival/service/UserServiceTest.java
@@ -296,7 +296,7 @@ git commit -m "feat: add BCrypt password hashing and user service"
 
 Constantes públicas: `MAX_ATTEMPTS = 5`, `LOCK_MINUTES = 15`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```java
 class LoginAttemptServiceTest {
@@ -361,21 +361,21 @@ class LoginAttemptServiceTest {
 
 `MutableClock` es una clase auxiliar de prueba que extiende `java.time.Clock`, guarda un `Instant` mutable y ofrece `advance(Duration)`.
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `.\mvnw.cmd test -Dtest=LoginAttemptServiceTest`
 Expected: FAIL — `LoginAttemptService` no existe.
 
-- [ ] **Step 3: Implementar**
+- [x] **Step 3: Implementar**
 
 Estado en `ConcurrentHashMap<String, Attempt>` con un `record Attempt(int failures, Instant lockedUntil)`. `recordFailure` incrementa; al llegar a `MAX_ATTEMPTS` fija `lockedUntil = now + 15 min` y reinicia el contador. `isBlocked` compara con `clock.instant()`.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `.\mvnw.cmd test -Dtest=LoginAttemptServiceTest`
 Expected: PASS, 4 tests.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/main/java/com/shiparrival/service/LoginAttemptService.java src/test/java/com/shiparrival/service/LoginAttemptServiceTest.java
@@ -400,7 +400,7 @@ git commit -m "feat: add login attempt throttling"
 - Produces: `AuthFilter.SESSION_USER_ID = "auth.userId"` y `AuthFilter.CURRENT_USER_ATTRIBUTE = "currentUser"`
 - Produces: `CurrentUserModelAdvice` que expone `${currentUser}` a Thymeleaf
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```java
 @SpringBootTest
@@ -454,12 +454,12 @@ class AuthFilterIntegrationTest {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `.\mvnw.cmd test -Dtest=AuthFilterIntegrationTest`
 Expected: FAIL — sin filtro, `GET /` responde 200 y el primer test falla.
 
-- [ ] **Step 3: Implementar**
+- [x] **Step 3: Implementar**
 
 `AuthFilter extends OncePerRequestFilter`: si `app.auth.enabled` es `false` continúa sin filtrar. Rutas públicas: `/login`, `/css/`, `/js/`, `/favicon.ico`, `/error`. Si hay `SESSION_USER_ID` y el usuario existe y está `enabled`, publica el atributo `currentUser` y continúa. En cualquier otro caso invalida la sesión y responde `sendRedirect(contextPath + "/login")`.
 
@@ -485,17 +485,17 @@ server.servlet.session.cookie.same-site=lax
 app.auth.enabled=false
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `.\mvnw.cmd test -Dtest=AuthFilterIntegrationTest`
 Expected: PASS, 4 tests.
 
-- [ ] **Step 5: Verify existing suite still passes**
+- [x] **Step 5: Verify existing suite still passes**
 
 Run: `.\mvnw.cmd test`
 Expected: la suite completa sigue en verde; el filtro está desactivado por defecto en pruebas.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/main/java/com/shiparrival/web/CurrentUser.java src/main/java/com/shiparrival/web/AuthFilter.java src/main/java/com/shiparrival/config/AuthWebConfig.java src/main/resources/application.properties src/test/resources/application.properties src/test/java/com/shiparrival/web/AuthFilterIntegrationTest.java
@@ -515,7 +515,7 @@ git commit -m "feat: add session authentication filter"
 - Consumes: `UserService` (Task 2), `LoginAttemptService` (Task 3), `AuthFilter` (Task 4)
 - Produces: rutas `GET /login`, `POST /login` (parámetros `username`, `password`, `redirect`), `POST /logout`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```java
 @SpringBootTest
@@ -632,12 +632,12 @@ class AuthControllerTest {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `.\mvnw.cmd test -Dtest=AuthControllerTest`
 Expected: FAIL — `/login` no existe.
 
-- [ ] **Step 3: Implementar**
+- [x] **Step 3: Implementar**
 
 `AuthController`: `GET /login` devuelve `login`. `POST /login` consulta `loginAttemptService.isBlocked`; si está bloqueado devuelve `login` con el mensaje de bloqueo. Si no, `userService.authenticate`; en éxito llama `userService.touchLastLogin`, guarda `SESSION_USER_ID`, ejecuta `request.changeSessionId()`, `loginAttemptService.recordSuccess` y redirige al destino seguro. En fallo, `recordFailure` y devuelve `login` con "Usuario o contraseña incorrectos.".
 
@@ -645,12 +645,12 @@ Destino seguro: solo se acepta si `redirect` no es nulo, empieza por `/`, no emp
 
 `login.html`: formulario Bootstrap con campos `username`, `password`, campo oculto `redirect` y bloque de error.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `.\mvnw.cmd test -Dtest=AuthControllerTest`
 Expected: PASS, 6 tests.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/main/java/com/shiparrival/web/AuthController.java src/main/resources/templates/login.html src/test/java/com/shiparrival/web/AuthControllerTest.java
@@ -670,7 +670,7 @@ git commit -m "feat: add login and logout screens"
 - Consumes: `CurrentUser` (Task 4), `UserService` (Task 2)
 - Produces: rutas `GET /usuarios`, `POST /usuarios`, `POST /usuarios/{id}/role`, `POST /usuarios/{id}/enabled`, `POST /usuarios/{id}/password`, `POST /usuarios/{id}/delete`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```java
 @SpringBootTest
@@ -743,23 +743,23 @@ class UserAdminControllerTest {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `.\mvnw.cmd test -Dtest=UserAdminControllerTest`
 Expected: FAIL — `/usuarios` no existe.
 
-- [ ] **Step 3: Implementar**
+- [x] **Step 3: Implementar**
 
 Cada handler recibe `@RequestAttribute(AuthFilter.CURRENT_USER_ATTRIBUTE) CurrentUser currentUser`; si `!currentUser.isAdmin()` lanza `ResponseStatusException(HttpStatus.FORBIDDEN)`. Los errores de `UserService` se convierten en `flash().addFlashAttribute("errorMessage", ex.getMessage())` y se redirige a `/usuarios`.
 
 `users.html`: tabla con usuario, rol, estado, último acceso y acciones; formulario de alta; botones de cambiar rol, activar/desactivar, restablecer contraseña y eliminar.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `.\mvnw.cmd test -Dtest=UserAdminControllerTest`
 Expected: PASS, 4 tests.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/main/java/com/shiparrival/web/UserAdminController.java src/main/resources/templates/users.html src/test/java/com/shiparrival/web/UserAdminControllerTest.java
@@ -779,7 +779,7 @@ git commit -m "feat: add user administration screen"
 - Consumes: `UserService` (Task 2), `AppUserRepository` (Task 1)
 - Produces: `AdminBootstrap` que implementa `ApplicationRunner` y lee `app.admin.username` / `app.admin.password`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```java
 class AdminBootstrapTest {
@@ -839,12 +839,12 @@ class AdminBootstrapTest {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `.\mvnw.cmd test -Dtest=AdminBootstrapTest`
 Expected: FAIL — `AdminBootstrap` no existe.
 
-- [ ] **Step 3: Implementar**
+- [x] **Step 3: Implementar**
 
 `AdminBootstrap` con `@Component`; constructor con `@Value("${app.admin.username:}")` y `@Value("${app.admin.password:}")`. En `run`, si `repository.count() > 0` retorna. Si username o password están en blanco, registra `log.warn` y retorna. Si no, `userService.createUser(...)` dentro de `try/catch (DataIntegrityViolationException | IllegalArgumentException)` registrando `log.warn`. Nunca registrar la contraseña.
 
@@ -856,12 +856,12 @@ app.admin.username=${ADMIN_USERNAME:}
 app.admin.password=${ADMIN_PASSWORD:}
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `.\mvnw.cmd test -Dtest=AdminBootstrapTest`
 Expected: PASS, 4 tests.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/main/java/com/shiparrival/config/AdminBootstrap.java src/main/resources/application.properties src/test/java/com/shiparrival/config/AdminBootstrapTest.java
@@ -880,7 +880,7 @@ git commit -m "feat: bootstrap first administrator from environment"
 **Interfaces:**
 - Consumes: `CurrentUser` (Task 4), `AuthFilter` (Task 4)
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```java
 @SpringBootTest
@@ -934,12 +934,12 @@ class DashboardUserRenderingTest {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `.\mvnw.cmd test -Dtest=DashboardUserRenderingTest`
 Expected: FAIL — la plantilla no muestra usuario ni condiciona el botón.
 
-- [ ] **Step 3: Implementar**
+- [x] **Step 3: Implementar**
 
 En `dashboard.html` y `history.html`, dentro de la barra de navegación:
 
@@ -951,17 +951,17 @@ En `dashboard.html` y `history.html`, dentro de la barra de navegación:
 
 `CurrentUser` debe exponer `boolean isAdmin()`. En la plantilla se invoca como `currentUser.isAdmin()`; no usar `currentUser.admin`, porque el acceso a propiedades de un `record` no es fiable en SpringEL.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `.\mvnw.cmd test -Dtest=DashboardUserRenderingTest`
 Expected: PASS, 3 tests.
 
-- [ ] **Step 5: Run the full suite**
+- [x] **Step 5: Run the full suite**
 
 Run: `.\mvnw.cmd test`
 Expected: 0 fallos, 3 omitidas.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/main/resources/templates/dashboard.html src/main/resources/templates/history.html src/test/java/com/shiparrival/web/DashboardUserRenderingTest.java
@@ -983,7 +983,7 @@ git commit -m "feat: show current user and restrict admin actions in the UI"
 - Produces: `TrackingRunProgress` con `Long id`, `String runId`, `String origin`, `String triggeredBy`, `String status`, `int total`, `int processed`, `int updated`, `int failed`, `int alertsSent`, `String currentTrackingNumber`, `String message`, `String detailsText`, `LocalDateTime startedAt`, `LocalDateTime finishedAt`, `LocalDateTime updatedAt`
 - Produces: `TrackingRunProgressRepository` con `Optional<TrackingRunProgress> findFirstByOrderByStartedAtDesc()` y `Optional<TrackingRunProgress> findByRunId(String runId)`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```java
 @DataJpaTest
@@ -1016,21 +1016,21 @@ class TrackingRunProgressRepositoryTest {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `.\mvnw.cmd test -Dtest=TrackingRunProgressRepositoryTest`
 Expected: FAIL — la entidad no existe.
 
-- [ ] **Step 3: Implementar**
+- [x] **Step 3: Implementar**
 
 Entidad `@Table(name = "tracking_run_progress", indexes = @Index(name = "idx_run_progress_run_id", columnList = "runId"))`. `runId` con `@Column(nullable = false, length = 64, unique = true)`. `detailsText` con `@Lob @Column(columnDefinition = "text")`. `@PrePersist`/`@PreUpdate` fijan `updatedAt`.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `.\mvnw.cmd test -Dtest=TrackingRunProgressRepositoryTest`
 Expected: PASS, 2 tests.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/main/java/com/shiparrival/domain/TrackingRunProgress.java src/main/java/com/shiparrival/repository/TrackingRunProgressRepository.java src/test/java/com/shiparrival/repository/TrackingRunProgressRepositoryTest.java
@@ -1056,7 +1056,7 @@ git commit -m "feat: add per-run tracking progress entity"
 - Produces en `TrackingSchedulerService`: `void setRunContext(String runId, String origin, String triggeredBy)`
 - Produce `TrackingRunOnceRunner`: lee `TRACKING_RUN_ID` y `TRACKING_ORIGIN` del entorno y establece el contexto antes del ciclo
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```java
 class TrackingProgressPublisherTest {
@@ -1125,12 +1125,12 @@ class TrackingProgressPublisherTest {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `.\mvnw.cmd test -Dtest=TrackingProgressPublisherTest`
 Expected: FAIL — `TrackingProgressPublisher` no existe.
 
-- [ ] **Step 3: Implementar**
+- [x] **Step 3: Implementar**
 
 `TrackingProgressPublisher` con `@Service` y `@Transactional(propagation = Propagation.REQUIRES_NEW)` en cada método público, envolviendo todo en `try/catch (RuntimeException)` con `log.warn`: el progreso es observabilidad, nunca debe tumbar el monitoreo.
 
@@ -1146,17 +1146,17 @@ trackingSchedulerService.setRunContext(runId, origin, origin.equals("ci") ? "git
 
 Añadir a `TrackingRunOnceRunnerTest` una prueba `shouldResolveRunIdFromEnvironment` sobre un método estático `static String resolveRunId(Map<String, String> env)` extraído para poder probarlo: con `TRACKING_RUN_ID=12345` devuelve `12345`; con el mapa vacío devuelve un valor que empieza por `local-`.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `.\mvnw.cmd test -Dtest=TrackingProgressPublisherTest`
 Expected: PASS, 4 tests.
 
-- [ ] **Step 5: Run the full suite**
+- [x] **Step 5: Run the full suite**
 
 Run: `.\mvnw.cmd test`
 Expected: 0 fallos. `TrackingSchedulerServiceTest` sigue compilando gracias al constructor de 7 argumentos.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/main/java/com/shiparrival/service/TrackingProgressPublisher.java src/main/java/com/shiparrival/service/TrackingSchedulerService.java src/test/java/com/shiparrival/service/TrackingProgressPublisherTest.java
@@ -1182,7 +1182,7 @@ git commit -m "feat: publish tracking progress per run"
   - `Optional<GitHubRunState> findRun(long runId)`
   - `Optional<GitHubRunState> findLatestRun()`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```java
 class GitHubActionsClientTest {
@@ -1269,12 +1269,12 @@ class GitHubActionsClientTest {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `.\mvnw.cmd test -Dtest=GitHubActionsClientTest`
 Expected: FAIL — las clases no existen.
 
-- [ ] **Step 3: Implementar**
+- [x] **Step 3: Implementar**
 
 `GitHubActionsProperties` como `@ConfigurationProperties(prefix = "github.dispatch")` con `enabled`, `token`, `owner`, `repo`, `workflow`, `ref`, más un record de constructor completo para las pruebas.
 
@@ -1293,12 +1293,12 @@ github.dispatch.workflow=${GITHUB_WORKFLOW:daily-monitoring.yml}
 github.dispatch.ref=${GITHUB_REF:master}
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `.\mvnw.cmd test -Dtest=GitHubActionsClientTest`
 Expected: PASS, 5 tests.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/main/java/com/shiparrival/service/github src/main/resources/application.properties src/test/java/com/shiparrival/service/github
@@ -1323,7 +1323,7 @@ git commit -m "feat: add GitHub Actions dispatch client"
 
 Fases posibles: `QUEUED`, `PREPARING`, `RUNNING`, `COMPLETED`, `FAILED`, `UNKNOWN`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```java
 @SpringBootTest
@@ -1426,12 +1426,12 @@ class RemoteTrackingControllerTest {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `.\mvnw.cmd test -Dtest=RemoteTrackingControllerTest`
 Expected: FAIL — las rutas nuevas no existen.
 
-- [ ] **Step 3: Implementar**
+- [x] **Step 3: Implementar**
 
 `POST /shipments/track-now`: recibe `@RequestAttribute(value = AuthFilter.CURRENT_USER_ATTRIBUTE, required = false) CurrentUser currentUser`. Si `currentUser != null && !currentUser.isAdmin()` lanza `ResponseStatusException(HttpStatus.FORBIDDEN)`. Se usa `required = false` a propósito: en `@WebMvcTest` y con la autenticación desactivada el atributo no existe, y las pruebas existentes del controlador deben seguir pasando.
 
@@ -1452,12 +1452,12 @@ Orden de decisión:
 
 `GET /shipments/live-status` devuelve `LiveTrackingStatusService.resolve(runId)`.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `.\mvnw.cmd test -Dtest=RemoteTrackingControllerTest`
 Expected: PASS, 5 tests.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/main/java/com/shiparrival/service/dto/LiveTrackingStatus.java src/main/java/com/shiparrival/service/LiveTrackingStatusService.java src/main/java/com/shiparrival/web/ShipmentWebController.java src/test/java/com/shiparrival/web/RemoteTrackingControllerTest.java
@@ -1475,7 +1475,7 @@ git commit -m "feat: dispatch monitoring to GitHub Actions and expose live statu
 **Interfaces:**
 - Consumes: `LiveTrackingStatus` (Task 12), `GET /shipments/live-status`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```java
 @SpringBootTest
@@ -1506,12 +1506,12 @@ class DashboardLivePanelRenderingTest {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `.\mvnw.cmd test -Dtest=DashboardLivePanelRenderingTest`
 Expected: FAIL — el panel no expone esos atributos.
 
-- [ ] **Step 3: Implementar**
+- [x] **Step 3: Implementar**
 
 En `dashboard.html`, añadir al panel `data-live-status-url="@{/shipments/live-status}"` y `th:attr="data-run-id=${param.runId != null ? param.runId[0] : ''}"`. No usar `${param.runId}` directamente: es un arreglo y Thymeleaf lo renderizaría como `[987654]`. En el script, cuando `runId` no esté vacío, consultar `live-status` cada 3 s y renderizar:
 - `QUEUED` → barra indeterminada, texto "En cola en GitHub Actions...".
@@ -1520,17 +1520,17 @@ En `dashboard.html`, añadir al panel `data-live-status-url="@{/shipments/live-s
 - `COMPLETED` → barra verde al 100 % y recarga de la página a los 3 s.
 - `FAILED` → barra roja y el `message` del backend en el resumen.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `.\mvnw.cmd test -Dtest=DashboardLivePanelRenderingTest`
 Expected: PASS, 1 test.
 
-- [ ] **Step 5: Run the full suite**
+- [x] **Step 5: Run the full suite**
 
 Run: `.\mvnw.cmd test`
 Expected: 0 fallos, 3 omitidas.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/main/resources/templates/dashboard.html src/test/java/com/shiparrival/web/DashboardLivePanelRenderingTest.java
@@ -1550,7 +1550,7 @@ git commit -m "feat: render live remote monitoring progress"
 **Interfaces:**
 - Consumes: `TrackingRunProgress` (Task 9), `TrackingSchedulerService.setRunContext` (Task 10)
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```java
 class DeploymentConfigurationTest {
@@ -1577,12 +1577,12 @@ class DeploymentConfigurationTest {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `.\mvnw.cmd test -Dtest=DeploymentConfigurationTest`
 Expected: FAIL — las variables no están declaradas.
 
-- [ ] **Step 3: Implementar**
+- [x] **Step 3: Implementar**
 
 En el paso "Run tracking cycle once", añadir al bloque `env`:
 
@@ -1606,17 +1606,17 @@ En `render.yaml`, añadir:
 
 En `AGENTS.md`, documentar en la Fase 10: cuentas por persona, rol `ADMIN`, variables `ADMIN_USERNAME`/`ADMIN_PASSWORD` y `GITHUB_TOKEN` (fine-grained, permiso `Actions: write`), y que el botón dispara el workflow.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `.\mvnw.cmd test -Dtest=DeploymentConfigurationTest`
 Expected: PASS, 2 tests.
 
-- [ ] **Step 5: Run the full suite**
+- [x] **Step 5: Run the full suite**
 
 Run: `.\mvnw.cmd test`
 Expected: 0 fallos, 3 omitidas.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add .github/workflows/daily-monitoring.yml render.yaml AGENTS.md src/test/java/com/shiparrival/config/DeploymentConfigurationTest.java
