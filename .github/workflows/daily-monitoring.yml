@@ -78,6 +78,8 @@ jobs:
           DISCORD_ENABLED: ${{ secrets.DISCORD_ENABLED }}
           HAPAG_LLOYD_HEADLESS: "false"
           APP_TIMEZONE: "America/Lima"
+          TRACKING_RUN_ID: ${{ github.run_id }}
+          TRACKING_ORIGIN: ci
         run: |
           JAR=$(ls target/*.jar | head -n 1)
           echo "Ejecutando ciclo de monitoreo con $JAR"
