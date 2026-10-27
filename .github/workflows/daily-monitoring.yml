@@ -1,0 +1,57 @@
+name: Daily Ship Arrival Monitoring
+
+on:
+  schedule:
+    - cron: '0 8 * * *' # Todos los dias a las 08:00 AM UTC (03:00 AM Peru, o ajustable segun necesidad)
+  workflow_dispatch: # Permite disparar manualmente en cualquier momento desde la app de GitHub o la web
+
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: 'maven'
+
+      - name: Set up Python for Playwright
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Playwright and Chrome
+        run: |
+          pip install playwright
+          playwright install chrome --with-deps
+
+      - name: Connect to Tailscale (Phone Exit Node)
+        uses: tailscale/github-action@v3
+        with:
+          authkey: ${{ secrets.TAILSCALE_AUTHKEY }}
+
+      - name: Activate Phone Exit Node
+        run: |
+          sudo tailscale set --exit-node=100.77.93.94
+
+      - name: Run Spring Boot Tracking Application
+        env:
+          SUPABASE_DB_HOST: ${{ secrets.SUPABASE_DB_HOST }}
+          SUPABASE_DB_PORT: ${{ secrets.SUPABASE_DB_PORT }}
+          SUPABASE_DB_NAME: ${{ secrets.SUPABASE_DB_NAME }}
+          SUPABASE_DB_USER: ${{ secrets.SUPABASE_DB_USER }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          TELEGRAM_ENABLED: ${{ secrets.TELEGRAM_ENABLED }}
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          DISCORD_ENABLED: ${{ secrets.DISCORD_ENABLED }}
+          HAPAG_LLOYD_HEADLESS: "false"
+        run: |
+          echo "=== Iniciando aplicacion Spring Boot para rastreo masivo ==="
+          # Ejecutamos un test o una tarea Java que dispare el TrackingSchedulerService
+          ./mvnw test -Dtest=ShipArrivalE2EIntegrationTest
