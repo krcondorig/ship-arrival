@@ -22,10 +22,22 @@
             Monitoreo Desatendido de Arribo de Buques (ONE / MSC / MAERSK / HAPAG-LLOYD)
         </span>
         <div class="ms-auto d-flex align-items-center gap-2">
+            <span th:if="${currentUser != null}" class="navbar-text text-light-50 small d-none d-md-inline">
+                <i class="bi bi-person-circle me-1"></i><span th:text="${currentUser.username}">usuario</span>
+            </span>
+            <a th:if="${currentUser != null and currentUser.isAdmin()}"
+               class="btn btn-outline-light btn-sm" th:href="@{/users}">
+                <i class="bi bi-people me-1"></i>Usuarios
+            </a>
             <form th:action="@{/shipments/track-now}" method="post" class="m-0" id="trackNowForm">
                 <button type="submit" id="trackNowButton" class="btn btn-warning btn-sm fw-semibold" th:disabled="${isTrackingInProgress}">
                     <i class="bi bi-arrow-repeat me-1"></i>
                     <span id="trackNowButtonText" th:text="${isTrackingInProgress ? 'Monitoreando...' : 'Monitorear Ahora'}">Monitorear Ahora</span>
+                </button>
+            </form>
+            <form th:if="${currentUser != null}" th:action="@{/logout}" method="post" class="m-0">
+                <button type="submit" class="btn btn-outline-light btn-sm" title="Cerrar sesión">
+                    <i class="bi bi-box-arrow-right"></i>
                 </button>
             </form>
         </div>
