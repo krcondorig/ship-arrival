@@ -60,8 +60,12 @@ public class AppUser {
      * Se incrementa al cambiar la contraseña. Las sesiones guardan el valor que
      * tenían al iniciar sesión; si ya no coincide, el filtro las invalida. Así un
      * restablecimiento de clave expulsa al intruso de inmediato.
+     *
+     * <p>El valor por defecto en la columna es necesario porque la tabla ya existe
+     * en producción con filas: sin él, agregar una columna {@code NOT NULL}
+     * fallaría al arrancar.</p>
      */
-    @Column(nullable = false)
+    @Column(nullable = false, columnDefinition = "bigint default 0")
     @Builder.Default
     private long sessionEpoch = 0L;
 
