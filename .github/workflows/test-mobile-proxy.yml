@@ -18,7 +18,7 @@ jobs:
       - name: Install Playwright
         run: |
           pip install playwright
-          playwright install chromium --with-deps
+          playwright install chrome --with-deps
 
       - name: Connect to Tailscale
         uses: tailscale/github-action@v3
@@ -34,34 +34,42 @@ jobs:
           curl -s --max-time 15 -x http://100.77.93.94:8080 https://ifconfig.me/ip
           echo ""
 
-          echo "=== 3. Probando MSC con Navegador Real (Playwright + Proxy Celular) ==="
+          echo "=== 3. Probando MSC con Google Chrome Oficial (Channel=chrome + Proxy Celular) ==="
           python3 - << 'EOF'
           import asyncio
           from playwright.async_api import async_playwright
 
           async def run():
               async with async_playwright() as p:
-                  # Lanzamos navegador Chromium pasando por el proxy del celular
+                  # Usamos el canal oficial "chrome" (no Chromium genérico)
                   browser = await p.chromium.launch(
+                      channel="chrome",
                       headless=True,
                       args=[
                           "--no-sandbox",
                           "--disable-dev-shm-usage",
-                          "--disable-blink-features=AutomationControlled"
+                          "--disable-blink-features=AutomationControlled",
+                          "--disable-infobars",
+                          "--window-size=1920,1080"
                       ],
                       proxy={"server": "http://100.77.93.94:8080"}
                   )
                   context = await browser.new_context(
                       user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36",
-                      viewport={"width": 1920, "height": 1080}
+                      viewport={"width": 1920, "height": 1080},
+                      locale="en-US"
                   )
-                  await context.add_init_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined});")
+                  await context.add_init_script("""
+                      Object.defineProperty(navigator, 'webdriver', {get: () => undefined});
+                      window.chrome = { runtime: {}, loadTimes: function() {}, csi: function() {}, app: {} };
+                  """)
                   page = await context.new_page()
 
                   print("Navegando a MSC...")
                   try:
                       await page.goto("https://www.msc.com/en/track-a-shipment", wait_until="domcontentloaded", timeout=45000)
-                      await page.wait_for_timeout(5000)
+                      # Esperamos a que los scripts de telemetría de Akamai se ejecuten
+                      await page.wait_for_timeout(6000)
                       title = await page.title()
                       print(f"TITULO MSC: {title}")
                       if "Access Denied" in title:
