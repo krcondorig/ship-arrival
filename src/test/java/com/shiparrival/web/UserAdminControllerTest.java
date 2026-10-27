@@ -57,6 +57,29 @@ class UserAdminControllerTest {
     }
 
     @Test
+    @DisplayName("El operador no puede ver el panel de usuarios")
+    void shouldForbidOperatorFromListingUsers() throws Exception {
+        AppUser operator = givenUser("operador", UserRole.OPERADOR);
+
+        mockMvc.perform(get("/users").sessionAttr(AuthFilter.SESSION_USER_ID, operator.getId()))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("El operador no puede crear cuentas")
+    void shouldForbidOperatorFromCreatingUsers() throws Exception {
+        AppUser operator = givenUser("operador2", UserRole.OPERADOR);
+
+        mockMvc.perform(post("/users").sessionAttr(AuthFilter.SESSION_USER_ID, operator.getId())
+                        .param("username", "intruso")
+                        .param("password", "claveSegura1")
+                        .param("role", "USER"))
+                .andExpect(status().isForbidden());
+
+        assertThat(userService.authenticate("intruso", "claveSegura1")).isEmpty();
+    }
+
+    @Test
     @DisplayName("Un administrador ve la lista de usuarios")
     void shouldShowUsersToAdmin() throws Exception {
         AppUser admin = givenUser("root", UserRole.ADMIN);

@@ -14,4 +14,13 @@ public record CurrentUser(Long id, String username, UserRole role) {
     public boolean isAdmin() {
         return role == UserRole.ADMIN;
     }
+
+    /**
+     * Trabajo del día a día: registrar, importar, eliminar guías y disparar el
+     * monitoreo. Lo comparten el administrador y el operador; consultar la lista
+     * de cuentas queda solo en manos del administrador.
+     */
+    public boolean canOperate() {
+        return role == UserRole.ADMIN || role == UserRole.OPERADOR;
+    }
 }

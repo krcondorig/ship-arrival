@@ -1,8 +1,11 @@
 package com.shiparrival.web;
 
 import com.shiparrival.domain.AppUser;
+import com.shiparrival.domain.Carrier;
+import com.shiparrival.domain.Shipment;
 import com.shiparrival.domain.UserRole;
 import com.shiparrival.repository.AppUserRepository;
+import com.shiparrival.repository.ShipmentRepository;
 import com.shiparrival.service.GitHubActionsClient;
 import com.shiparrival.service.GitHubRunState;
 import org.junit.jupiter.api.DisplayName;
@@ -10,6 +13,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -17,10 +21,12 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.Optional;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.flash;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -44,6 +50,9 @@ class RemoteTrackingControllerTest {
     private AppUserRepository repository;
 
     @Autowired
+    private ShipmentRepository shipmentRepository;
+
+    @Autowired
     private PasswordEncoder passwordEncoder;
 
     @MockitoBean
@@ -54,6 +63,13 @@ class RemoteTrackingControllerTest {
                 repository.save(AppUser.builder()
                         .username("root").passwordHash(passwordEncoder.encode("claveSegura1"))
                         .role(UserRole.ADMIN).enabled(true).build()));
+    }
+
+    private AppUser givenOperator() {
+        return repository.findByUsernameIgnoreCase("oper").orElseGet(() ->
+                repository.save(AppUser.builder()
+                        .username("oper").passwordHash(passwordEncoder.encode("claveSegura1"))
+                        .role(UserRole.OPERADOR).enabled(true).build()));
     }
 
     @Test
@@ -159,5 +175,62 @@ class RemoteTrackingControllerTest {
         mockMvc.perform(post("/shipments/1/delete")
                         .sessionAttr(AuthFilter.SESSION_USER_ID, user.getId()))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("Un operador puede disparar el monitoreo")
+    void shouldAllowOperatorToDispatch() throws Exception {
+        AppUser operator = givenOperator();
+        when(gitHubActionsClient.isEnabled()).thenReturn(true);
+        when(gitHubActionsClient.dispatch()).thenReturn(Optional.of(555L));
+
+        mockMvc.perform(post("/shipments/track-now")
+                        .sessionAttr(AuthFilter.SESSION_USER_ID, operator.getId()))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/?runId=555"));
+    }
+
+    @Test
+    @DisplayName("Un operador puede registrar guías")
+    void shouldAllowOperatorToRegister() throws Exception {
+        AppUser operator = givenOperator();
+
+        mockMvc.perform(post("/shipments")
+                        .sessionAttr(AuthFilter.SESSION_USER_ID, operator.getId())
+                        .param("trackingNumber", "TESTBL800001")
+                        .param("carrier", "ONE"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/"));
+
+        assertThat(shipmentRepository.findByTrackingNumber("TESTBL800001")).isPresent();
+    }
+
+    @Test
+    @DisplayName("Un operador puede eliminar guías")
+    void shouldAllowOperatorToDelete() throws Exception {
+        AppUser operator = givenOperator();
+        Shipment shipment = shipmentRepository.save(Shipment.builder()
+                .trackingNumber("TESTBL800002").carrier(Carrier.ONE).build());
+
+        mockMvc.perform(post("/shipments/" + shipment.getId() + "/delete")
+                        .sessionAttr(AuthFilter.SESSION_USER_ID, operator.getId()))
+                .andExpect(status().is3xxRedirection());
+
+        assertThat(shipmentRepository.findById(shipment.getId())).isEmpty();
+    }
+
+    @Test
+    @DisplayName("Un operador puede subir el Excel")
+    void shouldAllowOperatorToUploadExcel() throws Exception {
+        AppUser operator = givenOperator();
+        MockMultipartFile file = new MockMultipartFile(
+                "file", "guias.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                new byte[0]);
+
+        mockMvc.perform(multipart("/shipments/upload-excel")
+                        .file(file)
+                        .param("carrier", "ONE")
+                        .sessionAttr(AuthFilter.SESSION_USER_ID, operator.getId()))
+                .andExpect(status().is3xxRedirection());
     }
 }
