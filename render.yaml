@@ -27,3 +27,15 @@ services:
         value: "true"
       - key: DISCORD_WEBHOOK_URL
         sync: false
+      # Cuentas por persona: el primer administrador nace de estas variables.
+      - key: ADMIN_USERNAME
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
+      # Disparo del monitoreo desde el dashboard hacia GitHub Actions.
+      - key: GITHUB_DISPATCH_ENABLED
+        value: "true"
+      - key: GITHUB_TOKEN
+        sync: false
+      - key: SESSION_COOKIE_SECURE
+        value: "true"

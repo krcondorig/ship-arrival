@@ -3,9 +3,13 @@ package com.shiparrival.web;
 import com.shiparrival.domain.Carrier;
 import com.shiparrival.domain.Shipment;
 import com.shiparrival.domain.ShipmentEventLog;
+import com.shiparrival.service.GitHubActionsClient;
+import com.shiparrival.service.GitHubRunState;
+import com.shiparrival.service.LiveTrackingStatusService;
 import com.shiparrival.service.ShipmentService;
 import com.shiparrival.service.TrackingSchedulerService;
 import com.shiparrival.service.dto.BatchImportSummary;
+import com.shiparrival.service.dto.LiveTrackingStatus;
 import com.shiparrival.service.dto.ShipmentDto;
 import com.shiparrival.service.dto.ShipmentStats;
 import com.shiparrival.service.dto.TrackingStatus;
@@ -15,15 +19,18 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import org.springframework.web.util.UriComponentsBuilder;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.IntStream;
 
 @Slf4j
@@ -38,12 +45,16 @@ public class ShipmentWebController {
 
     private final ShipmentService shipmentService;
     private final TrackingSchedulerService trackingSchedulerService;
+    private final GitHubActionsClient gitHubActionsClient;
+    private final LiveTrackingStatusService liveTrackingStatusService;
 
     @GetMapping({"/", "/shipments"})
     public String dashboard(@RequestParam(required = false) String search,
                             @RequestParam(defaultValue = "0") int page,
                             @RequestParam(defaultValue = "10") int size,
+                            @RequestParam(required = false) String runId,
                             Model model) {
+        model.addAttribute("runId", runId);
         int safePage = Math.max(page, 0);
         int safeSize = Math.min(Math.max(size, 1), MAX_PAGE_SIZE);
         Pageable pageable = PageRequest.of(safePage, safeSize, Sort.by(Sort.Direction.DESC, "id"));
@@ -113,7 +124,10 @@ public class ShipmentWebController {
     @PostMapping("/shipments")
     public String registerShipment(@RequestParam String trackingNumber,
                                    @RequestParam(defaultValue = "ONE") Carrier carrier,
+                                   @RequestAttribute(value = AuthFilter.CURRENT_USER_ATTRIBUTE, required = false)
+                                   CurrentUser currentUser,
                                    RedirectAttributes redirectAttributes) {
+        requireAdmin(currentUser);
         try {
             boolean alreadyRegistered = shipmentService.existsByTrackingNumber(trackingNumber);
             Shipment registered = shipmentService.registerShipment(trackingNumber, carrier);
@@ -135,7 +149,10 @@ public class ShipmentWebController {
     @PostMapping("/shipments/upload-excel")
     public String uploadExcel(@RequestParam("file") MultipartFile file,
                               @RequestParam(defaultValue = "ONE") Carrier carrier,
+                              @RequestAttribute(value = AuthFilter.CURRENT_USER_ATTRIBUTE, required = false)
+                              CurrentUser currentUser,
                               RedirectAttributes redirectAttributes) {
+        requireAdmin(currentUser);
         if (file.isEmpty()) {
             redirectAttributes.addFlashAttribute("errorMessage", "Debe seleccionar un archivo Excel (.xlsx)");
             return "redirect:/";
@@ -161,7 +178,47 @@ public class ShipmentWebController {
     }
 
     @PostMapping("/shipments/track-now")
-    public String trackNow(RedirectAttributes redirectAttributes) {
+    public String trackNow(@RequestAttribute(value = AuthFilter.CURRENT_USER_ATTRIBUTE, required = false)
+                           CurrentUser currentUser,
+                           RedirectAttributes redirectAttributes) {
+
+        requireAdmin(currentUser);
+
+        if (!gitHubActionsClient.isEnabled()) {
+            return startLocalCycle(redirectAttributes);
+        }
+
+        Optional<GitHubRunState> latest = gitHubActionsClient.findLatestRun();
+        if (latest.isPresent() && (latest.get().isQueued() || latest.get().isInProgress())) {
+            redirectAttributes.addFlashAttribute("warningMessage",
+                    "Ya hay un monitoreo en curso. Espera a que termine.");
+            return "redirect:/";
+        }
+
+        Optional<Long> runId = gitHubActionsClient.dispatch();
+        if (runId.isEmpty()) {
+            redirectAttributes.addFlashAttribute("errorMessage",
+                    "No se pudo confirmar el envío del monitoreo. Revisa el token de GitHub o vuelve a intentarlo.");
+            return "redirect:/";
+        }
+
+        redirectAttributes.addFlashAttribute("infoMessage",
+                "Monitoreo enviado a la nube. El avance aparecerá en unos segundos.");
+        return "redirect:/?runId=" + runId.get();
+    }
+
+    /**
+     * Registrar, importar y eliminar son tareas de administración; un usuario
+     * normal solo consulta. La ausencia del atributo significa que la autenticación
+     * está desactivada (desarrollo local), y entonces se permite trabajar como antes.
+     */
+    private void requireAdmin(CurrentUser currentUser) {
+        if (currentUser != null && !currentUser.isAdmin()) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN);
+        }
+    }
+
+    private String startLocalCycle(RedirectAttributes redirectAttributes) {
         try {
             boolean started = trackingSchedulerService.startTrackingCycleAsync();
             if (started) {
@@ -177,6 +234,12 @@ public class ShipmentWebController {
                     "Error al iniciar monitoreo: " + ex.getMessage());
         }
         return "redirect:/";
+    }
+
+    @GetMapping("/shipments/live-status")
+    @ResponseBody
+    public LiveTrackingStatus liveStatus(@RequestParam(required = false) Long runId) {
+        return liveTrackingStatusService.resolve(runId);
     }
 
     @GetMapping("/shipments/track-status")
@@ -205,7 +268,10 @@ public class ShipmentWebController {
                                  @RequestParam(defaultValue = "0") int page,
                                  @RequestParam(defaultValue = "10") int size,
                                  @RequestParam(required = false) String search,
+                                 @RequestAttribute(value = AuthFilter.CURRENT_USER_ATTRIBUTE, required = false)
+                                 CurrentUser currentUser,
                                  RedirectAttributes redirectAttributes) {
+        requireAdmin(currentUser);
         try {
             shipmentService.deleteShipment(id);
             redirectAttributes.addFlashAttribute("successMessage", "Embarque eliminado correctamente.");

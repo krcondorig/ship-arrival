@@ -4,6 +4,7 @@ import com.shiparrival.service.TrackingSchedulerService;
 import com.shiparrival.service.dto.TrackingExecutionSummary;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.boot.SpringApplication;
@@ -11,6 +12,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.ApplicationContext;
 import org.springframework.stereotype.Component;
 
+import java.util.UUID;
 import java.util.function.IntConsumer;
 
 /**
@@ -31,23 +33,44 @@ public class TrackingRunOnceRunner implements ApplicationRunner {
 
     private final TrackingSchedulerService trackingSchedulerService;
     private final IntConsumer exitAction;
+    private final String runId;
+    private final String origin;
 
     @Autowired
     public TrackingRunOnceRunner(TrackingSchedulerService trackingSchedulerService,
-                                 ApplicationContext applicationContext) {
+                                 ApplicationContext applicationContext,
+                                 @Value("${TRACKING_RUN_ID:}") String runId,
+                                 @Value("${TRACKING_ORIGIN:}") String origin) {
         this(trackingSchedulerService,
-                code -> System.exit(SpringApplication.exit(applicationContext, () -> code)));
+                code -> System.exit(SpringApplication.exit(applicationContext, () -> code)),
+                runId, origin);
     }
 
     TrackingRunOnceRunner(TrackingSchedulerService trackingSchedulerService,
                           IntConsumer exitAction) {
+        this(trackingSchedulerService, exitAction, null, null);
+    }
+
+    TrackingRunOnceRunner(TrackingSchedulerService trackingSchedulerService,
+                          IntConsumer exitAction,
+                          String runId,
+                          String origin) {
         this.trackingSchedulerService = trackingSchedulerService;
         this.exitAction = exitAction;
+        this.runId = runId;
+        this.origin = origin;
     }
 
     @Override
     public void run(ApplicationArguments args) {
-        log.info("Modo de ejecución única activado: se monitorearán los embarques y el proceso finalizará");
+        String effectiveRunId = (runId == null || runId.isBlank())
+                ? UUID.randomUUID().toString()
+                : runId.trim();
+        String effectiveOrigin = (origin == null || origin.isBlank()) ? "LOCAL" : origin.trim();
+
+        trackingSchedulerService.setRunContext(effectiveRunId, effectiveOrigin);
+        log.info("Modo de ejecución única activado (ejecución {}, origen {}): "
+                + "se monitorearán los embarques y el proceso finalizará", effectiveRunId, effectiveOrigin);
 
         TrackingExecutionSummary summary;
         try {
