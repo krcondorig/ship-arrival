@@ -25,23 +25,26 @@ jobs:
         with:
           authkey: ${{ secrets.TAILSCALE_AUTHKEY }}
 
-      - name: Test Connection to Phone Proxy
+      - name: Activate Phone Exit Node & Test MSC
         run: |
-          echo "=== 1. Ping al celular por Tailscale ==="
-          tailscale ping -c 2 100.77.93.94
+          echo "=== 1. Verificando estado de Tailscale ==="
+          tailscale status
 
-          echo "=== 2. IP publica a traves del celular ==="
-          curl -s --max-time 15 -x http://100.77.93.94:8080 https://ifconfig.me/ip
+          echo "=== 2. Enrutando todo el trafico a traves del celular Xiaomi ==="
+          sudo tailscale set --exit-node=100.77.93.94
+
+          echo "=== 3. Comprobando la IP publica del sistema (debe ser la del celular) ==="
+          curl -s --max-time 15 https://ifconfig.me/ip
           echo ""
 
-          echo "=== 3. Probando MSC con Google Chrome Oficial (Channel=chrome + Proxy Celular) ==="
+          echo "=== 4. Probando MSC con Google Chrome Oficial atraves del celular ==="
           python3 - << 'EOF'
           import asyncio
           from playwright.async_api import async_playwright
 
           async def run():
               async with async_playwright() as p:
-                  # Usamos el canal oficial "chrome" (no Chromium genérico)
+                  # Sin configurar proxy en el navegador: todo el sistema Linux ya navega por el celular
                   browser = await p.chromium.launch(
                       channel="chrome",
                       headless=True,
@@ -51,8 +54,7 @@ jobs:
                           "--disable-blink-features=AutomationControlled",
                           "--disable-infobars",
                           "--window-size=1920,1080"
-                      ],
-                      proxy={"server": "http://100.77.93.94:8080"}
+                      ]
                   )
                   context = await browser.new_context(
                       user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36",
@@ -65,17 +67,16 @@ jobs:
                   """)
                   page = await context.new_page()
 
-                  print("Navegando a MSC...")
+                  print("Navegando a MSC a través de la conexión del celular...")
                   try:
                       await page.goto("https://www.msc.com/en/track-a-shipment", wait_until="domcontentloaded", timeout=45000)
-                      # Esperamos a que los scripts de telemetría de Akamai se ejecuten
                       await page.wait_for_timeout(6000)
                       title = await page.title()
                       print(f"TITULO MSC: {title}")
                       if "Access Denied" in title:
                           print("RESULTADO: MSC Bloqueado por Akamai")
                       else:
-                          print("RESULTADO: ¡EXITO TOTAL! MSC permitió el acceso con navegador real.")
+                          print("RESULTADO: ¡¡¡EXITO TOTAL!!! MSC permitió el acceso a través del celular.")
                   except Exception as e:
                       print(f"ERROR: {e}")
                   finally:
