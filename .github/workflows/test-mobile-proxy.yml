@@ -25,16 +25,16 @@ jobs:
         with:
           authkey: ${{ secrets.TAILSCALE_AUTHKEY }}
 
-      - name: Activate Phone Exit Node & Test Navieras
+      - name: Test Navieras through Phone Exit Node
         run: |
-          echo "=== 1. Enrutando todo el trafico a traves del celular ==="
+          echo "=== 1. Enrutando trafico por el celular ==="
           sudo tailscale set --exit-node=100.77.93.94
 
           echo "=== 2. IP publica del celular ==="
-          curl -s --max-time 15 https://ifconfig.me/ip
+          curl -s --max-time 10 https://ifconfig.me/ip
           echo ""
 
-          echo "=== 3. Probando ONE (Ocean Network Express) por el celular ==="
+          echo "=== 3. Probando Hapag-Lloyd ==="
           python3 - << 'EOF'
           import asyncio
           from playwright.async_api import async_playwright
@@ -47,10 +47,56 @@ jobs:
                       args=["--no-sandbox", "--disable-dev-shm-usage"]
                   )
                   page = await browser.new_page()
-                  print("Consultando ONE...")
-                  await page.goto("https://ecomm.one-line.com/one-ecom/manage-shipment/cargo-tracking", timeout=30000)
-                  print("ONE cargado exitosamente. Titulo:", await page.title())
-                  await browser.close()
+                  print("Consultando Hapag-Lloyd...")
+                  try:
+                      resp = await page.goto(
+                          "https://www.hapag-lloyd.com/en/online-business/track/track-by-booking-solution.html?blno=HLCUNG12607EKZE0",
+                          wait_until="domcontentloaded",
+                          timeout=30000
+                      )
+                      await page.wait_for_timeout(4000)
+                      title = await page.title()
+                      print(f"Hapag-Lloyd status: {resp.status if resp else 'None'}, Titulo: {title}")
+                  except Exception as e:
+                      print(f"Hapag-Lloyd error: {e}")
+                  finally:
+                      await browser.close()
+
+          asyncio.run(run())
+          EOF
+
+          echo "=== 4. Probando MSC con captura detallada ==="
+          python3 - << 'EOF'
+          import asyncio
+          from playwright.async_api import async_playwright
+
+          async def run():
+              async with async_playwright() as p:
+                  browser = await p.chromium.launch(
+                      channel="chrome",
+                      headless=True,
+                      args=[
+                          "--no-sandbox",
+                          "--disable-dev-shm-usage",
+                          "--disable-blink-features=AutomationControlled"
+                      ]
+                  )
+                  context = await browser.new_context(
+                      user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36",
+                      viewport={"width": 1920, "height": 1080}
+                  )
+                  await context.add_init_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined});")
+                  page = await context.new_page()
+                  print("Consultando MSC...")
+                  try:
+                      resp = await page.goto("https://www.msc.com/en/track-a-shipment", wait_until="commit", timeout=30000)
+                      await page.wait_for_timeout(5000)
+                      title = await page.title()
+                      print(f"MSC Status: {resp.status if resp else 'None'}, Titulo: {title}")
+                  except Exception as e:
+                      print(f"MSC error: {e}")
+                  finally:
+                      await browser.close()
 
           asyncio.run(run())
           EOF
