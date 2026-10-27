@@ -1,8 +1,11 @@
 package com.shiparrival.web;
 
 import com.shiparrival.domain.AppUser;
+import com.shiparrival.domain.Carrier;
+import com.shiparrival.domain.Shipment;
 import com.shiparrival.domain.UserRole;
 import com.shiparrival.repository.AppUserRepository;
+import com.shiparrival.repository.ShipmentRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -30,6 +33,9 @@ class DashboardUserRenderingTest {
 
     @Autowired
     private AppUserRepository repository;
+
+    @Autowired
+    private ShipmentRepository shipmentRepository;
 
     @Test
     @DisplayName("Solo el administrador ve el enlace a la administración de usuarios")
@@ -77,5 +83,22 @@ class DashboardUserRenderingTest {
         mockMvc.perform(get("/").sessionAttr(AuthFilter.SESSION_USER_ID, user.getId()))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("carla")));
+    }
+
+    @Test
+    @DisplayName("El operador ve registro, importación, monitoreo y borrado, pero no la administración de cuentas")
+    void shouldShowOperationalActionsToOperator() throws Exception {
+        AppUser operator = repository.save(AppUser.builder()
+                .username("operador").passwordHash("h").role(UserRole.OPERADOR).enabled(true).build());
+        Shipment shipment = shipmentRepository.save(Shipment.builder()
+                .trackingNumber("TESTBL700001").carrier(Carrier.ONE).build());
+
+        mockMvc.perform(get("/").sessionAttr(AuthFilter.SESSION_USER_ID, operator.getId()))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("id=\"trackNowForm\"")))
+                .andExpect(content().string(containsString("Registrar Embarque Individual")))
+                .andExpect(content().string(containsString("Carga Masiva desde Excel")))
+                .andExpect(content().string(containsString("/shipments/" + shipment.getId() + "/delete")))
+                .andExpect(content().string(not(containsString("href=\"/users\""))));
     }
 }

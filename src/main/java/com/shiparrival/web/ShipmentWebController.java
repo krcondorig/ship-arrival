@@ -127,7 +127,7 @@ public class ShipmentWebController {
                                    @RequestAttribute(value = AuthFilter.CURRENT_USER_ATTRIBUTE, required = false)
                                    CurrentUser currentUser,
                                    RedirectAttributes redirectAttributes) {
-        requireAdmin(currentUser);
+        requireOperator(currentUser);
         try {
             boolean alreadyRegistered = shipmentService.existsByTrackingNumber(trackingNumber);
             Shipment registered = shipmentService.registerShipment(trackingNumber, carrier);
@@ -152,7 +152,7 @@ public class ShipmentWebController {
                               @RequestAttribute(value = AuthFilter.CURRENT_USER_ATTRIBUTE, required = false)
                               CurrentUser currentUser,
                               RedirectAttributes redirectAttributes) {
-        requireAdmin(currentUser);
+        requireOperator(currentUser);
         if (file.isEmpty()) {
             redirectAttributes.addFlashAttribute("errorMessage", "Debe seleccionar un archivo Excel (.xlsx)");
             return "redirect:/";
@@ -182,7 +182,7 @@ public class ShipmentWebController {
                            CurrentUser currentUser,
                            RedirectAttributes redirectAttributes) {
 
-        requireAdmin(currentUser);
+        requireOperator(currentUser);
 
         if (!gitHubActionsClient.isEnabled()) {
             return startLocalCycle(redirectAttributes);
@@ -208,12 +208,14 @@ public class ShipmentWebController {
     }
 
     /**
-     * Registrar, importar y eliminar son tareas de administración; un usuario
-     * normal solo consulta. La ausencia del atributo significa que la autenticación
-     * está desactivada (desarrollo local), y entonces se permite trabajar como antes.
+     * Registrar, importar, eliminar y monitorear son tareas operativas: las
+     * comparten el administrador y el operador. Un usuario de solo consulta no
+     * las ve ni puede invocarlas. La ausencia del atributo significa que la
+     * autenticación está desactivada (desarrollo local), y entonces se permite
+     * trabajar como antes.
      */
-    private void requireAdmin(CurrentUser currentUser) {
-        if (currentUser != null && !currentUser.isAdmin()) {
+    private void requireOperator(CurrentUser currentUser) {
+        if (currentUser != null && !currentUser.canOperate()) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN);
         }
     }
@@ -271,7 +273,7 @@ public class ShipmentWebController {
                                  @RequestAttribute(value = AuthFilter.CURRENT_USER_ATTRIBUTE, required = false)
                                  CurrentUser currentUser,
                                  RedirectAttributes redirectAttributes) {
-        requireAdmin(currentUser);
+        requireOperator(currentUser);
         try {
             shipmentService.deleteShipment(id);
             redirectAttributes.addFlashAttribute("successMessage", "Embarque eliminado correctamente.");

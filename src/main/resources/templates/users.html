@@ -93,7 +93,7 @@
                     <td class="fw-semibold" th:text="${u.username}">usuario</td>
                     <td>
                         <span class="badge"
-                              th:classappend="${u.role.name() == 'ADMIN'} ? 'text-bg-primary' : 'text-bg-secondary'"
+                              th:classappend="${u.role.name() == 'ADMIN' ? 'text-bg-primary' : (u.role.name() == 'OPERADOR' ? 'text-bg-info' : 'text-bg-secondary')}"
                               th:text="${u.role}">USER</span>
                     </td>
                     <td>
@@ -116,7 +116,7 @@
                             </form>
 
                             <form th:action="@{/users/{id}/role(id=${u.id})}" method="post" class="mb-0 d-flex gap-1">
-                                <select class="form-select form-select-sm" name="role" style="width: 100px;">
+                                <select class="form-select form-select-sm" name="role" style="width: 120px;">
                                     <option th:each="r : ${roles}" th:value="${r}" th:text="${r}"
                                             th:selected="${r == u.role}">USER</option>
                                 </select>
