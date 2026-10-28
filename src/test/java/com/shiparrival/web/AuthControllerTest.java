@@ -68,7 +68,7 @@ class AuthControllerTest {
                 .andExpect(request().sessionAttribute(AuthFilter.SESSION_EPOCH, 1L));
 
         assertThat(repository.findByUsernameIgnoreCase("ana").orElseThrow().getActiveSessionExpiresAt())
-                .isAfter(java.time.LocalDateTime.now().plusHours(11));
+                .isAfter(java.time.LocalDateTime.now().plusMinutes(55));
     }
 
     @Test

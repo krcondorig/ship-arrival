@@ -133,7 +133,7 @@ public class UserService {
             return false;
         }
         user.setSessionEpoch(user.getSessionEpoch() + 1);
-        user.setActiveSessionExpiresAt(now.plusHours(12));
+        user.setActiveSessionExpiresAt(now.plusHours(1));
         user.setLastLoginAt(now);
         repository.save(user);
         return true;
