@@ -60,8 +60,10 @@ jobs:
       - name: Activate Phone Exit Node
         run: |
           sudo tailscale set --exit-node=100.77.93.94
+          echo "Estado de Tailscale y exit node:"
+          tailscale status
           echo "IP publica visible para las navieras:"
-          curl -s --max-time 20 https://ifconfig.me/ip
+          curl -fsS --max-time 20 https://ifconfig.me/ip
           echo ""
 
       - name: Run tracking cycle once
