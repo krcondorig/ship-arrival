@@ -402,6 +402,7 @@ public class ChromeHapagLloydTrackingClient implements HapagLloydTrackingClient 
      */
     private void waitForPageReady(int port) {
         long deadline = System.currentTimeMillis() + pageTimeout();
+        PageTarget lastTarget = null;
         while (System.currentTimeMillis() < deadline) {
             if (chromeProcess != null && !chromeProcess.isAlive()) {
                 throw new HapagLloydTrackingException(
@@ -410,6 +411,9 @@ public class ChromeHapagLloydTrackingClient implements HapagLloydTrackingClient 
             }
 
             PageTarget target = readPageTarget(port);
+            if (target != null) {
+                lastTarget = target;
+            }
             if (target != null
                     && target.title() != null
                     && target.title().toLowerCase(Locale.ROOT).contains("tracing by booking")
@@ -422,10 +426,28 @@ public class ChromeHapagLloydTrackingClient implements HapagLloydTrackingClient 
             sleepQuietly(POLL_INTERVAL_MS);
         }
 
+        String pageState = pageStateForDiagnostics(
+                lastTarget == null ? "<sin pestaña Hapag-Lloyd>" : lastTarget.title(),
+                lastTarget == null ? "" : lastTarget.url());
+        log.warn("Tiempo de espera al cargar Hapag-Lloyd; estado observado: {}", pageState);
         throw new HapagLloydTrackingException(
                 "Cloudflare no liberó la página de Hapag-Lloyd a tiempo. "
-                        + "Abra Chrome con el perfil " + profilePath()
-                        + " y resuelva el desafío una vez; luego reintente el monitoreo.");
+                        + "Estado observado: " + pageState);
+    }
+
+    static String pageStateForDiagnostics(String title, String url) {
+        String safeTitle = title == null ? "" : title.replaceAll("[\\r\\n\\t]", " ").trim();
+        String safeUrl = "";
+        if (url != null && !url.isBlank()) {
+            try {
+                URI parsed = URI.create(url);
+                safeUrl = new URI(parsed.getScheme(), parsed.getAuthority(), parsed.getPath(), null, null)
+                        .toString();
+            } catch (Exception ignored) {
+                safeUrl = "<URL no válida>";
+            }
+        }
+        return "title='" + safeTitle + "', url='" + safeUrl + "'";
     }
 
     private PageTarget readPageTarget(int port) {
