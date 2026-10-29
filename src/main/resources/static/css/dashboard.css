@@ -37,6 +37,11 @@ body {
     color: white;
 }
 
+.badge-manual {
+    background-color: #b8860b;
+    color: white;
+}
+
 .table-hover tbody tr:hover {
     background-color: #eef2f7;
 }

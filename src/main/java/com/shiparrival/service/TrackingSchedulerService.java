@@ -3,6 +3,7 @@ package com.shiparrival.service;
 import com.shiparrival.adapter.CarrierTrackingAdapter;
 import com.shiparrival.adapter.CarrierTrackingAdapterFactory;
 import com.shiparrival.adapter.TrackingResult;
+import com.shiparrival.domain.Carrier;
 import com.shiparrival.domain.Shipment;
 import com.shiparrival.domain.ShipmentStatus;
 import com.shiparrival.repository.ShipmentRepository;
@@ -19,7 +20,9 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 @Slf4j
@@ -33,6 +36,12 @@ public class TrackingSchedulerService {
     private final DiscordNotificationService discordNotificationService;
     private final TaskExecutor trackingTaskExecutor;
     private final long delayMs;
+
+    /**
+     * Navieras cuyo rastreo automático está deshabilitado: sus guías se marcan
+     * como {@code MANUAL_CHECK} para que un operador consulte el ETA a mano.
+     */
+    private final Set<Carrier> manualCheckCarriers;
 
     private final AtomicBoolean trackingInProgress = new AtomicBoolean(false);
     private TrackingStatus trackingStatus = TrackingStatus.idle();
@@ -59,7 +68,8 @@ public class TrackingSchedulerService {
                                      TelegramNotificationService telegramNotificationService,
                                      DiscordNotificationService discordNotificationService,
                                      @Qualifier("trackingTaskExecutor") TaskExecutor trackingTaskExecutor,
-                                     @Value("${tracking.request.delay-ms:2000}") long delayMs) {
+                                     @Value("${tracking.request.delay-ms:2000}") long delayMs,
+                                     @Value("${tracking.manual-check-carriers:HAPAG_LLOYD}") String manualCheckCarriersConfig) {
         this.shipmentService = shipmentService;
         this.shipmentRepository = shipmentRepository;
         this.adapterFactory = adapterFactory;
@@ -67,6 +77,32 @@ public class TrackingSchedulerService {
         this.discordNotificationService = discordNotificationService;
         this.trackingTaskExecutor = trackingTaskExecutor;
         this.delayMs = delayMs;
+        this.manualCheckCarriers = parseCarriers(manualCheckCarriersConfig);
+    }
+
+    /**
+     * Convierte la lista separada por comas de {@code tracking.manual-check-carriers}
+     * en un conjunto de navieras. Una lista vacía reactiva el rastreo automático
+     * de todas ellas; los nombres desconocidos se ignoran con una advertencia
+     * para no tumbar el arranque por un error de configuración.
+     */
+    private static Set<Carrier> parseCarriers(String config) {
+        Set<Carrier> carriers = new LinkedHashSet<>();
+        if (config == null || config.isBlank()) {
+            return carriers;
+        }
+        for (String raw : config.split(",")) {
+            String name = raw.trim();
+            if (name.isEmpty()) {
+                continue;
+            }
+            try {
+                carriers.add(Carrier.valueOf(name.toUpperCase()));
+            } catch (IllegalArgumentException ex) {
+                log.warn("Naviera desconocida en tracking.manual-check-carriers: '{}'. Se ignora.", name);
+            }
+        }
+        return carriers;
     }
 
     public boolean isTrackingInProgress() {
@@ -207,6 +243,14 @@ public class TrackingSchedulerService {
                 setCurrentTrackingNumber(shipment.getTrackingNumber());
 
                 try {
+                    if (manualCheckCarriers.contains(shipment.getCarrier())) {
+                        shipmentService.markForManualCheck(shipment);
+                        details.add("Guía " + shipment.getTrackingNumber() + ": Omitida - verificar manual");
+                        processed = i + 1;
+                        updateProgress(total, processed, updated, failed, alerts);
+                        continue;
+                    }
+
                     CarrierTrackingAdapter adapter = adapterFactory.getAdapter(shipment.getCarrier());
                     TrackingResult result = adapter.track(shipment.getTrackingNumber());
 

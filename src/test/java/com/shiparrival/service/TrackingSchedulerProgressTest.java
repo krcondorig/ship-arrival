@@ -42,7 +42,7 @@ class TrackingSchedulerProgressTest {
 
         schedulerService = new TrackingSchedulerService(
                 shipmentService, shipmentRepository, adapterFactory,
-                telegramService, discordService, Runnable::run, 0);
+                telegramService, discordService, Runnable::run, 0, "HAPAG_LLOYD");
         schedulerService.setProgressService(progressService);
     }
 

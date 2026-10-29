@@ -57,6 +57,10 @@ class TrackingSchedulerServiceTest {
     }
 
     private TrackingSchedulerService createService(TaskExecutor executor) {
+        return createService(executor, "HAPAG_LLOYD");
+    }
+
+    private TrackingSchedulerService createService(TaskExecutor executor, String manualCheckCarriers) {
         return new TrackingSchedulerService(
                 shipmentService,
                 shipmentRepository,
@@ -64,7 +68,8 @@ class TrackingSchedulerServiceTest {
                 telegramService,
                 discordService,
                 executor,
-                0 // 0 delay en tests para velocidad
+                0, // 0 delay en tests para velocidad
+                manualCheckCarriers
         );
     }
 
@@ -242,6 +247,95 @@ class TrackingSchedulerServiceTest {
         verify(telegramService, times(1)).sendArrivedAlert(arrived);
         verify(discordService, times(1)).sendArrivedAlert(arrived);
         assertThat(arrived.isAlertSentArrived()).isTrue();
+    }
+
+    @Test
+    @DisplayName("Debe omitir Hapag-Lloyd y marcarlo para verificación manual sin contarlo como fallo")
+    void shouldSkipHapagLloydAndMarkForManualCheck() {
+        Shipment hapag = Shipment.builder()
+                .id(20L)
+                .trackingNumber("HLCUNG12607EKZE0")
+                .carrier(Carrier.HAPAG_LLOYD)
+                .status(ShipmentStatus.IN_TRANSIT)
+                .active(true)
+                .alertSent3Days(false)
+                .alertSentArrived(false)
+                .build();
+
+        when(shipmentService.getActiveShipments()).thenReturn(List.of(hapag));
+
+        TrackingExecutionSummary summary = schedulerService.runTrackingCycle();
+
+        assertThat(summary.getTotalProcessed()).isEqualTo(1);
+        assertThat(summary.getUpdatedCount()).isZero();
+        assertThat(summary.getFailedCount()).isZero();
+        assertThat(summary.getAlertsSentCount()).isZero();
+        assertThat(summary.getDetails()).anySatisfy(detail ->
+                assertThat(detail).contains("HLCUNG12607EKZE0").contains("verificar manual"));
+        verify(shipmentService).markForManualCheck(hapag);
+        verify(adapterFactory, never()).getAdapter(Carrier.HAPAG_LLOYD);
+        verify(telegramService, never()).sendNearArrivalAlert(any(), anyLong());
+        verify(telegramService, never()).sendArrivedAlert(any());
+    }
+
+    @Test
+    @DisplayName("Debe seguir rastreando las demás navieras cuando hay guías de Hapag-Lloyd en el ciclo")
+    void shouldStillTrackOtherCarriersWhenHapagIsManual() {
+        Shipment hapag = Shipment.builder()
+                .id(20L)
+                .trackingNumber("HLCUNG12607EKZE0")
+                .carrier(Carrier.HAPAG_LLOYD)
+                .status(ShipmentStatus.IN_TRANSIT)
+                .active(true)
+                .build();
+        Shipment one = shipment(21L, "TESTBL900001");
+        TrackingResult result = successfulResult("TESTBL900001");
+        Shipment updated = shipment(21L, "TESTBL900001");
+
+        when(shipmentService.getActiveShipments()).thenReturn(List.of(hapag, one));
+        when(adapterFactory.getAdapter(Carrier.ONE)).thenReturn(trackingAdapter);
+        when(trackingAdapter.track("TESTBL900001")).thenReturn(result);
+        when(shipmentService.updateFromTrackingResult(one, result)).thenReturn(updated);
+
+        TrackingExecutionSummary summary = schedulerService.runTrackingCycle();
+
+        assertThat(summary.getTotalProcessed()).isEqualTo(2);
+        assertThat(summary.getUpdatedCount()).isEqualTo(1);
+        assertThat(summary.getFailedCount()).isZero();
+        verify(shipmentService).markForManualCheck(hapag);
+        verify(adapterFactory, never()).getAdapter(Carrier.HAPAG_LLOYD);
+        verify(trackingAdapter).track("TESTBL900001");
+    }
+
+    @Test
+    @DisplayName("Con la lista de verificación manual vacía, Hapag-Lloyd vuelve a rastrearse")
+    void shouldTrackHapagWhenManualCheckListIsEmpty() {
+        TrackingSchedulerService service = createService(Runnable::run, "");
+        Shipment hapag = Shipment.builder()
+                .id(20L)
+                .trackingNumber("HLCUNG12607EKZE0")
+                .carrier(Carrier.HAPAG_LLOYD)
+                .status(ShipmentStatus.IN_TRANSIT)
+                .active(true)
+                .build();
+        TrackingResult result = successfulResult("HLCUNG12607EKZE0");
+        Shipment updated = Shipment.builder()
+                .id(20L)
+                .trackingNumber("HLCUNG12607EKZE0")
+                .carrier(Carrier.HAPAG_LLOYD)
+                .status(ShipmentStatus.IN_TRANSIT)
+                .build();
+
+        when(shipmentService.getActiveShipments()).thenReturn(List.of(hapag));
+        when(adapterFactory.getAdapter(Carrier.HAPAG_LLOYD)).thenReturn(trackingAdapter);
+        when(trackingAdapter.track("HLCUNG12607EKZE0")).thenReturn(result);
+        when(shipmentService.updateFromTrackingResult(hapag, result)).thenReturn(updated);
+
+        TrackingExecutionSummary summary = service.runTrackingCycle();
+
+        assertThat(summary.getUpdatedCount()).isEqualTo(1);
+        assertThat(summary.getFailedCount()).isZero();
+        verify(shipmentService, never()).markForManualCheck(any());
     }
 
     @Test

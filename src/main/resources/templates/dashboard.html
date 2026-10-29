@@ -296,6 +296,9 @@
                             <span th:if="${s.status.name() == 'ARRIVED'}" class="badge badge-arrived">Arribado</span>
                             <span th:if="${s.status.name() == 'PENDING_FIRST_CHECK'}" class="badge badge-pending">Pendiente Rastreo</span>
                             <span th:if="${s.status.name() == 'ERROR_CHECKING'}" class="badge badge-error">Error al Consultar</span>
+                            <span th:if="${s.status.name() == 'MANUAL_CHECK'}" class="badge badge-manual">
+                                <i class="bi bi-person-check me-1"></i>Verificar manual
+                            </span>
                         </td>
                         <td class="small text-muted" th:text="${s.lastCheckedAt != null ? #temporals.format(s.lastCheckedAt, 'yyyy-MM-dd HH:mm') : 'Nunca'}">Nunca</td>
                         <td class="text-end">
