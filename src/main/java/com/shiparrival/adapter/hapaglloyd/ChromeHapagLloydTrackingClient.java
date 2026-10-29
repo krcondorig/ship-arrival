@@ -308,7 +308,7 @@ public class ChromeHapagLloydTrackingClient implements HapagLloydTrackingClient 
         command.add("--disable-background-timer-throttling");
         command.add("--disable-backgrounding-occluded-windows");
         command.add("--disable-renderer-backgrounding");
-        command.add("--window-position=-10000,-10000");
+        command.add("--window-position=0,0");
         command.add("--window-size=1280,900");
         command.add("--lang=en-US,en;q=0.9");
         if (headless) {
