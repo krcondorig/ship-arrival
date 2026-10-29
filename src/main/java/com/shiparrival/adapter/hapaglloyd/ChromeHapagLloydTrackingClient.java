@@ -128,7 +128,7 @@ public class ChromeHapagLloydTrackingClient implements HapagLloydTrackingClient 
             """;
 
     private static final String DEFAULT_PROFILE_DIR = "./data/hapag-chrome-profile";
-    private static final int DEFAULT_PAGE_TIMEOUT_SECONDS = 90;
+    private static final int DEFAULT_PAGE_TIMEOUT_SECONDS = 120;
     private static final Duration DEVTOOLS_TIMEOUT = Duration.ofSeconds(20);
     private static final long POLL_INTERVAL_MS = 500L;
     private static final long RETRY_DELAY_MS = 2500L;
@@ -333,8 +333,8 @@ public class ChromeHapagLloydTrackingClient implements HapagLloydTrackingClient 
         log.debug("Chrome de Hapag-Lloyd iniciado (PID {}, puerto CDP {}, perfil {})",
                 chromeProcess.pid(), debugPort, profilePath);
         waitForDevTools(debugPort);
-        waitForPageReady(debugPort);
         connectCdp();
+        waitForPageReady(debugPort);
     }
 
     private void connectCdp() {
@@ -403,6 +403,7 @@ public class ChromeHapagLloydTrackingClient implements HapagLloydTrackingClient 
     private void waitForPageReady(int port) {
         long deadline = System.currentTimeMillis() + pageTimeout();
         PageTarget lastTarget = null;
+        long lastInteractionAttempt = 0L;
         while (System.currentTimeMillis() < deadline) {
             if (chromeProcess != null && !chromeProcess.isAlive()) {
                 throw new HapagLloydTrackingException(
@@ -421,6 +422,19 @@ public class ChromeHapagLloydTrackingClient implements HapagLloydTrackingClient 
                     && target.url().contains("blno=")) {
                 log.debug("Página de Hapag-Lloyd lista (título: {})", target.title());
                 return;
+            }
+
+            // Si Cloudflare muestra "Just a moment...", intentamos simular interacción periódicamente
+            if (target != null
+                    && target.title() != null
+                    && target.title().toLowerCase(Locale.ROOT).contains("just a moment")
+                    && System.currentTimeMillis() - lastInteractionAttempt > 5000L) {
+                lastInteractionAttempt = System.currentTimeMillis();
+                try {
+                    if (cdp != null && cdp.isOpen()) {
+                        cdp.evaluateBoolean("(() => { const iframe = document.querySelector('iframe'); if (iframe) { iframe.click(); return true; } document.body.click(); return false; })()");
+                    }
+                } catch (Exception ignored) {}
             }
 
             sleepQuietly(POLL_INTERVAL_MS);
