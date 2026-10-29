@@ -41,17 +41,6 @@ jobs:
           fi
           google-chrome --version
 
-      - name: Prepare Hapag-Lloyd Chrome profile directory
-        run: mkdir -p data/hapag-chrome-profile
-
-      - name: Restore Hapag-Lloyd Chrome profile
-        uses: actions/cache@v4
-        with:
-          path: data/hapag-chrome-profile
-          key: hapag-chrome-profile-${{ github.run_id }}
-          restore-keys: |
-            hapag-chrome-profile-
-
       - name: Connect to Tailscale (Phone Exit Node)
         uses: tailscale/github-action@v3
         with:
@@ -107,3 +96,12 @@ jobs:
 
           echo "::error::El monitoreo falló tras 3 intentos."
           exit 1
+
+      # El exit node solo hace falta para el ciclo de rastreo. Si se deja activo,
+      # la subida de caché y logs del runner sale por la red móvil del teléfono y
+      # se queda colgada. Este paso corre siempre, incluso si el ciclo falla.
+      - name: Disconnect from Tailscale
+        if: always()
+        run: |
+          sudo tailscale set --exit-node= || true
+          sudo tailscale down || true
