@@ -216,4 +216,40 @@ class ShipmentServiceTest {
         assertThat(stats.nearArrival()).isEqualTo(2);
         assertThat(stats.arrived()).isEqualTo(1);
     }
+
+    @Test
+    @DisplayName("Debe marcar el embarque para verificación manual sin alterar la fecha de última consulta")
+    void shouldMarkShipmentForManualCheck() {
+        LocalDateTime lastChecked = LocalDateTime.of(2026, 10, 20, 8, 0);
+        Shipment shipment = Shipment.builder()
+                .id(5L)
+                .trackingNumber("HLCUNG12607EKZE0")
+                .carrier(Carrier.HAPAG_LLOYD)
+                .status(ShipmentStatus.IN_TRANSIT)
+                .lastCheckedAt(lastChecked)
+                .build();
+        when(shipmentRepository.save(any(Shipment.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        shipmentService.markForManualCheck(shipment);
+
+        assertThat(shipment.getStatus()).isEqualTo(ShipmentStatus.MANUAL_CHECK);
+        assertThat(shipment.getLastCheckedAt()).isEqualTo(lastChecked);
+        verify(shipmentRepository).save(shipment);
+    }
+
+    @Test
+    @DisplayName("No debe degradar a verificación manual un embarque ya arribado")
+    void shouldNotDowngradeArrivedShipmentToManualCheck() {
+        Shipment arrived = Shipment.builder()
+                .id(6L)
+                .trackingNumber("HLCUNG12608BMJY0")
+                .carrier(Carrier.HAPAG_LLOYD)
+                .status(ShipmentStatus.ARRIVED)
+                .build();
+
+        shipmentService.markForManualCheck(arrived);
+
+        assertThat(arrived.getStatus()).isEqualTo(ShipmentStatus.ARRIVED);
+        verify(shipmentRepository, never()).save(any());
+    }
 }

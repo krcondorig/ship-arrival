@@ -124,6 +124,24 @@ public class ShipmentService {
                 .build();
     }
 
+    /**
+     * Marca un embarque para que un operador consulte la naviera a mano. Se usa
+     * con las navieras cuyo rastreo automático está deshabilitado. No modifica
+     * {@code lastCheckedAt} porque no hubo consulta real, y respeta los estados
+     * finales (arribado o cancelado) para no degradar guías ya resueltas.
+     */
+    @Transactional
+    public Shipment markForManualCheck(Shipment shipment) {
+        if (shipment.getStatus() == ShipmentStatus.ARRIVED
+                || shipment.getStatus() == ShipmentStatus.CANCELLED
+                || shipment.getStatus() == ShipmentStatus.MANUAL_CHECK) {
+            return shipment;
+        }
+        shipment.setStatus(ShipmentStatus.MANUAL_CHECK);
+        log.info("Embarque marcado para verificación manual: Guía={}", shipment.getTrackingNumber());
+        return shipmentRepository.save(shipment);
+    }
+
     @Transactional
     public Shipment updateFromTrackingResult(Shipment shipment, TrackingResult result) {
         shipment.setLastCheckedAt(LocalDateTime.now());
