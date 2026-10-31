@@ -94,6 +94,28 @@ class ZenRowsHapagLloydTrackingClientTest {
     }
 
     @Test
+    void reportsSafeDetailsPageMetadataWhenNoMovementsAreFound() {
+        RestClient.Builder builder = RestClient.builder();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        server.expect(requestTo(org.hamcrest.Matchers.startsWith(BASE_URL)))
+                .andRespond(withSuccess(fixtureUnchecked("zenrows-booking.html"), org.springframework.http.MediaType.TEXT_HTML));
+        server.expect(requestTo(org.hamcrest.Matchers.startsWith(BASE_URL)))
+                .andRespond(withSuccess("<html><head><title>Unexpected page</title></head><body>PRIVATE BODY</body></html>",
+                        org.springframework.http.MediaType.TEXT_HTML));
+        ZenRowsHapagLloydTrackingClient client = new ZenRowsHapagLloydTrackingClient(
+                builder, API_KEY, BASE_URL, 1000);
+
+        assertThatThrownBy(() -> client.fetchTrackingSnapshot("TESTBL00000001"))
+                .isInstanceOf(HapagLloydTrackingException.class)
+                .hasMessageContaining("Unexpected page")
+                .hasMessageNotContaining("PRIVATE BODY")
+                .hasMessageNotContaining(API_KEY)
+                .hasMessageContaining("httpStatus=200")
+                .hasMessageContaining("tableCount=0");
+        server.verify();
+    }
+
+    @Test
     void rejectsDetailsPageWithoutMovements() {
         RestClient.Builder builder = RestClient.builder();
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
