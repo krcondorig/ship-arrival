@@ -82,6 +82,7 @@ public class SeleniumMscTrackingClient implements MscTrackingClient {
 
         try {
             driver = new ChromeDriver(options);
+            driver.manage().timeouts().pageLoadTimeout(PAGE_LOAD_TIMEOUT);
             driver.executeCdpCommand(
                     "Page.addScriptToEvaluateOnNewDocument",
                     Map.of("source", "Object.defineProperty(navigator, 'webdriver', {get: () => undefined});"));

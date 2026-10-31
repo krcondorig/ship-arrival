@@ -22,10 +22,29 @@ class DeploymentConfigurationTest {
                 .contains("with-phone-exit-node:")
                 .contains("CarrierNetworkDiagnosticTest")
                 .contains("CARRIER_NETWORK_DIAGNOSTIC")
+                .contains("test-compile dependency:resolve dependency:resolve-plugins")
+                .contains("--exit-node=100.77.93.94")
+                .contains("xvfb-run -a ./mvnw -B -Dtest=CarrierNetworkDiagnosticTest test")
+                .contains("timeout-minutes: 20");
+
+        assertThat(workflow)
                 .doesNotContain("--tracking.run-once")
                 .doesNotContain("HAPAG_LLOYD")
                 .doesNotContain("SUPABASE_DB_PASSWORD")
                 .doesNotContain("ZENROWS_API_KEY");
+        assertPrefetchOccursBeforeDiagnostics(workflow, "without-tailscale:", "with-phone-exit-node:");
+    }
+
+    private void assertPrefetchOccursBeforeDiagnostics(String workflow, String... jobMarkers) {
+        for (String jobMarker : jobMarkers) {
+            int jobStart = workflow.indexOf(jobMarker);
+            int diagnostics = workflow.indexOf("-Dtest=CarrierNetworkDiagnosticTest", jobStart);
+            int prefetch = workflow.indexOf("test-compile dependency:resolve", jobStart);
+            assertThat(jobStart).as("job %s exists", jobMarker).isGreaterThanOrEqualTo(0);
+            assertThat(prefetch).as("job %s prefetches Maven dependencies", jobMarker)
+                    .isGreaterThan(jobStart);
+            assertThat(diagnostics).as("job %s runs diagnostics", jobMarker).isGreaterThan(prefetch);
+        }
     }
 
     @Test
