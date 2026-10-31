@@ -26,7 +26,7 @@ class DeploymentConfigurationTest {
         String workflow = Files.readString(Path.of(".github/workflows/daily-monitoring.yml"));
 
         assertThat(workflow).contains("ZENROWS_API_KEY: ${{ secrets.ZENROWS_API_KEY }}");
-        assertThat(workflow).contains("TRACKING_MANUAL_CHECK_CARRIERS: ${{ github.event_name == 'workflow_dispatch' && '' || 'HAPAG_LLOYD' }}");
+        assertThat(workflow).contains("TRACKING_MANUAL_CHECK_CARRIERS: ${{ github.event_name == 'schedule' && 'HAPAG_LLOYD' || '' }}");
         assertThat(workflow).doesNotContain("echo $ZENROWS_API_KEY");
     }
 
