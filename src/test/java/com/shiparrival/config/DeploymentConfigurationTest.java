@@ -12,6 +12,23 @@ import static org.assertj.core.api.Assertions.assertThat;
 class DeploymentConfigurationTest {
 
     @Test
+    @DisplayName("El diagnóstico de red es manual, aislado y compara ambas rutas para ONE, MSC y MAERSK")
+    void carrierNetworkDiagnosticIsIsolatedAndManualOnly() throws IOException {
+        String workflow = Files.readString(Path.of(".github/workflows/carrier-network-diagnostic.yml"));
+
+        assertThat(workflow)
+                .contains("workflow_dispatch:")
+                .contains("without-tailscale:")
+                .contains("with-phone-exit-node:")
+                .contains("CarrierNetworkDiagnosticTest")
+                .contains("CARRIER_NETWORK_DIAGNOSTIC")
+                .doesNotContain("--tracking.run-once")
+                .doesNotContain("HAPAG_LLOYD")
+                .doesNotContain("SUPABASE_DB_PASSWORD")
+                .doesNotContain("ZENROWS_API_KEY");
+    }
+
+    @Test
     @DisplayName("El workflow pasa el identificador del run al ciclo de monitoreo")
     void workflowShouldPassRunId() throws IOException {
         String workflow = Files.readString(Path.of(".github/workflows/daily-monitoring.yml"));
