@@ -31,6 +31,8 @@ import java.util.Optional;
 @RequiredArgsConstructor
 public class ShipmentService {
 
+    private static final int MAX_EVENT_DESCRIPTION_LENGTH = 512;
+
     private final ShipmentRepository shipmentRepository;
     private final ShipmentEventLogRepository shipmentEventLogRepository;
     private final ExcelImportService excelImportService;
@@ -143,6 +145,13 @@ public class ShipmentService {
     }
 
     @Transactional
+    private String limitEventDescription(String description) {
+        if (description == null || description.length() <= MAX_EVENT_DESCRIPTION_LENGTH) {
+            return description;
+        }
+        return description.substring(0, MAX_EVENT_DESCRIPTION_LENGTH);
+    }
+
     public Shipment updateFromTrackingResult(Shipment shipment, TrackingResult result) {
         shipment.setLastCheckedAt(LocalDateTime.now());
 
@@ -151,7 +160,7 @@ public class ShipmentService {
             ShipmentEventLog errorLog = ShipmentEventLog.builder()
                     .shipment(shipment)
                     .eventType("SCRAPE_FAILED")
-                    .description("Error al rastrear: " + result.getErrorMessage())
+                    .description(limitEventDescription("Error al rastrear: " + result.getErrorMessage()))
                     .recordedAt(LocalDateTime.now())
                     .build();
             shipmentEventLogRepository.save(errorLog);
