@@ -68,7 +68,7 @@ jobs:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
           DISCORD_ENABLED: ${{ secrets.DISCORD_ENABLED }}
           ZENROWS_API_KEY: ${{ secrets.ZENROWS_API_KEY }}
-          TRACKING_MANUAL_CHECK_CARRIERS: ${{ github.event_name == 'workflow_dispatch' && '' || 'HAPAG_LLOYD' }}
+          TRACKING_MANUAL_CHECK_CARRIERS: ${{ github.event_name == 'schedule' && 'HAPAG_LLOYD' || '' }}
           HAPAG_LLOYD_HEADLESS: "false"
           APP_TIMEZONE: "America/Lima"
           TRACKING_RUN_ID: ${{ github.run_id }}
