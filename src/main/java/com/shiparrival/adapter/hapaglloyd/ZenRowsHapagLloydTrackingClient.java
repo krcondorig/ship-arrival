@@ -21,6 +21,7 @@ public class ZenRowsHapagLloydTrackingClient implements HapagLloydTrackingClient
     private static final String ZENROWS_ENDPOINT = "https://api.zenrows.com/v1/";
     private static final String HAPAG_TRACKING_URL =
             "https://www.hapag-lloyd.com/en/online-business/track/track-by-booking-solution.html";
+    private static final int MAX_ERROR_MESSAGE_LENGTH = 512;
 
     private final RestClient restClient;
     private final String apiKey;
@@ -79,10 +80,10 @@ public class ZenRowsHapagLloydTrackingClient implements HapagLloydTrackingClient
         Document details = detailsResponse.document();
         List<HapagLloydMovement> movements = parseMovements(details);
         if (movements.isEmpty()) {
-            throw new HapagLloydTrackingException(
-                    "Hapag-Lloyd no devolvió movimientos para el primer contenedor de "
-                            + cleanTrackingNumber + ". Diagnóstico de respuesta: "
-                            + describePage(detailsResponse));
+            String message = "Hapag-Lloyd no devolvió movimientos para el primer contenedor de "
+                    + cleanTrackingNumber + ". Diagnóstico de respuesta: "
+                    + describePage(detailsResponse);
+            throw new HapagLloydTrackingException(truncate(message, MAX_ERROR_MESSAGE_LENGTH));
         }
 
         Element informationTable = details.selectFirst("table.groupBorder");
@@ -151,6 +152,10 @@ public class ZenRowsHapagLloydTrackingClient implements HapagLloydTrackingClient
         }
         return "httpStatus=" + response.httpStatus() + ", title='" + title
                 + "', tableCount=" + document.select("table").size() + ", tables=" + tables;
+    }
+
+    private String truncate(String value, int maxLength) {
+        return value.length() <= maxLength ? value : value.substring(0, maxLength);
     }
 
     private List<HapagLloydMovement> parseMovements(Document details) {

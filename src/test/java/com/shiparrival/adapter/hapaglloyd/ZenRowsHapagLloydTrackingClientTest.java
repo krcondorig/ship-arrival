@@ -99,9 +99,11 @@ class ZenRowsHapagLloydTrackingClientTest {
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
         server.expect(requestTo(org.hamcrest.Matchers.startsWith(BASE_URL)))
                 .andRespond(withSuccess(fixtureUnchecked("zenrows-booking.html"), org.springframework.http.MediaType.TEXT_HTML));
+        String oversizedClassName = "c".repeat(100);
+        String unexpectedPage = "<html><head><title>Unexpected page</title></head><body>PRIVATE BODY</body>"
+                + ("<table class=\"" + oversizedClassName + "\"></table>").repeat(10) + "</html>";
         server.expect(requestTo(org.hamcrest.Matchers.startsWith(BASE_URL)))
-                .andRespond(withSuccess("<html><head><title>Unexpected page</title></head><body>PRIVATE BODY</body></html>",
-                        org.springframework.http.MediaType.TEXT_HTML));
+                .andRespond(withSuccess(unexpectedPage, org.springframework.http.MediaType.TEXT_HTML));
         ZenRowsHapagLloydTrackingClient client = new ZenRowsHapagLloydTrackingClient(
                 builder, API_KEY, BASE_URL, 1000);
 
@@ -111,7 +113,8 @@ class ZenRowsHapagLloydTrackingClientTest {
                 .hasMessageNotContaining("PRIVATE BODY")
                 .hasMessageNotContaining(API_KEY)
                 .hasMessageContaining("httpStatus=200")
-                .hasMessageContaining("tableCount=0");
+                .hasMessageContaining("tableCount=10")
+                .satisfies(ex -> assertThat(ex.getMessage()).hasSizeLessThanOrEqualTo(512));
         server.verify();
     }
 
