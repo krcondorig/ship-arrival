@@ -43,7 +43,7 @@ class ZenRowsHapagLloydTrackingClientTest {
                 .andRespond(withSuccess(fixture("zenrows-booking.html"), org.springframework.http.MediaType.TEXT_HTML));
         server.expect(requestTo(org.hamcrest.Matchers.startsWith(BASE_URL)))
                 .andExpect(method(GET))
-                .andExpect(queryParam("url", org.hamcrest.Matchers.containsString("container%3DHLBU%252B%252B2959982")))
+                .andExpect(queryParam("url", org.hamcrest.Matchers.containsString("container%3DHLBU%2B%2B2959982")))
                 .andRespond(withSuccess(fixture("zenrows-container.html"), org.springframework.http.MediaType.TEXT_HTML));
 
         ZenRowsHapagLloydTrackingClient client = new ZenRowsHapagLloydTrackingClient(

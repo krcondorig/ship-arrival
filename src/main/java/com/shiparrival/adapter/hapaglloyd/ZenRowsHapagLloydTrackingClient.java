@@ -75,7 +75,7 @@ public class ZenRowsHapagLloydTrackingClient implements HapagLloydTrackingClient
         }
 
         String detailsUrl = HAPAG_TRACKING_URL + "?view=S8510&container="
-                + encode(containerNumber.replace(" ", "++"));
+                + containerNumber.replace(" ", "++");
         PageResponse detailsResponse = fetchPage(detailsUrl);
         Document details = detailsResponse.document();
         List<HapagLloydMovement> movements = parseMovements(details);
