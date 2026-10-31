@@ -119,6 +119,28 @@ class ZenRowsHapagLloydTrackingClientTest {
     }
 
     @Test
+    void parsesMovementsFromSharedHapagLloydDetailsPageStructure() throws IOException {
+        RestClient.Builder builder = RestClient.builder();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        server.expect(requestTo(org.hamcrest.Matchers.startsWith(BASE_URL)))
+                .andRespond(withSuccess(fixture("zenrows-booking.html"), org.springframework.http.MediaType.TEXT_HTML));
+        server.expect(requestTo(org.hamcrest.Matchers.startsWith(BASE_URL)))
+                .andRespond(withSuccess(fixture("zenrows-details-shared-structure.html"),
+                        org.springframework.http.MediaType.TEXT_HTML));
+        ZenRowsHapagLloydTrackingClient client = new ZenRowsHapagLloydTrackingClient(
+                builder, API_KEY, BASE_URL, 1000);
+
+        HapagLloydTrackingSnapshot snapshot = client.fetchTrackingSnapshot("TESTBL00000001");
+
+        assertThat(snapshot.getContainers()).hasSize(1);
+        assertThat(snapshot.getContainers().get(0).getMovements()).hasSize(2);
+        assertThat(snapshot.getContainers().get(0).getMovements().get(0).getStatus()).isEqualTo("Vessel departed");
+        assertThat(snapshot.getContainers().get(0).getMovements().get(1).getPlace())
+                .isEqualTo("MANZANILLO, COL (MX)");
+        server.verify();
+    }
+
+    @Test
     void rejectsDetailsPageWithoutMovements() {
         RestClient.Builder builder = RestClient.builder();
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();

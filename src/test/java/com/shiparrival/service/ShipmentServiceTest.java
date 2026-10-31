@@ -183,6 +183,30 @@ class ShipmentServiceTest {
     }
 
     @Test
+    @DisplayName("Debe limitar el mensaje de error guardado al máximo de 512 caracteres")
+    void shouldLimitScrapeFailureDescriptionToDatabaseColumnLength() {
+        Shipment shipment = Shipment.builder()
+                .id(42L)
+                .trackingNumber("HLCUNG12607EKZE0")
+                .status(ShipmentStatus.IN_TRANSIT)
+                .build();
+        TrackingResult result = TrackingResult.builder()
+                .success(false)
+                .errorMessage("Diagnóstico: " + "x".repeat(700))
+                .build();
+
+        when(shipmentRepository.save(any(Shipment.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        Shipment updated = shipmentService.updateFromTrackingResult(shipment, result);
+
+        ArgumentCaptor<ShipmentEventLog> logCaptor = ArgumentCaptor.forClass(ShipmentEventLog.class);
+        verify(shipmentEventLogRepository).save(logCaptor.capture());
+        assertThat(logCaptor.getValue().getDescription()).hasSizeLessThanOrEqualTo(512);
+        assertThat(updated.getStatus()).isEqualTo(ShipmentStatus.ERROR_CHECKING);
+        verify(shipmentRepository).save(shipment);
+    }
+
+    @Test
     @DisplayName("Debe consultar embarques visibles con paginación y patrón de búsqueda")
     void shouldQueryVisibleShipmentsWithPagination() {
         Pageable pageable = PageRequest.of(0, 10);
