@@ -52,7 +52,8 @@ public class ZenRowsHapagLloydTrackingClient implements HapagLloydTrackingClient
         }
 
         String cleanTrackingNumber = trackingNumber.trim();
-        Document booking = fetchPage(HAPAG_TRACKING_URL + "?blno=" + encode(cleanTrackingNumber));
+        PageResponse bookingResponse = fetchPage(HAPAG_TRACKING_URL + "?blno=" + encode(cleanTrackingNumber));
+        Document booking = bookingResponse.document();
         List<Element> rows = booking.select("#tracing_by_booking_f\\:hl27 tbody tr");
         if (rows.isEmpty()) {
             throw new HapagLloydTrackingException(
@@ -74,12 +75,14 @@ public class ZenRowsHapagLloydTrackingClient implements HapagLloydTrackingClient
 
         String detailsUrl = HAPAG_TRACKING_URL + "?view=S8510&container="
                 + encode(containerNumber.replace(" ", "++"));
-        Document details = fetchPage(detailsUrl);
+        PageResponse detailsResponse = fetchPage(detailsUrl);
+        Document details = detailsResponse.document();
         List<HapagLloydMovement> movements = parseMovements(details);
         if (movements.isEmpty()) {
             throw new HapagLloydTrackingException(
                     "Hapag-Lloyd no devolvió movimientos para el primer contenedor de "
-                            + cleanTrackingNumber);
+                            + cleanTrackingNumber + ". Diagnóstico de respuesta: "
+                            + describePage(detailsResponse));
         }
 
         Element informationTable = details.selectFirst("table.groupBorder");
@@ -110,19 +113,20 @@ public class ZenRowsHapagLloydTrackingClient implements HapagLloydTrackingClient
                 .build();
     }
 
-    private Document fetchPage(String targetUrl) {
+    private PageResponse fetchPage(String targetUrl) {
         URI requestUri = URI.create(baseUrl + "?apikey=" + encode(apiKey)
                 + "&url=" + encode(targetUrl) + "&mode=auto");
         try {
-            String html = restClient.get()
+            org.springframework.http.ResponseEntity<String> response = restClient.get()
                     .uri(requestUri)
                     .accept(MediaType.TEXT_HTML)
                     .retrieve()
-                    .body(String.class);
+                    .toEntity(String.class);
+            String html = response.getBody();
             if (html == null || html.isBlank()) {
                 throw new HapagLloydTrackingException("ZenRows devolvió una página vacía");
             }
-            return Jsoup.parse(html);
+            return new PageResponse(response.getStatusCode().value(), Jsoup.parse(html));
         } catch (HapagLloydTrackingException ex) {
             throw ex;
         } catch (Exception ex) {
@@ -130,6 +134,23 @@ public class ZenRowsHapagLloydTrackingClient implements HapagLloydTrackingClient
                     "No se pudo consultar Hapag-Lloyd mediante ZenRows ("
                             + ex.getClass().getSimpleName() + ")");
         }
+    }
+
+    private String describePage(PageResponse response) {
+        Document document = response.document();
+        String title = clean(document.title());
+        if (title.length() > 120) title = title.substring(0, 120);
+        List<String> tables = new ArrayList<>();
+        for (Element table : document.select("table")) {
+            String id = clean(table.id());
+            String classes = clean(table.className());
+            String descriptor = "id=" + (id.isBlank() ? "-" : id)
+                    + ",class=" + (classes.isBlank() ? "-" : classes)
+                    + ",rows=" + table.select("tbody tr").size();
+            if (tables.size() < 10) tables.add(descriptor);
+        }
+        return "httpStatus=" + response.httpStatus() + ", title='" + title
+                + "', tableCount=" + document.select("table").size() + ", tables=" + tables;
     }
 
     private List<HapagLloydMovement> parseMovements(Document details) {
@@ -152,6 +173,9 @@ public class ZenRowsHapagLloydTrackingClient implements HapagLloydTrackingClient
                     .build());
         }
         return movements;
+    }
+
+    private record PageResponse(int httpStatus, Document document) {
     }
 
     private String encode(String value) {
