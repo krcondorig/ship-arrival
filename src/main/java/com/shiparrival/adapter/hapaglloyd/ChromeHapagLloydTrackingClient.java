@@ -40,7 +40,6 @@ import java.util.concurrent.TimeUnit;
  * al finalizar mediante {@link #close()}.</p>
  */
 @Slf4j
-@Component
 public class ChromeHapagLloydTrackingClient implements HapagLloydTrackingClient {
 
     private static final String TRACKING_URL =

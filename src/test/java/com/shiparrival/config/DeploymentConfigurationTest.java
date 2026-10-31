@@ -21,6 +21,16 @@ class DeploymentConfigurationTest {
     }
 
     @Test
+    @DisplayName("El workflow usa ZenRows solo para disparos manuales y conserva Hapag-Lloyd manual en el cron")
+    void workflowEnablesHapagLloydOnlyForManualDispatch() throws IOException {
+        String workflow = Files.readString(Path.of(".github/workflows/daily-monitoring.yml"));
+
+        assertThat(workflow).contains("ZENROWS_API_KEY: ${{ secrets.ZENROWS_API_KEY }}");
+        assertThat(workflow).contains("TRACKING_MANUAL_CHECK_CARRIERS: ${{ github.event_name == 'workflow_dispatch' && '' || 'HAPAG_LLOYD' }}");
+        assertThat(workflow).doesNotContain("echo $ZENROWS_API_KEY");
+    }
+
+    @Test
     @DisplayName("Render declara las variables de autenticación y del disparo remoto")
     void renderShouldDeclareRequiredEnvVars() throws IOException {
         String render = Files.readString(Path.of("render.yaml"));

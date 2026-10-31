@@ -65,6 +65,13 @@
 			<version>${poi.version}</version>
 		</dependency>
 
+		<!-- Jsoup para interpretar las tablas públicas de Hapag-Lloyd devueltas por ZenRows -->
+		<dependency>
+			<groupId>org.jsoup</groupId>
+			<artifactId>jsoup</artifactId>
+			<version>1.18.3</version>
+		</dependency>
+
 		<!-- Selenium para consultar los portales de MSC y MAERSK (protegidos por Akamai) -->
 		<dependency>
 			<groupId>org.seleniumhq.selenium</groupId>
