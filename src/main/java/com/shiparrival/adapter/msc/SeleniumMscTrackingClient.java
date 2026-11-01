@@ -27,7 +27,7 @@ public class SeleniumMscTrackingClient implements MscTrackingClient {
     private static final String TRACKING_URL = "https://www.msc.com/en/track-a-shipment";
     private static final String TRACKING_API = "/api/feature/tools/TrackingInfo";
     private static final String FETCH_ERROR_PREFIX = "__MSC_FETCH_ERROR__:";
-    private static final Duration PAGE_LOAD_TIMEOUT = Duration.ofSeconds(30);
+    private static final Duration PAGE_LOAD_TIMEOUT = Duration.ofSeconds(60);
     private static final long AKAMAI_COOKIE_WAIT_MS = 4000L;
     private static final String USER_AGENT =
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
