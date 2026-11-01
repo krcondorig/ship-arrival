@@ -36,6 +36,8 @@ public class TrackingSchedulerService {
     private final DiscordNotificationService discordNotificationService;
     private final TaskExecutor trackingTaskExecutor;
     private final long delayMs;
+    private CarrierTrackingCoordinator carrierTrackingCoordinator;
+    private boolean parallelTrackingEnabled;
 
     /**
      * Navieras cuyo rastreo automático está deshabilitado: sus guías se marcan
@@ -107,6 +109,16 @@ public class TrackingSchedulerService {
 
     public boolean isTrackingInProgress() {
         return trackingInProgress.get();
+    }
+
+    @Autowired(required = false)
+    public void setCarrierTrackingCoordinator(CarrierTrackingCoordinator coordinator) {
+        this.carrierTrackingCoordinator = coordinator;
+    }
+
+    @Autowired(required = false)
+    public void setParallelTrackingEnabled(@Value("${tracking.parallel.enabled:false}") boolean enabled) {
+        this.parallelTrackingEnabled = enabled;
     }
 
     @Autowired(required = false)
@@ -237,6 +249,21 @@ public class TrackingSchedulerService {
         publishStart(total);
         log.info("Comenzando ciclo de monitoreo para {} embarques activos", total);
 
+        boolean parallelCycle = parallelTrackingEnabled && carrierTrackingCoordinator != null;
+        java.util.Map<Integer, java.util.concurrent.CompletableFuture<TrackingResult>> pilotResults = new java.util.HashMap<>();
+        if (parallelCycle) {
+            carrierTrackingCoordinator.beginCycle();
+            for (int i = 0; i < total; i++) {
+                Shipment candidate = activeShipments.get(i);
+                if (manualCheckCarriers.contains(candidate.getCarrier())) continue;
+                if ((candidate.getCarrier() == Carrier.MSC || candidate.getCarrier() == Carrier.MAERSK)
+                        && activeShipments.subList(0, i).stream().noneMatch(previous -> previous.getCarrier() == candidate.getCarrier()
+                        && !manualCheckCarriers.contains(previous.getCarrier()))) {
+                    pilotResults.put(i, carrierTrackingCoordinator.submit(candidate.getCarrier(),
+                            adapterFactory.getAdapter(candidate.getCarrier()), candidate.getTrackingNumber()));
+                }
+            }
+        }
         try {
             for (int i = 0; i < total; i++) {
                 Shipment shipment = activeShipments.get(i);
@@ -252,7 +279,14 @@ public class TrackingSchedulerService {
                     }
 
                     CarrierTrackingAdapter adapter = adapterFactory.getAdapter(shipment.getCarrier());
-                    TrackingResult result = adapter.track(shipment.getTrackingNumber());
+                    TrackingResult result;
+                    if (parallelCycle && (shipment.getCarrier() == Carrier.MSC || shipment.getCarrier() == Carrier.MAERSK)) {
+                        // Wait for a bounded pilot lookup before advancing the ordered application loop.
+                        result = pilotResults.get(i).get();
+                    } else {
+                        if (parallelCycle) carrierTrackingCoordinator.drain();
+                        result = adapter.track(shipment.getTrackingNumber());
+                    }
 
                     Shipment updatedShipment = shipmentService.updateFromTrackingResult(shipment, result);
 
@@ -289,6 +323,10 @@ public class TrackingSchedulerService {
                 }
             }
         } finally {
+            if (parallelCycle) {
+                try { carrierTrackingCoordinator.drain(); }
+                catch (InterruptedException ex) { Thread.currentThread().interrupt(); }
+            }
             try {
                 adapterFactory.releaseResources();
             } catch (Exception ex) {
