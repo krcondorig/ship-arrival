@@ -8,6 +8,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.dao.DataIntegrityViolationException;
 
+import java.time.LocalDateTime;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -36,6 +38,19 @@ class AppUserRepositoryTest {
         assertThatThrownBy(() -> repository.saveAndFlush(AppUser.builder()
                 .username("admin").passwordHash("otro").role(UserRole.USER).enabled(true).build()))
                 .isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    @Test
+    @DisplayName("Renueva sesión solo con época coincidente y sesión todavía vigente")
+    void shouldExtendOnlyCurrentUnexpiredSession() {
+        LocalDateTime now = LocalDateTime.of(2026, 10, 27, 12, 0);
+        AppUser user = repository.saveAndFlush(AppUser.builder()
+                .username("session-user").passwordHash("hash").role(UserRole.USER).enabled(true)
+                .sessionEpoch(3L).activeSessionExpiresAt(now.plusMinutes(5)).build());
+
+        assertThat(repository.extendActiveSession(user.getId(), 3L, now, now.plusHours(1))).isEqualTo(1);
+        assertThat(repository.extendActiveSession(user.getId(), 2L, now, now.plusHours(2))).isZero();
+        assertThat(repository.extendActiveSession(user.getId(), 3L, now.plusHours(2), now.plusHours(3))).isZero();
     }
 
     @Test

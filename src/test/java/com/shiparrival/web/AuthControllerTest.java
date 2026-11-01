@@ -72,22 +72,27 @@ class AuthControllerTest {
     }
 
     @Test
-    @DisplayName("Rechaza otro inicio cuando ya existe una sesión vigente")
-    void shouldRejectLoginWhenAnotherSessionIsActive() throws Exception {
+    @DisplayName("Un login válido reemplaza una sesión anterior y deja inválida su cookie")
+    void shouldReplaceExistingSessionOnLogin() throws Exception {
         AppUser user = repository.save(AppUser.builder()
                 .username("ana-activa").passwordHash(passwordEncoder.encode("claveSegura1"))
                 .role(UserRole.USER).enabled(true)
-                .activeSessionExpiresAt(java.time.LocalDateTime.now().plusHours(11)).build());
+                .sessionEpoch(3L)
+                .activeSessionExpiresAt(java.time.LocalDateTime.now().plusMinutes(59)).build());
+        MockHttpSession previousSession = new MockHttpSession();
+        previousSession.setAttribute(AuthFilter.SESSION_USER_ID, user.getId());
+        previousSession.setAttribute(AuthFilter.SESSION_EPOCH, 3L);
 
         mockMvc.perform(post("/login")
                         .param("username", "ana-activa")
                         .param("password", "claveSegura1"))
-                .andExpect(status().isOk())
-                .andExpect(view().name("login"))
-                .andExpect(model().attribute("errorMessage",
-                        "Esta cuenta ya tiene una sesión abierta. Cierra sesión en el otro dispositivo o pide a un administrador que la libere."));
+                .andExpect(status().is3xxRedirection())
+                .andExpect(request().sessionAttribute(AuthFilter.SESSION_EPOCH, 4L));
 
-        assertThat(repository.findById(user.getId()).orElseThrow().getSessionEpoch()).isZero();
+        assertThat(repository.findById(user.getId()).orElseThrow().getSessionEpoch()).isEqualTo(4L);
+        mockMvc.perform(get("/").session(previousSession))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/login"));
     }
 
     @Test

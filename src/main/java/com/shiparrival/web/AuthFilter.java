@@ -2,6 +2,7 @@ package com.shiparrival.web;
 
 import com.shiparrival.domain.AppUser;
 import com.shiparrival.repository.AppUserRepository;
+import com.shiparrival.service.UserService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -30,10 +31,12 @@ public class AuthFilter extends OncePerRequestFilter {
     private static final List<String> PUBLIC_PATHS = List.of("/login", "/error", "/favicon.ico");
 
     private final AppUserRepository repository;
+    private final UserService userService;
     private final boolean enabled;
 
-    public AuthFilter(AppUserRepository repository, boolean enabled) {
+    public AuthFilter(AppUserRepository repository, UserService userService, boolean enabled) {
         this.repository = repository;
+        this.userService = userService;
         this.enabled = enabled;
     }
 
@@ -56,6 +59,13 @@ public class AuthFilter extends OncePerRequestFilter {
                     && user.get().getActiveSessionExpiresAt() != null
                     && user.get().getActiveSessionExpiresAt().isAfter(java.time.LocalDateTime.now())) {
                 AppUser found = user.get();
+                Object storedEpoch = session.getAttribute(SESSION_EPOCH);
+                long epoch = storedEpoch instanceof Long value ? value : 0L;
+                if (!userService.refreshSession(found.getId(), epoch, java.time.LocalDateTime.now())) {
+                    session.invalidate();
+                    response.sendRedirect(request.getContextPath() + "/login");
+                    return;
+                }
                 request.setAttribute(CURRENT_USER_ATTRIBUTE,
                         new CurrentUser(found.getId(), found.getUsername(), found.getRole()));
                 filterChain.doFilter(request, response);

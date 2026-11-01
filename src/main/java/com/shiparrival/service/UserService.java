@@ -129,9 +129,11 @@ public class UserService {
     @Transactional
     public boolean startSession(String username, LocalDateTime now) {
         AppUser user = repository.findByUsernameForUpdate(normalizeUsername(username)).orElseThrow();
-        if (user.getActiveSessionExpiresAt() != null && user.getActiveSessionExpiresAt().isAfter(now)) {
+        if (!user.isEnabled()) {
             return false;
         }
+        // Un nuevo login autenticado reemplaza la reserva anterior. El incremento
+        // de sessionEpoch invalida inmediatamente la cookie del navegador anterior.
         user.setSessionEpoch(user.getSessionEpoch() + 1);
         user.setActiveSessionExpiresAt(now.plusHours(1));
         user.setLastLoginAt(now);
@@ -154,6 +156,11 @@ public class UserService {
                     user.setActiveSessionExpiresAt(null);
                     repository.save(user);
                 });
+    }
+
+    @Transactional
+    public boolean refreshSession(Long id, long epoch, LocalDateTime now) {
+        return repository.extendActiveSession(id, epoch, now, now.plusHours(1)) == 1;
     }
 
     @Transactional

@@ -1,6 +1,7 @@
 package com.shiparrival.config;
 
 import com.shiparrival.repository.AppUserRepository;
+import com.shiparrival.service.UserService;
 import com.shiparrival.web.AuthFilter;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
@@ -21,10 +22,11 @@ public class AuthWebConfig {
     @Bean
     public FilterRegistrationBean<AuthFilter> authFilterRegistration(
             AppUserRepository appUserRepository,
+            UserService userService,
             @Value("${app.auth.enabled:true}") boolean enabled) {
 
         FilterRegistrationBean<AuthFilter> registration =
-                new FilterRegistrationBean<>(new AuthFilter(appUserRepository, enabled));
+                new FilterRegistrationBean<>(new AuthFilter(appUserRepository, userService, enabled));
         registration.setOrder(Ordered.HIGHEST_PRECEDENCE + 10);
         registration.addUrlPatterns("/*");
         return registration;
