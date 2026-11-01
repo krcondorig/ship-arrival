@@ -141,7 +141,7 @@ class CarrierTrackingCoordinatorTest {
     }
 
     @Test
-    void concurrentDrainDoesNotClearTailsForNextCycle() throws Exception {
+    void beginCycleWaitsForSerializedDrainsAndPreservesNextCycleSubmissions() throws Exception {
         CarrierTrackingCoordinator coordinator = new CarrierTrackingCoordinator(true,
                 new java.util.concurrent.ThreadPoolExecutor(2, 2, 0, TimeUnit.MILLISECONDS,
                         new java.util.concurrent.ArrayBlockingQueue<>(2), new java.util.concurrent.ThreadPoolExecutor.AbortPolicy()));
@@ -157,21 +157,42 @@ class CarrierTrackingCoordinatorTest {
             coordinator.beginCycle();
             coordinator.submit(Carrier.MSC, adapter, "old");
             assertTrue(started.await(2, TimeUnit.SECONDS));
-            Thread firstDrain = new Thread(() -> { try { coordinator.drain(); } catch (InterruptedException e) { Thread.currentThread().interrupt(); } });
-            Thread secondDrain = new Thread(() -> { try { coordinator.cancelAndDrain(); } catch (InterruptedException e) { Thread.currentThread().interrupt(); } });
+            CountDownLatch firstDrainDone = new CountDownLatch(1);
+            CountDownLatch secondDrainDone = new CountDownLatch(1);
+            Thread firstDrain = new Thread(() -> { try { coordinator.drain(); } catch (InterruptedException e) { Thread.currentThread().interrupt(); } finally { firstDrainDone.countDown(); } });
+            Thread secondDrain = new Thread(() -> { try { coordinator.cancelAndDrain(); } catch (InterruptedException e) { Thread.currentThread().interrupt(); } finally { secondDrainDone.countDown(); } });
             firstDrain.start();
+            assertTrue(waitUntilWaiting(firstDrain));
             secondDrain.start();
+            assertTrue(waitUntilWaiting(secondDrain));
+            CountDownLatch cycleStarted = new CountDownLatch(1);
+            Thread nextCycleStarter = new Thread(() -> { coordinator.beginCycle(); cycleStarted.countDown(); });
+            nextCycleStarter.start();
+            assertTrue(waitUntilWaiting(nextCycleStarter));
             release.countDown();
-            firstDrain.join(2000);
-            secondDrain.join(2000);
-            coordinator.beginCycle();
-            coordinator.submit(Carrier.MSC, adapter, "new");
+            assertTrue(firstDrainDone.await(2, TimeUnit.SECONDS));
+            assertTrue(secondDrainDone.await(2, TimeUnit.SECONDS));
+            nextCycleStarter.join(2000);
+            assertFalse(nextCycleStarter.isAlive());
+            assertTrue(cycleStarted.await(2, TimeUnit.SECONDS));
+            var nextCycle = coordinator.submit(Carrier.MSC, adapter, "new");
             coordinator.drain();
+            assertTrue(nextCycle.isDone());
         } finally {
             release.countDown();
             coordinator.shutdown();
         }
     }
+
+    private boolean waitUntilWaiting(Thread thread) throws InterruptedException {
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(2);
+        while (System.nanoTime() < deadline) {
+            if (thread.getState() == Thread.State.WAITING) return true;
+            Thread.yield();
+        }
+        return false;
+    }
+
 
     private TrackingResult run(CountDownLatch entered, CountDownLatch release, AtomicInteger active,
                                AtomicInteger maximum, String number) throws InterruptedException {

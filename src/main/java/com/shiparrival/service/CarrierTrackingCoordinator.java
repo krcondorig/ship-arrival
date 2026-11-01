@@ -15,6 +15,7 @@ import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.ReentrantLock;
 
 /** Runs pilot carrier lookups on a dedicated, bounded executor. */
 @Component
@@ -24,7 +25,7 @@ public class CarrierTrackingCoordinator {
     private final Map<Carrier, Worker> carrierTails = new EnumMap<>(Carrier.class);
     private final List<Worker> cycleTasks = new ArrayList<>();
     private final Object lifecycle = new Object();
-    private final Object drainLock = new Object();
+    private final ReentrantLock drainLock = new ReentrantLock(true);
     private boolean cycleOpen;
     private boolean cycleCancelled;
 
@@ -39,10 +40,15 @@ public class CarrierTrackingCoordinator {
     }
 
     public void beginCycle() {
-        synchronized (lifecycle) {
-            if (cycleOpen || !cycleTasks.isEmpty()) throw new IllegalStateException("Previous tracking cycle is not drained");
-            cycleOpen = true;
-            cycleCancelled = false;
+        drainLock.lock();
+        try {
+            synchronized (lifecycle) {
+                if (cycleOpen || !cycleTasks.isEmpty()) throw new IllegalStateException("Previous tracking cycle is not drained");
+                cycleOpen = true;
+                cycleCancelled = false;
+            }
+        } finally {
+            drainLock.unlock();
         }
     }
 
@@ -106,7 +112,8 @@ public class CarrierTrackingCoordinator {
 
     /** Ends this cycle's submission boundary and waits for all accepted work to terminate. */
     public void drain() throws InterruptedException {
-        synchronized (drainLock) {
+        drainLock.lock();
+        try {
             List<Worker> tasks;
             synchronized (lifecycle) {
                 cycleOpen = false;
@@ -114,12 +121,15 @@ public class CarrierTrackingCoordinator {
             }
             waitForWorkers(tasks);
             synchronized (lifecycle) { cycleTasks.removeAll(tasks); carrierTails.clear(); }
+        } finally {
+            drainLock.unlock();
         }
     }
 
     /** Cancels accepted work and waits without falsely reporting completion on timeout. */
     public void cancelAndDrain() throws InterruptedException {
-        synchronized (drainLock) {
+        drainLock.lock();
+        try {
             List<Worker> tasks;
             synchronized (lifecycle) {
                 cycleOpen = false;
@@ -133,6 +143,8 @@ public class CarrierTrackingCoordinator {
             });
             waitForWorkers(tasks);
             synchronized (lifecycle) { cycleTasks.removeAll(tasks); carrierTails.clear(); }
+        } finally {
+            drainLock.unlock();
         }
     }
 
