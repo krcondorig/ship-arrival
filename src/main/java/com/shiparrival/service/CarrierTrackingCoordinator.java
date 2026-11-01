@@ -24,7 +24,6 @@ public class CarrierTrackingCoordinator {
     private final Map<Carrier, Worker> carrierTails = new EnumMap<>(Carrier.class);
     private final List<Worker> cycleTasks = new ArrayList<>();
     private final Object lifecycle = new Object();
-    private final Object drainLock = new Object();
     private boolean cycleOpen;
     private boolean cycleCancelled;
 
@@ -38,103 +37,98 @@ public class CarrierTrackingCoordinator {
         this.executor = executor;
     }
 
-    public synchronized void beginCycle() {
-        if (cycleOpen || !cycleTasks.isEmpty()) throw new IllegalStateException("Previous tracking cycle is not drained");
-        cycleOpen = true;
-        cycleCancelled = false;
+    public void beginCycle() {
+        synchronized (lifecycle) {
+            if (cycleOpen || !cycleTasks.isEmpty()) throw new IllegalStateException("Previous tracking cycle is not drained");
+            cycleOpen = true;
+            cycleCancelled = false;
+        }
     }
 
-    public synchronized CompletableFuture<TrackingResult> submit(Carrier carrier,
+    public CompletableFuture<TrackingResult> submit(Carrier carrier,
             CarrierTrackingAdapter adapter, String trackingNumber) {
-        if (!enabled || (carrier != Carrier.MSC && carrier != Carrier.MAERSK)) {
-            throw new IllegalStateException("Carrier is not enabled for parallel tracking: " + carrier);
-        }
-        if (!cycleOpen) throw new IllegalStateException("No tracking cycle is open");
+        synchronized (lifecycle) {
+            if (!enabled || (carrier != Carrier.MSC && carrier != Carrier.MAERSK)) {
+                throw new IllegalStateException("Carrier is not enabled for parallel tracking: " + carrier);
+            }
+            if (!cycleOpen) throw new IllegalStateException("No tracking cycle is open");
 
-        Worker predecessor = carrierTails.get(carrier);
-        CompletableFuture<TrackingResult> result = new CompletableFuture<>();
-        CompletableFuture<Void> completion = new CompletableFuture<>();
-        Worker worker = new Worker(result, completion);
-        result.whenComplete((ignored, error) -> {
-            if (result.isCancelled()) {
-                Thread thread = worker.thread;
-                if (thread != null) thread.interrupt();
-            }
-        });
-        cycleTasks.add(worker);
-        carrierTails.put(carrier, worker);
-        Runnable dispatch = () -> {
-            synchronized (lifecycle) {
-                if (cycleCancelled || result.isCancelled()) {
-                    completion.complete(null);
-                    return;
+            Worker predecessor = carrierTails.get(carrier);
+            CompletableFuture<TrackingResult> result = new CompletableFuture<>();
+            CompletableFuture<Void> completion = new CompletableFuture<>();
+            Worker worker = new Worker(result, completion);
+            result.whenComplete((ignored, error) -> {
+                if (result.isCancelled()) {
+                    Thread thread = worker.thread;
+                    if (thread != null) thread.interrupt();
                 }
-                try {
-                    executor.execute(() -> {
-                        worker.thread = Thread.currentThread();
-                        try {
-                            synchronized (lifecycle) {
-                                if (cycleCancelled || result.isCancelled()) return;
-                                worker.adapterStarted = true;
+            });
+            cycleTasks.add(worker);
+            carrierTails.put(carrier, worker);
+            Runnable dispatch = () -> {
+                synchronized (lifecycle) {
+                    if (cycleCancelled || result.isCancelled()) {
+                        completion.complete(null);
+                        return;
+                    }
+                    try {
+                        executor.execute(() -> {
+                            worker.thread = Thread.currentThread();
+                            try {
+                                synchronized (lifecycle) {
+                                    if (cycleCancelled || result.isCancelled()) return;
+                                }
+                                result.complete(adapter.track(trackingNumber));
+                            } catch (Throwable error) {
+                                result.completeExceptionally(error);
+                            } finally {
+                                worker.thread = null;
+                                completion.complete(null);
                             }
-                            result.complete(adapter.track(trackingNumber));
-                        } catch (Throwable error) {
-                            result.completeExceptionally(error);
-                        } finally {
-                            worker.thread = null;
-                            completion.complete(null);
-                        }
-                    });
-                } catch (RuntimeException error) {
-                    result.completeExceptionally(error);
-                    completion.complete(null);
+                        });
+                    } catch (RuntimeException error) {
+                        result.completeExceptionally(error);
+                        completion.complete(null);
+                    }
                 }
-            }
-        };
-        if (predecessor == null) dispatch.run();
-        else predecessor.completion.whenComplete((ignored, error) -> {
-            if (cycleCancelled) {
-                result.cancel(false);
-                completion.complete(null);
-            } else dispatch.run();
-        });
-        return result;
+            };
+            if (predecessor == null) dispatch.run();
+            else predecessor.completion.whenComplete((ignored, error) -> {
+                if (cycleCancelled) {
+                    result.cancel(false);
+                    completion.complete(null);
+                } else dispatch.run();
+            });
+            return result;
+        }
     }
 
     /** Ends this cycle's submission boundary and waits for all accepted work to terminate. */
     public void drain() throws InterruptedException {
-        synchronized (drainLock) {
-            List<Worker> tasks;
-            synchronized (lifecycle) {
-                synchronized (this) {
-                    cycleOpen = false;
-                    tasks = new ArrayList<>(cycleTasks);
-                }
-            }
-            waitForWorkers(tasks);
-            synchronized (this) { cycleTasks.removeAll(tasks); carrierTails.clear(); }
+        List<Worker> tasks;
+        synchronized (lifecycle) {
+            cycleOpen = false;
+            tasks = new ArrayList<>(cycleTasks);
         }
+        waitForWorkers(tasks);
+        synchronized (lifecycle) { cycleTasks.removeAll(tasks); carrierTails.clear(); }
     }
 
     /** Cancels accepted work and waits without falsely reporting completion on timeout. */
     public void cancelAndDrain() throws InterruptedException {
-        synchronized (drainLock) {
-            List<Worker> tasks;
-            synchronized (lifecycle) {
-                synchronized (this) {
-                    cycleOpen = false;
-                    cycleCancelled = true;
-                    tasks = new ArrayList<>(cycleTasks);
-                }
-            }
-            tasks.forEach(worker -> {
-                worker.result.cancel(true);
-                Thread thread = worker.thread;
-                if (thread != null) thread.interrupt();
-            });
-            waitForWorkers(tasks);
-            synchronized (this) { cycleTasks.removeAll(tasks); carrierTails.clear(); }
+        List<Worker> tasks;
+        synchronized (lifecycle) {
+            cycleOpen = false;
+            cycleCancelled = true;
+            tasks = new ArrayList<>(cycleTasks);
         }
+        tasks.forEach(worker -> {
+            worker.result.cancel(true);
+            Thread thread = worker.thread;
+            if (thread != null) thread.interrupt();
+        });
+        waitForWorkers(tasks);
+        synchronized (lifecycle) { cycleTasks.removeAll(tasks); carrierTails.clear(); }
     }
 
     private static void waitForWorkers(List<Worker> tasks) throws InterruptedException {
@@ -164,7 +158,6 @@ public class CarrierTrackingCoordinator {
         private final CompletableFuture<TrackingResult> result;
         private final CompletableFuture<Void> completion;
         private volatile Thread thread;
-        private volatile boolean adapterStarted;
 
         private Worker(CompletableFuture<TrackingResult> result, CompletableFuture<Void> completion) {
             this.result = result;
