@@ -12,6 +12,18 @@ import static org.assertj.core.api.Assertions.assertThat;
 class DeploymentConfigurationTest {
 
     @Test
+    @DisplayName("Carrier parallelism pilot remains disabled and is not enabled by deployment")
+    void carrierParallelismPilotDefaultsToDisabledAndIsNotEnabledByDeployment() throws IOException {
+        String properties = Files.readString(Path.of("src/main/resources/application.properties"));
+        String workflow = Files.readString(Path.of(".github/workflows/daily-monitoring.yml"));
+        String render = Files.readString(Path.of("render.yaml"));
+
+        assertThat(properties).contains("tracking.parallel.enabled=${TRACKING_PARALLEL_ENABLED:false}");
+        assertThat(workflow).doesNotContain("TRACKING_PARALLEL_ENABLED");
+        assertThat(render).doesNotContain("TRACKING_PARALLEL_ENABLED");
+    }
+
+    @Test
     @DisplayName("El diagnóstico de red es manual, aislado y compara ambas rutas para ONE, MSC y MAERSK")
     void carrierNetworkDiagnosticIsIsolatedAndManualOnly() throws IOException {
         String workflow = Files.readString(Path.of(".github/workflows/carrier-network-diagnostic.yml"));
