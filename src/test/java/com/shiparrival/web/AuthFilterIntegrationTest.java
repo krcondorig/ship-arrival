@@ -45,16 +45,22 @@ class AuthFilterIntegrationTest {
     }
 
     @Test
-    @DisplayName("Con sesión válida se accede al dashboard")
-    void shouldAllowAuthenticatedUser() throws Exception {
+    @DisplayName("Una petición autenticada renueva la reserva de sesión por una hora")
+    void shouldExtendSessionAfterAuthenticatedRequest() throws Exception {
+        java.time.LocalDateTime oldExpiry = java.time.LocalDateTime.now().plusMinutes(1);
         AppUser user = repository.save(AppUser.builder()
                 .username("ana").passwordHash("h").role(UserRole.USER).enabled(true)
-                .activeSessionExpiresAt(java.time.LocalDateTime.now().plusHours(1)).build());
+                .activeSessionExpiresAt(oldExpiry).build());
 
-        mockMvc.perform(get("/").sessionAttr(AuthFilter.SESSION_USER_ID, user.getId()))
+        mockMvc.perform(get("/")
+                        .sessionAttr(AuthFilter.SESSION_USER_ID, user.getId())
+                        .sessionAttr(AuthFilter.SESSION_EPOCH, 0L))
                 .andExpect(status().isOk())
                 .andExpect(request().attribute(AuthFilter.CURRENT_USER_ATTRIBUTE,
                         new CurrentUser(user.getId(), "ana", UserRole.USER)));
+
+        org.assertj.core.api.Assertions.assertThat(repository.findById(user.getId()).orElseThrow()
+                .getActiveSessionExpiresAt()).isAfter(oldExpiry);
     }
 
     @Test

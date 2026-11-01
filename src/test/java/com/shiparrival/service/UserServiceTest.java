@@ -14,6 +14,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class UserServiceTest {
@@ -104,17 +105,41 @@ class UserServiceTest {
     }
 
     @Test
-    @DisplayName("Iniciar sesión registra exactamente 1 hora y rechaza un segundo acceso")
-    void shouldReserveOneSessionForOneHour() {
+    @DisplayName("Un nuevo login reemplaza la sesión anterior e invalida su época")
+    void shouldReplaceExistingSessionOnNewLogin() {
         AppUser user = AppUser.builder().id(9L).username("ana").passwordHash("h")
-                .role(UserRole.USER).enabled(true).build();
+                .role(UserRole.USER).enabled(true)
+                .sessionEpoch(4L)
+                .activeSessionExpiresAt(java.time.LocalDateTime.of(2026, 10, 27, 13, 0))
+                .build();
         when(repository.findByUsernameForUpdate("ana")).thenReturn(Optional.of(user));
         java.time.LocalDateTime now = java.time.LocalDateTime.of(2026, 10, 27, 12, 0);
 
         assertThat(userService.startSession("ana", now)).isTrue();
-        assertThat(user.getActiveSessionExpiresAt()).isEqualTo(java.time.LocalDateTime.of(2026, 10, 27, 13, 0));
+        assertThat(user.getSessionEpoch()).isEqualTo(5L);
+        assertThat(user.getActiveSessionExpiresAt()).isEqualTo(now.plusHours(1));
         org.mockito.Mockito.verify(repository).save(user);
-        assertThat(userService.startSession("ana", now.plusMinutes(1))).isFalse();
+    }
+
+    @Test
+    @DisplayName("No inicia una sesión para una cuenta desactivada después de autenticar")
+    void shouldNotStartSessionForDisabledUser() {
+        AppUser user = AppUser.builder().id(9L).username("ana").passwordHash("h")
+                .role(UserRole.USER).enabled(false).sessionEpoch(4L).build();
+        when(repository.findByUsernameForUpdate("ana")).thenReturn(Optional.of(user));
+
+        assertThat(userService.startSession("ana", java.time.LocalDateTime.now())).isFalse();
+        assertThat(user.getSessionEpoch()).isEqualTo(4L);
+    }
+
+    @Test
+    @DisplayName("La renovación informa si la sesión sigue vigente y pertenece a la época actual")
+    void shouldReturnWhetherSessionRefreshSucceeded() {
+        java.time.LocalDateTime now = java.time.LocalDateTime.of(2026, 10, 27, 12, 0);
+        when(repository.extendActiveSession(9L, 5L, now, now.plusHours(1))).thenReturn(1);
+
+        assertThat(userService.refreshSession(9L, 5L, now)).isTrue();
+        verify(repository).extendActiveSession(9L, 5L, now, now.plusHours(1));
     }
 
     @Test
