@@ -13,7 +13,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.Future;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
@@ -22,8 +21,12 @@ import java.util.concurrent.TimeUnit;
 public class CarrierTrackingCoordinator {
     private final boolean enabled;
     private final ThreadPoolExecutor executor;
-    private final Map<Carrier, CompletableFuture<?>> carrierTails = new EnumMap<>(Carrier.class);
-    private final List<CompletableFuture<?>> cycleTasks = new ArrayList<>();
+    private final Map<Carrier, Worker> carrierTails = new EnumMap<>(Carrier.class);
+    private final List<Worker> cycleTasks = new ArrayList<>();
+    private final Object lifecycle = new Object();
+    private final Object drainLock = new Object();
+    private boolean cycleOpen;
+    private boolean cycleCancelled;
 
     public CarrierTrackingCoordinator(@Value("${tracking.parallel.enabled:false}") boolean enabled) {
         this(enabled, new ThreadPoolExecutor(2, 2, 0L, TimeUnit.MILLISECONDS,
@@ -35,62 +38,137 @@ public class CarrierTrackingCoordinator {
         this.executor = executor;
     }
 
+    public synchronized void beginCycle() {
+        if (cycleOpen || !cycleTasks.isEmpty()) throw new IllegalStateException("Previous tracking cycle is not drained");
+        cycleOpen = true;
+        cycleCancelled = false;
+    }
+
     public synchronized CompletableFuture<TrackingResult> submit(Carrier carrier,
             CarrierTrackingAdapter adapter, String trackingNumber) {
         if (!enabled || (carrier != Carrier.MSC && carrier != Carrier.MAERSK)) {
             throw new IllegalStateException("Carrier is not enabled for parallel tracking: " + carrier);
         }
-        CompletableFuture<?> previous = carrierTails.get(carrier);
+        if (!cycleOpen) throw new IllegalStateException("No tracking cycle is open");
+
+        Worker predecessor = carrierTails.get(carrier);
         CompletableFuture<TrackingResult> result = new CompletableFuture<>();
-        Future<?> task = executor.submit(() -> {
-            try {
-                if (previous != null) previous.join();
-                result.complete(adapter.track(trackingNumber));
-            } catch (Throwable error) {
-                result.completeExceptionally(error);
+        CompletableFuture<Void> completion = new CompletableFuture<>();
+        Worker worker = new Worker(result, completion);
+        result.whenComplete((ignored, error) -> {
+            if (result.isCancelled()) {
+                Thread thread = worker.thread;
+                if (thread != null) thread.interrupt();
             }
         });
-        result.whenComplete((ignored, error) -> {
-            if (result.isCancelled()) task.cancel(true);
+        cycleTasks.add(worker);
+        carrierTails.put(carrier, worker);
+        Runnable dispatch = () -> {
+            synchronized (lifecycle) {
+                if (cycleCancelled || result.isCancelled()) {
+                    completion.complete(null);
+                    return;
+                }
+                try {
+                    executor.execute(() -> {
+                        worker.thread = Thread.currentThread();
+                        try {
+                            synchronized (lifecycle) {
+                                if (cycleCancelled || result.isCancelled()) return;
+                                worker.adapterStarted = true;
+                            }
+                            result.complete(adapter.track(trackingNumber));
+                        } catch (Throwable error) {
+                            result.completeExceptionally(error);
+                        } finally {
+                            worker.thread = null;
+                            completion.complete(null);
+                        }
+                    });
+                } catch (RuntimeException error) {
+                    result.completeExceptionally(error);
+                    completion.complete(null);
+                }
+            }
+        };
+        if (predecessor == null) dispatch.run();
+        else predecessor.completion.whenComplete((ignored, error) -> {
+            if (cycleCancelled) {
+                result.cancel(false);
+                completion.complete(null);
+            } else dispatch.run();
         });
-        carrierTails.put(carrier, result);
-        cycleTasks.add(result);
         return result;
     }
 
-    /** Waits for every submitted cycle task, propagating interruption to callers. */
+    /** Ends this cycle's submission boundary and waits for all accepted work to terminate. */
     public void drain() throws InterruptedException {
-        List<CompletableFuture<?>> tasks;
-        synchronized (this) {
-            tasks = new ArrayList<>(cycleTasks);
-        }
-        for (CompletableFuture<?> task : tasks) {
-            try { task.get(); }
-            catch (java.util.concurrent.ExecutionException | java.util.concurrent.CancellationException ignored) { }
-        }
-        synchronized (this) {
-            cycleTasks.removeAll(tasks);
-            carrierTails.clear();
+        synchronized (drainLock) {
+            List<Worker> tasks;
+            synchronized (lifecycle) {
+                synchronized (this) {
+                    cycleOpen = false;
+                    tasks = new ArrayList<>(cycleTasks);
+                }
+            }
+            waitForWorkers(tasks);
+            synchronized (this) { cycleTasks.removeAll(tasks); carrierTails.clear(); }
         }
     }
 
-    /** Cancels outstanding work and waits for worker termination before resources are released. */
+    /** Cancels accepted work and waits without falsely reporting completion on timeout. */
     public void cancelAndDrain() throws InterruptedException {
-        List<CompletableFuture<?>> tasks;
-        synchronized (this) { tasks = new ArrayList<>(cycleTasks); }
-        tasks.forEach(task -> task.cancel(true));
-        drainWorkers();
-        synchronized (this) { cycleTasks.removeAll(tasks); carrierTails.clear(); }
+        synchronized (drainLock) {
+            List<Worker> tasks;
+            synchronized (lifecycle) {
+                synchronized (this) {
+                    cycleOpen = false;
+                    cycleCancelled = true;
+                    tasks = new ArrayList<>(cycleTasks);
+                }
+            }
+            tasks.forEach(worker -> {
+                worker.result.cancel(true);
+                Thread thread = worker.thread;
+                if (thread != null) thread.interrupt();
+            });
+            waitForWorkers(tasks);
+            synchronized (this) { cycleTasks.removeAll(tasks); carrierTails.clear(); }
+        }
     }
 
-    private void drainWorkers() throws InterruptedException {
-        executor.getQueue().clear();
-        executor.shutdownNow();
-        executor.awaitTermination(60, TimeUnit.SECONDS);
+    private static void waitForWorkers(List<Worker> tasks) throws InterruptedException {
+        for (Worker worker : tasks) {
+            try { worker.completion.get(); }
+            catch (java.util.concurrent.ExecutionException ignored) { }
+        }
     }
 
     @PreDestroy
     public void shutdown() {
-        executor.shutdownNow();
+        try {
+            cancelAndDrain();
+            executor.shutdown();
+            if (!executor.awaitTermination(60, TimeUnit.SECONDS)) {
+                executor.shutdownNow();
+                if (!executor.awaitTermination(60, TimeUnit.SECONDS))
+                    throw new IllegalStateException("Tracking workers remain active during shutdown");
+            }
+        } catch (InterruptedException error) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("Interrupted while draining tracking workers", error);
+        }
+    }
+
+    private static final class Worker {
+        private final CompletableFuture<TrackingResult> result;
+        private final CompletableFuture<Void> completion;
+        private volatile Thread thread;
+        private volatile boolean adapterStarted;
+
+        private Worker(CompletableFuture<TrackingResult> result, CompletableFuture<Void> completion) {
+            this.result = result;
+            this.completion = completion;
+        }
     }
 }

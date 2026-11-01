@@ -1,9 +1,10 @@
 # Task 2 report — bounded adapter-call coordinator
 
 ## Implemented
-- Added `CarrierTrackingCoordinator`: separate two-worker executor with bounded queue, explicit opt-in gate, MSC/Maersk-only submissions, asynchronous `CompletableFuture<TrackingResult>` return, per-carrier future chaining, cycle drain/cancel methods, and Spring destruction hook.
-- Added `TrackingParallelismConfiguration` and tests demonstrating simultaneous stub MSC+Maersk calls, plus test guarding Maersk synchronization.
-- The pilot remains disabled by default. No workflow changes made.
+- Hardened `CarrierTrackingCoordinator` with cycle-scoped submission boundary, deferred same-carrier dispatch, and worker-completion tracking. Accepted work is either prevented from entering the adapter when the cycle is cancelled or has its adapter call interrupted and completion awaited.
+- Drain and cancel/drain are serialized and reusable between cycles. Deferred predecessor callbacks consult cycle cancellation; cancelled successors complete without an adapter call. Individual result-future cancellation interrupts its active worker.
+- Removed the unused `TrackingParallelismConfiguration`; the coordinator reads the existing property directly. Pilot remains disabled by default; workflow unchanged.
+- Added deterministic cancellation coverage in addition to cross-carrier overlap and same-carrier serialization tests. Maersk `fetchTrackingJson` remains synchronized.
 
 ## Exact requirements and disposition
 - Dedicated bounded two-thread executor separate from `trackingTaskExecutor`: done.
@@ -15,7 +16,11 @@
 
 ## Verification
 Command: `./mvnw.cmd -B "-Dtest=CarrierTrackingCoordinatorTest,SeleniumMaerskTrackingClientConcurrencyTest" test`
-Result: 2 tests, 0 failures/errors/skips; BUILD SUCCESS.
+Result: **4 tests, 0 failures, 0 errors, 0 skipped; BUILD SUCCESS** (2026-11-01 16:07:39 -05:00).
+
+The coordinator tests verify one MSC and one Maersk can overlap, repeated MSC submissions serialize while Maersk proceeds, max global active calls remains <=2 and per-carrier active calls <=1, cancellation prevents the deferred successor adapter call, and cancellation interrupts and waits for an active worker to exit. The Maersk test confirms its synchronization remains present.
+
+Cancellation boundary: `CarrierTrackingAdapter.track` has no cancellation token or forced-stop API. The coordinator interrupts the worker and waits until its invocation returns; it cannot safely guarantee termination if a third-party adapter ignores interruption. In that case `cancelAndDrain` deliberately remains blocked rather than falsely reporting drained. No completion timeout is advertised.
 
 ## Scope
 No scheduler integration, activation, or workflow changes. Existing untracked design/plan files were pre-existing and are not included in the commit.
