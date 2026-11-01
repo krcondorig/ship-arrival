@@ -4,6 +4,7 @@ import com.shiparrival.adapter.CarrierTrackingAdapter;
 import com.shiparrival.adapter.TrackingResult;
 import com.shiparrival.domain.Carrier;
 import jakarta.annotation.PreDestroy;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -29,6 +30,7 @@ public class CarrierTrackingCoordinator {
     private boolean cycleOpen;
     private boolean cycleCancelled;
 
+    @Autowired
     public CarrierTrackingCoordinator(@Value("${tracking.parallel.enabled:false}") boolean enabled) {
         this(enabled, new ThreadPoolExecutor(2, 2, 0L, TimeUnit.MILLISECONDS,
                 new ArrayBlockingQueue<>(2), new ThreadPoolExecutor.AbortPolicy()));
