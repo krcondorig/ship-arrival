@@ -81,8 +81,30 @@ public class SeleniumMaerskTrackingClient implements MaerskTrackingClient {
     private static final String ANTI_DETECTION_SCRIPT =
             "Object.defineProperty(navigator, 'webdriver', {get: () => undefined});";
 
+    interface BrowserSession extends AutoCloseable {
+        String fetch(String trackingNumber);
+
+        @Override
+        void close();
+    }
+
+    @FunctionalInterface
+    interface BrowserSessionFactory {
+        BrowserSession open();
+    }
+
+    private final BrowserSessionFactory browserSessionFactory;
+
+    public SeleniumMaerskTrackingClient() {
+        this(null);
+    }
+
+    SeleniumMaerskTrackingClient(BrowserSessionFactory browserSessionFactory) {
+        this.browserSessionFactory = browserSessionFactory == null ? this::openChromeSession : browserSessionFactory;
+    }
+
     @Override
-    public synchronized String fetchTrackingJson(String trackingNumber) {
+    public String fetchTrackingJson(String trackingNumber) {
         if (trackingNumber == null || trackingNumber.isBlank()) {
             throw new MaerskTrackingException("El número de guía no puede estar vacío");
         }
@@ -115,25 +137,41 @@ public class SeleniumMaerskTrackingClient implements MaerskTrackingClient {
     }
 
     private String fetchWithFreshBrowser(String trackingNumber) {
-        ChromeDriver driver = null;
+        BrowserSession session = null;
         try {
-            driver = createDriver();
-            String url = TRACKING_URL + trackingNumber;
-            log.debug("Cargando página de rastreo de Maersk: {}", url);
-            driver.get(url);
-
-            String response = waitForTrackingResponse(driver, trackingNumber);
-            log.debug("Respuesta de Maersk capturada para la guía {} ({} caracteres)",
-                    trackingNumber, response.length());
-            return response;
+            session = browserSessionFactory.open();
+            return session.fetch(trackingNumber);
         } catch (MaerskTrackingException ex) {
             throw ex;
         } catch (RuntimeException ex) {
             throw new MaerskTrackingException(
                     "Error al consultar Maersk desde el navegador: " + ex.getMessage(), ex);
         } finally {
-            quitDriver(driver);
+            if (session != null) {
+                session.close();
+            }
         }
+    }
+
+    private BrowserSession openChromeSession() {
+        ChromeDriver driver = createDriver();
+        return new BrowserSession() {
+            @Override
+            public String fetch(String trackingNumber) {
+                String url = TRACKING_URL + trackingNumber;
+                log.debug("Cargando página de rastreo de Maersk: {}", url);
+                driver.get(url);
+                String response = waitForTrackingResponse(driver, trackingNumber);
+                log.debug("Respuesta de Maersk capturada para la guía {} ({} caracteres)",
+                        trackingNumber, response.length());
+                return response;
+            }
+
+            @Override
+            public void close() {
+                quitDriver(driver);
+            }
+        };
     }
 
     private ChromeDriver createDriver() {
