@@ -3,6 +3,7 @@ package com.shiparrival.adapter.msc;
 import jakarta.annotation.PreDestroy;
 import lombok.extern.slf4j.Slf4j;
 import org.openqa.selenium.JavascriptExecutor;
+import org.openqa.selenium.PageLoadStrategy;
 import org.openqa.selenium.chrome.ChromeDriver;
 import org.openqa.selenium.chrome.ChromeOptions;
 import org.openqa.selenium.support.ui.WebDriverWait;
@@ -40,20 +41,20 @@ public class SeleniumMscTrackingClient implements MscTrackingClient {
     @Override
     public String fetchTrackingJson(String trackingNumber) {
         synchronized (monitor) {
-            ensureDriverStarted();
-
+            MscTrackingException firstFailure;
             try {
+                ensureDriverStarted();
                 String response = executeFetch(trackingNumber);
                 if (!isBlockedOrEmpty(response)) {
                     return response;
                 }
-                log.warn("MSC devolvió una respuesta vacía o una página de bloqueo; se reinicia la sesión del navegador");
+                firstFailure = new MscTrackingException(
+                        "MSC devolvió una respuesta vacía o una página de bloqueo");
             } catch (MscTrackingException ex) {
-                log.warn("Error al consultar MSC; se reinicia la sesión del navegador: {}", ex.getMessage());
+                firstFailure = ex;
             }
 
-            // Un único reintento con una sesión nueva: las cookies de Akamai
-            // pueden haber caducado o el navegador puede haber quedado inestable.
+            log.warn("Error al consultar MSC; se reinicia la sesión del navegador: {}", firstFailure.getMessage());
             restartDriver();
             return executeFetch(trackingNumber);
         }
@@ -66,19 +67,7 @@ public class SeleniumMscTrackingClient implements MscTrackingClient {
     }
 
     private void startDriver() {
-        ChromeOptions options = new ChromeOptions();
-        options.addArguments(
-                "--headless=new",
-                "--disable-gpu",
-                "--no-sandbox",
-                "--disable-dev-shm-usage",
-                "--window-size=1920,1080",
-                "--disable-blink-features=AutomationControlled",
-                "--lang=en-US,en;q=0.9",
-                "--user-agent=" + USER_AGENT
-        );
-        options.setExperimentalOption("excludeSwitches", List.of("enable-automation"));
-        options.setExperimentalOption("useAutomationExtension", false);
+        ChromeOptions options = createChromeOptions();
 
         try {
             driver = new ChromeDriver(options);
@@ -98,10 +87,31 @@ public class SeleniumMscTrackingClient implements MscTrackingClient {
         }
     }
 
+    static ChromeOptions createChromeOptions() {
+        ChromeOptions options = new ChromeOptions();
+        options.addArguments(
+                "--headless=new",
+                "--disable-gpu",
+                "--no-sandbox",
+                "--disable-dev-shm-usage",
+                "--window-size=1920,1080",
+                "--disable-blink-features=AutomationControlled",
+                "--lang=en-US,en;q=0.9",
+                "--user-agent=" + USER_AGENT
+        );
+        options.setPageLoadStrategy(PageLoadStrategy.EAGER);
+        options.setExperimentalOption("excludeSwitches", List.of("enable-automation"));
+        options.setExperimentalOption("useAutomationExtension", false);
+
+        return options;
+    }
+
     private void waitForPageReady() {
-        WebDriverWait wait = new WebDriverWait(driver, PAGE_LOAD_TIMEOUT);
-        wait.until(d -> "complete".equals(
-                ((JavascriptExecutor) d).executeScript("return document.readyState")));
+        WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(30));
+        wait.until(d -> {
+            Object readyState = ((JavascriptExecutor) d).executeScript("return document.readyState");
+            return "interactive".equals(readyState) || "complete".equals(readyState);
+        });
 
         // Akamai ejecuta scripts que establecen cookies después del load.
         try {
