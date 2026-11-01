@@ -22,9 +22,9 @@ class DeploymentConfigurationTest {
                 .contains("with-phone-exit-node:")
                 .contains("CarrierNetworkDiagnosticTest")
                 .contains("CARRIER_NETWORK_DIAGNOSTIC")
-                .contains("run: ./mvnw -B -DskipTests test")
+                .contains("test-compile dependency:resolve dependency:resolve-plugins")
                 .contains("--exit-node=100.77.93.94")
-                .contains("xvfb-run -a ./mvnw -B -o -Dtest=CarrierNetworkDiagnosticTest test")
+                .contains("xvfb-run -a ./mvnw -B -Dtest=CarrierNetworkDiagnosticTest test")
                 .contains("timeout-minutes: 20");
 
         assertThat(workflow)
@@ -39,7 +39,7 @@ class DeploymentConfigurationTest {
         for (String jobMarker : jobMarkers) {
             int jobStart = workflow.indexOf(jobMarker);
             int diagnostics = workflow.indexOf("-Dtest=CarrierNetworkDiagnosticTest", jobStart);
-            int prefetch = workflow.indexOf("./mvnw -B -DskipTests test", jobStart);
+            int prefetch = workflow.indexOf("test-compile dependency:resolve", jobStart);
             assertThat(jobStart).as("job %s exists", jobMarker).isGreaterThanOrEqualTo(0);
             assertThat(prefetch).as("job %s prefetches Maven dependencies", jobMarker)
                     .isGreaterThan(jobStart);

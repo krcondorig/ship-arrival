@@ -29,11 +29,11 @@ jobs:
             sudo apt-get install -y google-chrome-stable
           fi
       - name: Build and prefetch Maven dependencies
-        run: ./mvnw -B -DskipTests test
+        run: ./mvnw -B test-compile dependency:resolve dependency:resolve-plugins
       - name: Run isolated real-adapter diagnostics
         env:
           CARRIER_NETWORK_DIAGNOSTIC: "true"
-        run: xvfb-run -a ./mvnw -B -o -Dtest=CarrierNetworkDiagnosticTest test
+        run: xvfb-run -a ./mvnw -B -Dtest=CarrierNetworkDiagnosticTest test
 
   with-phone-exit-node:
     name: With phone exit node
@@ -57,7 +57,7 @@ jobs:
             sudo apt-get install -y google-chrome-stable
           fi
       - name: Build and prefetch Maven dependencies
-        run: ./mvnw -B -DskipTests test
+        run: ./mvnw -B test-compile dependency:resolve dependency:resolve-plugins
       - name: Connect to Tailscale
         uses: tailscale/github-action@v3
         with:
@@ -70,7 +70,7 @@ jobs:
       - name: Run isolated real-adapter diagnostics
         env:
           CARRIER_NETWORK_DIAGNOSTIC: "true"
-        run: xvfb-run -a ./mvnw -B -o -Dtest=CarrierNetworkDiagnosticTest test
+        run: xvfb-run -a ./mvnw -B -Dtest=CarrierNetworkDiagnosticTest test
       - name: Disconnect from Tailscale
         if: always()
         run: |
