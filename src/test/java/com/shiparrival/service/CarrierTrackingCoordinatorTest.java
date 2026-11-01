@@ -140,6 +140,39 @@ class CarrierTrackingCoordinatorTest {
         } finally { coordinator.shutdown(); }
     }
 
+    @Test
+    void concurrentDrainDoesNotClearTailsForNextCycle() throws Exception {
+        CarrierTrackingCoordinator coordinator = new CarrierTrackingCoordinator(true,
+                new java.util.concurrent.ThreadPoolExecutor(2, 2, 0, TimeUnit.MILLISECONDS,
+                        new java.util.concurrent.ArrayBlockingQueue<>(2), new java.util.concurrent.ThreadPoolExecutor.AbortPolicy()));
+        CountDownLatch started = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        CarrierTrackingAdapter adapter = mock(CarrierTrackingAdapter.class);
+        when(adapter.track(org.mockito.ArgumentMatchers.anyString())).thenAnswer(invocation -> {
+            started.countDown();
+            assertTrue(release.await(2, TimeUnit.SECONDS));
+            return TrackingResult.builder().success(true).trackingNumber(invocation.getArgument(0)).build();
+        });
+        try {
+            coordinator.beginCycle();
+            coordinator.submit(Carrier.MSC, adapter, "old");
+            assertTrue(started.await(2, TimeUnit.SECONDS));
+            Thread firstDrain = new Thread(() -> { try { coordinator.drain(); } catch (InterruptedException e) { Thread.currentThread().interrupt(); } });
+            Thread secondDrain = new Thread(() -> { try { coordinator.cancelAndDrain(); } catch (InterruptedException e) { Thread.currentThread().interrupt(); } });
+            firstDrain.start();
+            secondDrain.start();
+            release.countDown();
+            firstDrain.join(2000);
+            secondDrain.join(2000);
+            coordinator.beginCycle();
+            coordinator.submit(Carrier.MSC, adapter, "new");
+            coordinator.drain();
+        } finally {
+            release.countDown();
+            coordinator.shutdown();
+        }
+    }
+
     private TrackingResult run(CountDownLatch entered, CountDownLatch release, AtomicInteger active,
                                AtomicInteger maximum, String number) throws InterruptedException {
         int current = active.incrementAndGet();

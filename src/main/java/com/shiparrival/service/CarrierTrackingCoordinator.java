@@ -24,6 +24,7 @@ public class CarrierTrackingCoordinator {
     private final Map<Carrier, Worker> carrierTails = new EnumMap<>(Carrier.class);
     private final List<Worker> cycleTasks = new ArrayList<>();
     private final Object lifecycle = new Object();
+    private final Object drainLock = new Object();
     private boolean cycleOpen;
     private boolean cycleCancelled;
 
@@ -105,30 +106,34 @@ public class CarrierTrackingCoordinator {
 
     /** Ends this cycle's submission boundary and waits for all accepted work to terminate. */
     public void drain() throws InterruptedException {
-        List<Worker> tasks;
-        synchronized (lifecycle) {
-            cycleOpen = false;
-            tasks = new ArrayList<>(cycleTasks);
+        synchronized (drainLock) {
+            List<Worker> tasks;
+            synchronized (lifecycle) {
+                cycleOpen = false;
+                tasks = new ArrayList<>(cycleTasks);
+            }
+            waitForWorkers(tasks);
+            synchronized (lifecycle) { cycleTasks.removeAll(tasks); carrierTails.clear(); }
         }
-        waitForWorkers(tasks);
-        synchronized (lifecycle) { cycleTasks.removeAll(tasks); carrierTails.clear(); }
     }
 
     /** Cancels accepted work and waits without falsely reporting completion on timeout. */
     public void cancelAndDrain() throws InterruptedException {
-        List<Worker> tasks;
-        synchronized (lifecycle) {
-            cycleOpen = false;
-            cycleCancelled = true;
-            tasks = new ArrayList<>(cycleTasks);
+        synchronized (drainLock) {
+            List<Worker> tasks;
+            synchronized (lifecycle) {
+                cycleOpen = false;
+                cycleCancelled = true;
+                tasks = new ArrayList<>(cycleTasks);
+            }
+            tasks.forEach(worker -> {
+                worker.result.cancel(true);
+                Thread thread = worker.thread;
+                if (thread != null) thread.interrupt();
+            });
+            waitForWorkers(tasks);
+            synchronized (lifecycle) { cycleTasks.removeAll(tasks); carrierTails.clear(); }
         }
-        tasks.forEach(worker -> {
-            worker.result.cancel(true);
-            Thread thread = worker.thread;
-            if (thread != null) thread.interrupt();
-        });
-        waitForWorkers(tasks);
-        synchronized (lifecycle) { cycleTasks.removeAll(tasks); carrierTails.clear(); }
     }
 
     private static void waitForWorkers(List<Worker> tasks) throws InterruptedException {
