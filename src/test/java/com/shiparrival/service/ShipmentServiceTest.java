@@ -262,6 +262,33 @@ class ShipmentServiceTest {
     }
 
     @Test
+    @DisplayName("Debe reactivar un embarque si detecta que ya no está arribado")
+    void shouldReactivateShipmentIfNoLongerArrived() {
+        Shipment shipment = Shipment.builder()
+                .id(1L)
+                .trackingNumber("TESTBL900001")
+                .carrier(Carrier.ONE)
+                .status(ShipmentStatus.ARRIVED)
+                .active(false)
+                .estimatedArrival(LocalDateTime.of(2026, 10, 20, 9, 0))
+                .build();
+
+        TrackingResult result = TrackingResult.builder()
+                .success(true)
+                .trackingNumber("TESTBL900001")
+                .estimatedArrival(LocalDateTime.of(2026, 11, 29, 16, 0))
+                .detectedStatus(ShipmentStatus.IN_TRANSIT)
+                .build();
+
+        when(shipmentRepository.save(any(Shipment.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        Shipment updated = shipmentService.updateFromTrackingResult(shipment, result);
+
+        assertThat(updated.getStatus()).isEqualTo(ShipmentStatus.IN_TRANSIT);
+        assertThat(updated.isActive()).isTrue();
+    }
+
+    @Test
     @DisplayName("No debe degradar a verificación manual un embarque ya arribado")
     void shouldNotDowngradeArrivedShipmentToManualCheck() {
         Shipment arrived = Shipment.builder()

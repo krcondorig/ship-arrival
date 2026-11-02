@@ -151,6 +151,53 @@ class OneLineTrackingAdapterTest {
         assertThat(result.getErrorMessage()).contains("500");
     }
 
+    @Test
+    @DisplayName("Debe detectar como IN_TRANSIT cuando llega a un puerto de transbordo (T/S Port)")
+    void shouldMapInTransitWhenArrivedAtTsPort() throws IOException {
+        String tsResponse = """
+        {
+          "status": 200,
+          "data": [{
+            "bookingNo": "TA6DB5606900",
+            "containerNo": "BEAU2153201",
+            "latestEvent": {
+              "eventName": "Vessel Arrival at T/S Port",
+              "locationName": "PUSAN",
+              "date": "2026-11-02T05:08:00"
+            },
+            "place": { "locationName": "PUSAN" },
+            "pod": { "locationName": "MEXICO CITY" },
+            "cargoEvents": [
+              {
+                "matrixId": "E061",
+                "locationName": "QINGDAO, SHANDONG",
+                "trigger": "ACTUAL",
+                "localPortDate": "2026-10-14T16:53:00"
+              },
+              {
+                "matrixId": "E089",
+                "locationName": "MANZANILLO",
+                "trigger": "ESTIMATED",
+                "localPortDate": "2026-11-29T16:00:00"
+              }
+            ]
+          }]
+        }
+        """;
+
+        mockServer.expect(requestTo(ENDPOINT))
+                .andExpect(method(HttpMethod.POST))
+                .andRespond(withSuccess(tsResponse, MediaType.APPLICATION_JSON));
+
+        TrackingResult result = adapter.track("TA6DB5606900");
+
+        assertThat(result.isSuccess()).isTrue();
+        assertThat(result.getDetectedStatus()).isEqualTo(ShipmentStatus.IN_TRANSIT);
+        assertThat(result.getPortOfDischarge()).isEqualTo("MANZANILLO");
+        assertThat(result.getActualArrival()).isNull();
+        assertThat(result.getEstimatedArrival()).isEqualTo(LocalDateTime.of(2026, 11, 29, 16, 0));
+    }
+
     private String fixture(String name) throws IOException {
         try (InputStream in = getClass().getResourceAsStream("/fixtures/one/" + name)) {
             assertThat(in).as("fixture %s", name).isNotNull();

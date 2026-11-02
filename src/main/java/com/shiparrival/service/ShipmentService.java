@@ -213,10 +213,16 @@ public class ShipmentService {
         if (result.getDetectedStatus() == ShipmentStatus.ARRIVED) {
             shipment.setStatus(ShipmentStatus.ARRIVED);
             shipment.setActive(false);
-        } else if (checkProximity(shipment, LocalDate.now())) {
-            shipment.setStatus(ShipmentStatus.NEAR_ARRIVAL);
         } else {
-            shipment.setStatus(result.getDetectedStatus() != null ? result.getDetectedStatus() : ShipmentStatus.IN_TRANSIT);
+            // Si el estado detectado no es ARRIVED (ej. volvió a IN_TRANSIT por corrección de datos),
+            // nos aseguramos de que el embarque vuelva a estar activo para el scheduler.
+            shipment.setActive(true);
+            
+            if (checkProximity(shipment, LocalDate.now())) {
+                shipment.setStatus(ShipmentStatus.NEAR_ARRIVAL);
+            } else {
+                shipment.setStatus(result.getDetectedStatus() != null ? result.getDetectedStatus() : ShipmentStatus.IN_TRANSIT);
+            }
         }
 
         return shipmentRepository.save(shipment);

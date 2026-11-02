@@ -110,12 +110,16 @@ public class OneLineTrackingAdapter implements CarrierTrackingAdapter {
         LocalDateTime portArrivalDate = parseDateTime(
                 portArrivalEvent != null ? portArrivalEvent.getLocalPortDate() : null);
 
+        String portOfDischarge = portArrivalEvent != null && portArrivalEvent.getLocationName() != null
+                ? portArrivalEvent.getLocationName()
+                : resolvePortOfDischargeFallback(data);
+
         LocalDateTime actualArrival = isActual(portArrivalEvent) ? portArrivalDate : null;
         LocalDateTime estimatedArrival = portArrivalDate;
 
         // Si ONE aún no marca el evento E089 como ACTUAL pero el último evento ya es
-        // un arribo/descarga en el puerto, se usa ese evento como fecha real.
-        if (actualArrival == null && isArrivalEvent(data.getLatestEvent())) {
+        // un arribo/descarga en el puerto DE DESTINO, se usa ese evento como fecha real.
+        if (actualArrival == null && isArrivalAtDestination(data.getLatestEvent(), portOfDischarge)) {
             actualArrival = parseDateTime(data.getLatestEvent().getDate());
             if (estimatedArrival == null) {
                 estimatedArrival = actualArrival;
@@ -129,10 +133,6 @@ public class OneLineTrackingAdapter implements CarrierTrackingAdapter {
         String portOfLoading = departureEvent != null && departureEvent.getLocationName() != null
                 ? departureEvent.getLocationName()
                 : locationName(data.getPor());
-
-        String portOfDischarge = portArrivalEvent != null && portArrivalEvent.getLocationName() != null
-                ? portArrivalEvent.getLocationName()
-                : resolvePortOfDischargeFallback(data);
 
         return TrackingResult.builder()
                 .success(true)
@@ -148,6 +148,20 @@ public class OneLineTrackingAdapter implements CarrierTrackingAdapter {
                 .detectedStatus(detectedStatus)
                 .rawStatusMessage(buildRawStatusMessage(data.getLatestEvent()))
                 .build();
+    }
+
+    private boolean isArrivalAtDestination(OneTrackingResponseDto.OneEvent event, String destination) {
+        if (!isArrivalEvent(event)) {
+            return false;
+        }
+        if (destination == null || event.getLocationName() == null) {
+            return false;
+        }
+        String eventLoc = event.getLocationName().trim().toUpperCase();
+        String destLoc = destination.trim().toUpperCase();
+
+        // Coincidencia exacta o contenida (ej: "MANZANILLO, MEXICO" vs "MANZANILLO")
+        return eventLoc.contains(destLoc) || destLoc.contains(eventLoc);
     }
 
     private OneTrackingResponseDto.OneCargoEvent findEvent(
@@ -170,15 +184,18 @@ public class OneLineTrackingAdapter implements CarrierTrackingAdapter {
             return false;
         }
         String name = event.getEventName().toLowerCase();
+        // Excluir arribos a puertos de transbordo (T/S Port) que no son el destino final
+        if (name.contains("t/s port") || name.contains("transshipment")) {
+            return false;
+        }
         return name.contains("vessel arrival")
                 || name.contains("unloaded from vessel")
                 || name.contains("arrival at port");
     }
 
     private String resolvePortOfDischargeFallback(OneTrackingResponseDto.OneContainerData data) {
-        if (data.getPlace() != null && data.getPlace().getLocationName() != null) {
-            return data.getPlace().getLocationName();
-        }
+        // NO usar data.getPlace() porque es la ubicación actual del contenedor,
+        // la cual cambia durante el viaje (ej: puertos intermedios).
         return locationName(data.getPod());
     }
 
