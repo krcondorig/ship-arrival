@@ -288,6 +288,40 @@ class CarrierTrackingCoordinatorTest {
     }
 
     @Test
+    void delayedWorkerCannotInvalidateSpacingAtActualAdapterInvocationBoundary() throws Exception {
+        CarrierTrackingCoordinator coordinator = new CarrierTrackingCoordinator(true,
+                new java.util.concurrent.ThreadPoolExecutor(2, 2, 0, TimeUnit.MILLISECONDS,
+                        new java.util.concurrent.ArrayBlockingQueue<>(2), new java.util.concurrent.ThreadPoolExecutor.AbortPolicy()),
+                100, System::nanoTime, millis -> TimeUnit.MILLISECONDS.sleep(millis));
+        CountDownLatch reserved = new CountDownLatch(1);
+        CountDownLatch allowFirstInvocation = new CountDownLatch(1);
+        CountDownLatch secondInvoked = new CountDownLatch(1);
+        java.util.concurrent.atomic.AtomicLong firstStart = new java.util.concurrent.atomic.AtomicLong();
+        java.util.concurrent.atomic.AtomicLong secondStart = new java.util.concurrent.atomic.AtomicLong();
+        coordinator.setAfterStartReservationHook(carrier -> {
+            if (carrier == Carrier.MSC) {
+                reserved.countDown();
+                allowFirstInvocation.await();
+            }
+        });
+        CarrierTrackingAdapter msc = mock(CarrierTrackingAdapter.class);
+        CarrierTrackingAdapter maersk = mock(CarrierTrackingAdapter.class);
+        when(msc.track("first")).thenAnswer(inv -> { firstStart.set(System.nanoTime()); return TrackingResult.builder().success(true).build(); });
+        when(maersk.track("second")).thenAnswer(inv -> { secondStart.set(System.nanoTime()); secondInvoked.countDown(); return TrackingResult.builder().success(true).build(); });
+        try {
+            coordinator.beginCycle();
+            coordinator.submit(Carrier.MSC, msc, "first");
+            assertTrue(reserved.await(2, TimeUnit.SECONDS));
+            coordinator.submit(Carrier.MAERSK, maersk, "second");
+            assertTrue(secondInvoked.await(2, TimeUnit.SECONDS));
+            allowFirstInvocation.countDown();
+            coordinator.drain();
+            assertTrue(TimeUnit.NANOSECONDS.toMillis(firstStart.get() - secondStart.get()) >= 100,
+                    "actual adapter invocations must remain spaced even if a worker pauses after reservation");
+        } finally { allowFirstInvocation.countDown(); coordinator.shutdown(); }
+    }
+
+    @Test
     void sameCarrierSuccessorWaitsForPredecessorCompletionAndDelay() throws Exception {
         CarrierTrackingCoordinator coordinator = new CarrierTrackingCoordinator(true,
                 new java.util.concurrent.ThreadPoolExecutor(2, 2, 0, TimeUnit.MILLISECONDS,

@@ -79,6 +79,12 @@ public class CarrierTrackingCoordinator {
     private final Object startGate = new Object();
     private long lastCallStart = Long.MIN_VALUE;
     private final Map<Carrier, Long> carrierCompletion = new EnumMap<>(Carrier.class);
+    private volatile StartReservationHook afterStartReservationHook = carrier -> {};
+
+    @FunctionalInterface
+    interface StartReservationHook { void afterReservation(Carrier carrier) throws InterruptedException; }
+
+    void setAfterStartReservationHook(StartReservationHook hook) { afterStartReservationHook = hook; }
 
     public void beginCycle() {
         drainLock.lock();
@@ -130,6 +136,7 @@ public class CarrierTrackingCoordinator {
                             worker.thread = Thread.currentThread();
                             try {
                                 awaitStart(carrier);
+                                afterStartReservationHook.afterReservation(carrier);
                             } catch (InterruptedException interrupted) {
                                 Thread.currentThread().interrupt();
                                 result.completeExceptionally(interrupted);
@@ -137,8 +144,8 @@ public class CarrierTrackingCoordinator {
                                 completion.complete(null);
                                 return;
                             }
-                            long callStarted = monotonicClock.getAsLong();
                             boolean success = false;
+                            long[] invocationStarted = {0};
                             synchronized (lifecycle) {
                                 if (cycleCancelled || result.isCancelled()) {
                                     worker.thread = null;
@@ -149,13 +156,14 @@ public class CarrierTrackingCoordinator {
                                 peakInFlight = Math.max(peakInFlight, activeCalls);
                             }
                             try {
+                                invocationStarted[0] = reserveInvocationStart(carrier);
                                 TrackingResult tracked = adapter.track(trackingNumber);
                                 success = tracked != null && tracked.isSuccess();
                                 result.complete(tracked);
                             } catch (Throwable error) {
                                 result.completeExceptionally(error);
                             } finally {
-                                long elapsedMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - callStarted);
+                                long elapsedMs = TimeUnit.NANOSECONDS.toMillis(monotonicClock.getAsLong() - invocationStarted[0]);
                                 int successes;
                                 int failures;
                                 int observedPeak;
@@ -284,12 +292,26 @@ public class CarrierTrackingCoordinator {
                 Long completed = carrierCompletion.get(carrier);
                 if (completed != null) earliest = Math.max(earliest, completed + delayNanos);
                 long remaining = earliest - now;
+                if (remaining <= 0) return;
+                sleeper.sleep(Math.max(1, TimeUnit.NANOSECONDS.toMillis(remaining)));
+            }
+        }
+    }
+
+    private long reserveInvocationStart(Carrier carrier) throws InterruptedException {
+        synchronized (startGate) {
+            while (true) {
+                long now = monotonicClock.getAsLong();
+                long earliest = lastCallStart == Long.MIN_VALUE ? now : lastCallStart + delayNanos;
+                Long completed = carrierCompletion.get(carrier);
+                if (completed != null) earliest = Math.max(earliest, completed + delayNanos);
+                long remaining = earliest - now;
                 if (remaining <= 0) {
-                    lastCallStart = monotonicClock.getAsLong();
-                    return;
+                    long started = monotonicClock.getAsLong();
+                    lastCallStart = started;
+                    return started;
                 }
-                long millis = Math.max(1, TimeUnit.NANOSECONDS.toMillis(remaining));
-                sleeper.sleep(millis);
+                sleeper.sleep(Math.max(1, TimeUnit.NANOSECONDS.toMillis(remaining)));
             }
         }
     }
