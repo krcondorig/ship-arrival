@@ -184,6 +184,149 @@ class CarrierTrackingCoordinatorTest {
         }
     }
 
+    @Test
+    void overlappingBarriersAndSubmittersRemainSerializedUntilBothBarriersFinish() throws Exception {
+        CarrierTrackingCoordinator coordinator = new CarrierTrackingCoordinator(true,
+                new java.util.concurrent.ThreadPoolExecutor(2, 2, 0, TimeUnit.MILLISECONDS,
+                        new java.util.concurrent.ArrayBlockingQueue<>(2), new java.util.concurrent.ThreadPoolExecutor.AbortPolicy()));
+        CountDownLatch firstEntered = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        CountDownLatch barrierEntered = new CountDownLatch(1);
+        CountDownLatch releaseBarrier = new CountDownLatch(1);
+        coordinator.setBarrierEnteredHook(() -> { barrierEntered.countDown(); try { releaseBarrier.await(); } catch (InterruptedException e) { Thread.currentThread().interrupt(); } });
+        CarrierTrackingAdapter adapter = mock(CarrierTrackingAdapter.class);
+        when(adapter.track(org.mockito.ArgumentMatchers.anyString())).thenAnswer(inv -> {
+            if ("first".equals(inv.getArgument(0))) { firstEntered.countDown(); release.await(); }
+            return TrackingResult.builder().success(true).build();
+        });
+        try {
+            coordinator.beginCycle();
+            coordinator.submit(Carrier.MSC, adapter, "first");
+            assertTrue(firstEntered.await(2, TimeUnit.SECONDS));
+            Thread a = new Thread(() -> { try { coordinator.awaitWorkers(); } catch (InterruptedException e) { Thread.currentThread().interrupt(); } });
+            Thread b = new Thread(() -> { try { coordinator.awaitCarrier(Carrier.MSC); } catch (InterruptedException e) { Thread.currentThread().interrupt(); } });
+            a.start(); b.start();
+            assertTrue(barrierEntered.await(2, TimeUnit.SECONDS));
+            assertTrue(waitUntilWaiting(b), "second barrier must queue behind the first barrier gate");
+            CountDownLatch submitStarted = new CountDownLatch(1);
+            Thread submitter = new Thread(() -> { submitStarted.countDown(); coordinator.submit(Carrier.MAERSK, adapter, "queued"); });
+            submitter.start();
+            assertTrue(submitStarted.await(2, TimeUnit.SECONDS));
+            assertTrue(waitUntilWaiting(submitter), "submitter must queue behind the barrier gate");
+            releaseBarrier.countDown();
+            release.countDown();
+            a.join(2000); b.join(2000); submitter.join(2000);
+            assertFalse(a.isAlive()); assertFalse(b.isAlive()); assertFalse(submitter.isAlive());
+            coordinator.drain();
+            assertEquals(1, coordinator.observedPeakInFlight());
+        } finally { releaseBarrier.countDown(); release.countDown(); coordinator.shutdown(); }
+    }
+
+    @Test
+    void awaitWorkersIsBarrierAgainstConcurrentAcceptedSubmissions() throws Exception {
+        CarrierTrackingCoordinator coordinator = new CarrierTrackingCoordinator(true,
+                new java.util.concurrent.ThreadPoolExecutor(2, 2, 0, TimeUnit.MILLISECONDS,
+                        new java.util.concurrent.ArrayBlockingQueue<>(2), new java.util.concurrent.ThreadPoolExecutor.AbortPolicy()));
+        CountDownLatch firstEntered = new CountDownLatch(1);
+        CountDownLatch releaseFirst = new CountDownLatch(1);
+        CountDownLatch awaiting = new CountDownLatch(1);
+        CountDownLatch barrierEntered = new CountDownLatch(1);
+        coordinator.setBarrierEnteredHook(barrierEntered::countDown);
+        CarrierTrackingAdapter msc = mock(CarrierTrackingAdapter.class);
+        CarrierTrackingAdapter maersk = mock(CarrierTrackingAdapter.class);
+        when(msc.track("first")).thenAnswer(inv -> { firstEntered.countDown(); releaseFirst.await(); return TrackingResult.builder().success(true).build(); });
+        when(maersk.track("second")).thenReturn(TrackingResult.builder().success(true).build());
+        try {
+            coordinator.beginCycle();
+            coordinator.submit(Carrier.MSC, msc, "first");
+            assertTrue(firstEntered.await(2, TimeUnit.SECONDS));
+            Thread barrier = new Thread(() -> { awaiting.countDown(); try { coordinator.awaitWorkers(); } catch (InterruptedException e) { Thread.currentThread().interrupt(); } });
+            barrier.start();
+            assertTrue(awaiting.await(2, TimeUnit.SECONDS));
+            assertTrue(barrierEntered.await(2, TimeUnit.SECONDS));
+            java.util.concurrent.atomic.AtomicReference<java.util.concurrent.CompletableFuture<TrackingResult>> accepted = new java.util.concurrent.atomic.AtomicReference<>();
+            Thread submitter = new Thread(() -> accepted.set(coordinator.submit(Carrier.MAERSK, maersk, "second")));
+            submitter.start();
+            assertTrue(waitUntilWaiting(submitter));
+            assertTrue(submitter.isAlive(), "submitter must remain gated until the barrier's workers finish");
+            releaseFirst.countDown();
+            barrier.join(2000);
+            submitter.join(2000);
+            assertFalse(barrier.isAlive());
+            assertFalse(submitter.isAlive());
+            assertNotNull(accepted.get());
+            coordinator.drain();
+        } finally { releaseFirst.countDown(); coordinator.shutdown(); }
+    }
+
+    @Test
+    void startsDifferentCarriersAtLeastDelayApartWhileFirstRemainsInFlight() throws Exception {
+        CarrierTrackingCoordinator coordinator = new CarrierTrackingCoordinator(true,
+                new java.util.concurrent.ThreadPoolExecutor(2, 2, 0, TimeUnit.MILLISECONDS,
+                        new java.util.concurrent.ArrayBlockingQueue<>(2), new java.util.concurrent.ThreadPoolExecutor.AbortPolicy()),
+                120, System::nanoTime, millis -> TimeUnit.MILLISECONDS.sleep(millis));
+        CountDownLatch firstStarted = new CountDownLatch(1);
+        CountDownLatch secondStarted = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        java.util.concurrent.atomic.AtomicLong firstAt = new java.util.concurrent.atomic.AtomicLong();
+        java.util.concurrent.atomic.AtomicLong secondAt = new java.util.concurrent.atomic.AtomicLong();
+        CarrierTrackingAdapter first = mock(CarrierTrackingAdapter.class);
+        CarrierTrackingAdapter second = mock(CarrierTrackingAdapter.class);
+        when(first.track("first")).thenAnswer(inv -> { firstAt.set(System.nanoTime()); firstStarted.countDown(); release.await(); return TrackingResult.builder().success(true).build(); });
+        when(second.track("second")).thenAnswer(inv -> { secondAt.set(System.nanoTime()); secondStarted.countDown(); return TrackingResult.builder().success(true).build(); });
+        try {
+            coordinator.beginCycle();
+            coordinator.submit(Carrier.MSC, first, "first");
+            assertTrue(firstStarted.await(2, TimeUnit.SECONDS));
+            coordinator.submit(Carrier.MAERSK, second, "second");
+            assertTrue(secondStarted.await(2, TimeUnit.SECONDS));
+            assertTrue(TimeUnit.NANOSECONDS.toMillis(secondAt.get() - firstAt.get()) >= 120);
+            assertEquals(2, coordinator.observedPeakInFlight());
+            release.countDown();
+            coordinator.drain();
+        } finally { release.countDown(); coordinator.shutdown(); }
+    }
+
+    @Test
+    void sameCarrierSuccessorWaitsForPredecessorCompletionAndDelay() throws Exception {
+        CarrierTrackingCoordinator coordinator = new CarrierTrackingCoordinator(true,
+                new java.util.concurrent.ThreadPoolExecutor(2, 2, 0, TimeUnit.MILLISECONDS,
+                        new java.util.concurrent.ArrayBlockingQueue<>(2), new java.util.concurrent.ThreadPoolExecutor.AbortPolicy()),
+                120, System::nanoTime, millis -> TimeUnit.MILLISECONDS.sleep(millis));
+        CountDownLatch firstRelease = new CountDownLatch(1);
+        java.util.concurrent.atomic.AtomicLong firstDone = new java.util.concurrent.atomic.AtomicLong();
+        java.util.concurrent.atomic.AtomicLong secondAt = new java.util.concurrent.atomic.AtomicLong();
+        CarrierTrackingAdapter adapter = mock(CarrierTrackingAdapter.class);
+        when(adapter.track("first")).thenAnswer(inv -> { firstRelease.await(); firstDone.set(System.nanoTime()); return TrackingResult.builder().success(true).build(); });
+        when(adapter.track("second")).thenAnswer(inv -> { secondAt.set(System.nanoTime()); return TrackingResult.builder().success(true).build(); });
+        try {
+            coordinator.beginCycle();
+            coordinator.submit(Carrier.MSC, adapter, "first");
+            coordinator.submit(Carrier.MSC, adapter, "second");
+            firstRelease.countDown();
+            coordinator.drain();
+            assertTrue(TimeUnit.NANOSECONDS.toMillis(secondAt.get() - firstDone.get()) >= 120);
+        } finally { firstRelease.countDown(); coordinator.shutdown(); }
+    }
+
+    @Test
+    void rejectionHasExplicitDispatchFailureOutcome() throws Exception {
+        var executor = new java.util.concurrent.ThreadPoolExecutor(1, 1, 0, TimeUnit.MILLISECONDS,
+                new java.util.concurrent.SynchronousQueue<>(), new java.util.concurrent.ThreadPoolExecutor.AbortPolicy());
+        CountDownLatch executorOccupied = new CountDownLatch(1);
+        CountDownLatch releaseExecutor = new CountDownLatch(1);
+        executor.execute(() -> { executorOccupied.countDown(); try { releaseExecutor.await(); } catch (InterruptedException e) { Thread.currentThread().interrupt(); } });
+        assertTrue(executorOccupied.await(2, TimeUnit.SECONDS));
+        CarrierTrackingCoordinator coordinator = new CarrierTrackingCoordinator(true, executor, 0, System::nanoTime, millis -> {});
+        try {
+            coordinator.beginCycle();
+            var outcome = coordinator.submit(Carrier.MSC, mock(CarrierTrackingAdapter.class), "safe");
+            assertInstanceOf(CarrierTrackingCoordinator.DispatchRejectedException.class,
+                    assertThrows(java.util.concurrent.CompletionException.class, outcome::join).getCause());
+            coordinator.drain();
+        } finally { releaseExecutor.countDown(); coordinator.shutdown(); }
+    }
+
     private boolean waitUntilWaiting(Thread thread) throws InterruptedException {
         long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(2);
         while (System.nanoTime() < deadline) {
