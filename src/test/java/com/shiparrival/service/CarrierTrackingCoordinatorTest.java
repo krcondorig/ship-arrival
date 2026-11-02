@@ -388,6 +388,37 @@ class CarrierTrackingCoordinatorTest {
     }
 
     @Test
+    void authorizationHookRunsAfterLifecycleAndPacingLocksAreReleased() throws Exception {
+        CarrierTrackingCoordinator coordinator = new CarrierTrackingCoordinator(true,
+                new java.util.concurrent.ThreadPoolExecutor(2, 2, 0, TimeUnit.MILLISECONDS,
+                        new java.util.concurrent.ArrayBlockingQueue<>(2), new java.util.concurrent.ThreadPoolExecutor.AbortPolicy()),
+                40, System::nanoTime, millis -> TimeUnit.MILLISECONDS.sleep(millis));
+        CountDownLatch firstAuthorized = new CountDownLatch(1);
+        CountDownLatch hookFinished = new CountDownLatch(2);
+        java.util.concurrent.atomic.AtomicInteger callbacks = new java.util.concurrent.atomic.AtomicInteger();
+        java.util.concurrent.atomic.AtomicBoolean hookBlockedOnLifecycle = new java.util.concurrent.atomic.AtomicBoolean();
+        coordinator.setAuthorizationHook((carrier, timestamp) -> {
+            Thread probe = new Thread(coordinator::observedPeakInFlight);
+            probe.start();
+            try { probe.join(1000); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+            if (probe.isAlive()) hookBlockedOnLifecycle.set(true);
+            if (callbacks.incrementAndGet() == 1) firstAuthorized.countDown();
+            hookFinished.countDown();
+        });
+        CarrierTrackingAdapter adapter = mock(CarrierTrackingAdapter.class);
+        when(adapter.track(org.mockito.ArgumentMatchers.anyString())).thenReturn(TrackingResult.builder().success(true).build());
+        try {
+            coordinator.beginCycle();
+            coordinator.submit(Carrier.MSC, adapter, "one");
+            assertTrue(firstAuthorized.await(2, TimeUnit.SECONDS));
+            coordinator.submit(Carrier.MAERSK, adapter, "two");
+            assertTrue(hookFinished.await(2, TimeUnit.SECONDS), "authorization callbacks must run outside coordinator locks");
+            assertFalse(hookBlockedOnLifecycle.get(), "authorization hook must run after lifecycle lock is released");
+            coordinator.drain();
+        } finally { coordinator.shutdown(); }
+    }
+
+    @Test
     void sameCarrierSuccessorWaitsForPredecessorCompletionAndDelay() throws Exception {
         CarrierTrackingCoordinator coordinator = new CarrierTrackingCoordinator(true,
                 new java.util.concurrent.ThreadPoolExecutor(2, 2, 0, TimeUnit.MILLISECONDS,

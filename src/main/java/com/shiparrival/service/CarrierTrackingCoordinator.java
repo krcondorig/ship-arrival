@@ -76,7 +76,6 @@ public class CarrierTrackingCoordinator {
     private final long delayNanos;
     private final java.util.function.LongSupplier monotonicClock;
     private final Sleeper sleeper;
-    private final Object startGate = new Object();
     private long lastCallStart = Long.MIN_VALUE;
     private final Map<Carrier, Long> carrierCompletion = new EnumMap<>(Carrier.class);
     private volatile StartReservationHook afterStartReservationHook = carrier -> {};
@@ -147,6 +146,7 @@ public class CarrierTrackingCoordinator {
                                 awaitStart(carrier);
                                 afterStartReservationHook.afterReservation(carrier);
                                 beforeAuthorizationHook.afterReservation(carrier);
+                                invocationStarted = reserveInvocationStart(carrier);
                             } catch (InterruptedException interrupted) {
                                 Thread.currentThread().interrupt();
                                 result.cancel(false);
@@ -160,7 +160,6 @@ public class CarrierTrackingCoordinator {
                                     completion.complete(null);
                                     return;
                                 }
-                                invocationStarted = reserveInvocationStart(carrier);
                                 if (invocationStarted == Long.MIN_VALUE) {
                                     result.cancel(false);
                                     worker.thread = null;
@@ -169,8 +168,8 @@ public class CarrierTrackingCoordinator {
                                 }
                                 activeCalls++;
                                 peakInFlight = Math.max(peakInFlight, activeCalls);
-                                authorizationHook.authorized(carrier, invocationStarted);
                             }
+                            authorizationHook.authorized(carrier, invocationStarted);
                             try {
                                 TrackingResult tracked = adapter.track(trackingNumber);
                                 success = tracked != null && tracked.isSuccess();
@@ -182,8 +181,9 @@ public class CarrierTrackingCoordinator {
                                 int successes;
                                 int failures;
                                 int observedPeak;
-                                synchronized (startGate) { carrierCompletion.put(carrier, monotonicClock.getAsLong()); }
                                 synchronized (lifecycle) {
+                                    carrierCompletion.put(carrier, monotonicClock.getAsLong());
+                                    lifecycle.notifyAll();
                                     activeCalls--;
                                     Map<Carrier, Integer> outcomes = success ? carrierSuccesses : carrierFailures;
                                     outcomes.merge(carrier, 1, Integer::sum);
@@ -280,6 +280,7 @@ public class CarrierTrackingCoordinator {
             synchronized (lifecycle) {
                 cycleOpen = false;
                 cycleCancelled = true;
+                lifecycle.notifyAll();
                 tasks = new ArrayList<>(cycleTasks);
             }
             tasks.forEach(worker -> {
@@ -300,40 +301,40 @@ public class CarrierTrackingCoordinator {
     }
 
     private void awaitStart(Carrier carrier) throws InterruptedException {
-        synchronized (startGate) {
-            while (true) {
-                long now = monotonicClock.getAsLong();
-                long earliest = lastCallStart == Long.MIN_VALUE ? now : lastCallStart + delayNanos;
-                Long completed = carrierCompletion.get(carrier);
-                if (completed != null) earliest = Math.max(earliest, completed + delayNanos);
-                long remaining = earliest - now;
-                if (remaining <= 0) return;
-                sleeper.sleep(Math.max(1, TimeUnit.NANOSECONDS.toMillis(remaining)));
-            }
+        while (true) {
+            long remaining = remainingUntilStart(carrier);
+            if (remaining <= 0) return;
+            sleeper.sleep(Math.max(1, TimeUnit.NANOSECONDS.toMillis(remaining)));
         }
     }
 
-    private long reserveInvocationStart(Carrier carrier) {
-        synchronized (startGate) {
-            while (true) {
+    private long reserveInvocationStart(Carrier carrier) throws InterruptedException {
+        while (true) {
+            long waitNanos;
+            synchronized (lifecycle) {
                 long now = monotonicClock.getAsLong();
-                long earliest = lastCallStart == Long.MIN_VALUE ? now : lastCallStart + delayNanos;
-                Long completed = carrierCompletion.get(carrier);
-                if (completed != null) earliest = Math.max(earliest, completed + delayNanos);
-                long remaining = earliest - now;
-                if (remaining <= 0) {
-                    long started = monotonicClock.getAsLong();
-                    lastCallStart = started;
-                    return started;
-                }
-                try {
-                    sleeper.sleep(Math.max(1, TimeUnit.NANOSECONDS.toMillis(remaining)));
-                } catch (InterruptedException interrupted) {
-                    Thread.currentThread().interrupt();
-                    return Long.MIN_VALUE;
+                waitNanos = earliestStartLocked(carrier, now) - now;
+                if (waitNanos <= 0) {
+                    lastCallStart = now;
+                    return now;
                 }
             }
+            sleeper.sleep(Math.max(1, TimeUnit.NANOSECONDS.toMillis(waitNanos)));
         }
+    }
+
+    private long remainingUntilStart(Carrier carrier) {
+        synchronized (lifecycle) {
+            long now = monotonicClock.getAsLong();
+            return earliestStartLocked(carrier, now) - now;
+        }
+    }
+
+    private long earliestStartLocked(Carrier carrier, long now) {
+        long earliest = lastCallStart == Long.MIN_VALUE ? now : lastCallStart + delayNanos;
+        Long completed = carrierCompletion.get(carrier);
+        if (completed != null) earliest = Math.max(earliest, completed + delayNanos);
+        return earliest;
     }
 
     private static void waitForWorkers(List<Worker> tasks) throws InterruptedException {
