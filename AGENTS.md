@@ -6,7 +6,7 @@ Este archivo sirve como referencia central para cualquier agente o desarrollador
 
 ## 1. Estado Actual del Proyecto
 
-- **Fase actual:** Implementación completa con soporte para ONE, MSC, MAERSK y HAPAG-LLOYD; suite de pruebas pasando (81 tests, 3 omitidos por requerir navegador real). Monitoreo desatendido en GitHub Actions y dashboard desplegable en Render.
+- **Fase actual:** Implementación completa con soporte para ONE, MSC, MAERSK y HAPAG-LLOYD; suite de pruebas pasando (246 tests, 6 omitidos por requerir navegador real). Monitoreo desatendido en GitHub Actions y dashboard desplegable en Render. Paralelismo acotado MSC/Maersk implementado y desactivado por defecto (`tracking.parallel.enabled=false`).
 - **Repositorio Git:** Rama `master`, con Maven Wrapper autónomo y suite de tests verde.
 - **Entorno de ejecución:** 
   - Sistema Operativo: Windows (win32)
@@ -120,6 +120,7 @@ Aplicación web monolítica ligera en **Java 21** con **Spring Boot 3**, que per
 - [x] Suprimir la alerta de arribo cuando el ATA es anterior a la fecha de registro del embarque (arribo histórico), evitando notificaciones tardías.
 - [x] Retención de datos: al final de cada ciclo (`ShipmentRetentionService`) se borran definitivamente los embarques arribados hace más de 7 días junto con su historial, los cancelados, y los que quedaron en `ERROR_CHECKING` con la ETA ya vencida hace más de 7 días (una guía sin ETA se conserva: todavía puede llegar). Plazo configurable con `tracking.retention.days`; `0` desactiva la limpieza.
 - [x] Navieras con rastreo automático deshabilitado: `tracking.manual-check-carriers` (por defecto `HAPAG_LLOYD`, lista separada por comas) hace que el ciclo omita esas guías sin llamar al adaptador y las marque como `MANUAL_CHECK` ("Verificar manual" en el dashboard). No cuentan como fallo ni disparan alertas; un operador consulta el ETA a mano. Dejar la lista vacía reactiva el rastreo automático. Una guía ya `ARRIVED` o `CANCELLED` no se degrada.
+- [x] Paralelismo acotado MSC/Maersk: máximo 2 consultas en vuelo (1 por carrier), workers que solo invocan adaptadores, aplicación de resultados en el orden original, pausa de cortesía entre autorizaciones y drenado/cancelación segura antes de liberar recursos. Se controla con `tracking.parallel.enabled` (desactivado por defecto) y está pensado para el runner run-once de GitHub Actions.
 
 ### Fase 8: Interfaz Web (Thymeleaf)
 - [x] Vista principal (dashboard) con tabla de embarques, filtros e insignias de estado (colores según proximidad).
@@ -131,7 +132,7 @@ Aplicación web monolítica ligera en **Java 21** con **Spring Boot 3**, que per
 ### Fase 9: Pruebas E2E y Verificación Final
 - [x] Probar flujo completo: Carga manual/Excel -> Rastreo -> Actualización de datos -> Disparo de alerta -> Visualización web.
 - [x] Verificar HAPAG-LLOYD con las guías reales `HLCUNG12607EKZE0` y `HLCUNG12608BMJY0`: datos de buque, viaje, puerto y arribo, historial de ETA y supresión de alertas históricas.
-- [x] Suite final: 81 tests, 0 fallos, 3 omitidos (pruebas reales de navegador MSC, MAERSK y HAPAG-LLOYD).
+- [x] Suite final: 246 tests, 0 fallos, 6 omitidos (pruebas reales de navegador MSC, MAERSK y HAPAG-LLOYD, más integraciones condicionadas).
 
 ### Fase 10: Ejecución Desatendida en la Nube
 - [x] `TrackingRunOnceRunner`: ejecuta un único ciclo y termina el proceso; se activa con `--tracking.run-once=true`.
@@ -140,7 +141,7 @@ Aplicación web monolítica ligera en **Java 21** con **Spring Boot 3**, que per
 - [x] Chrome + `xvfb` en el runner para HAPAG-LLOYD, con caché del perfil `data/hapag-chrome-profile` entre ejecuciones.
 - [x] Credenciales en GitHub Secrets (`SUPABASE_DB_*`, `TELEGRAM_*`, `DISCORD_*`, `TAILSCALE_AUTHKEY`); nunca en el repositorio.
 - [x] Dashboard desplegable en Render (`render.yaml` + `Dockerfile`) consumiendo la misma base PostgreSQL de Supabase.
-- [x] Acceso con cuentas por persona: filtro propio (`AuthFilter`) + BCrypt, sin Spring Security completo. Roles `ADMIN` (administra cuentas además de operar), `OPERADOR` (registra, importa Excel, elimina guías y dispara el monitoreo, sin tocar cuentas) y `USER` (solo consulta). Sesión de 12 h, cookie `HttpOnly` + `SameSite=Lax`, rotación del identificador tras el login y bloqueo de 15 minutos tras 5 intentos fallidos.
+- [x] Acceso con cuentas por persona: filtro propio (`AuthFilter`) + BCrypt, sin Spring Security completo. Roles `ADMIN` (administra cuentas además de operar), `OPERADOR` (registra, importa Excel, elimina guías y dispara el monitoreo, sin tocar cuentas) y `USER` (solo consulta). Sesión deslizante de 1 h renovada en cada petición autenticada, cookie `HttpOnly` + `SameSite=Lax`, rotación del identificador tras el login y bloqueo de 15 minutos tras 5 intentos fallidos.
 - [x] El primer administrador nace de `ADMIN_USERNAME` / `ADMIN_PASSWORD`; no hay registro público ni recuperación por correo (un administrador restablece la clave).
 - [x] Botón "Monitorear Ahora" que dispara el workflow real de GitHub Actions (`workflow_dispatch`) con un token fine-grained de permiso `Actions: Read and write` (`GITHUB_TOKEN`, `GITHUB_DISPATCH_ENABLED=true`). Sin token configurado, el botón conserva el ciclo local en proceso.
 - [x] El runner publica su avance en `tracking_run_progress` (identificado con `github.run_id` vía `TRACKING_RUN_ID`); el dashboard lo lee en `GET /shipments/live-status` y dibuja la barra. Si el exit node falla, el mensaje lo explica en lugar de dejar la barra detenida.
