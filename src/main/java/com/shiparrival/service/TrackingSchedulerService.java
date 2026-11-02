@@ -23,11 +23,21 @@ import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.HashSet;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 @Slf4j
 @Service
 public class TrackingSchedulerService {
+    private enum DispatchState { PENDING, MANUAL_SKIP, SERIAL_REQUIRED, PILOT_ACCEPTED, PILOT_DISPATCH_FAILED, RESULT_READY, RESULT_FAILED, APPLIED }
+    private static final class DispatchRecord {
+        final int index;
+        final Shipment shipment;
+        volatile DispatchState state = DispatchState.PENDING;
+        volatile CompletableFuture<TrackingResult> future;
+        DispatchRecord(int index, Shipment shipment) { this.index = index; this.shipment = shipment; }
+    }
 
     private final ShipmentService shipmentService;
     private final ShipmentRepository shipmentRepository;
@@ -109,6 +119,14 @@ public class TrackingSchedulerService {
 
     public boolean isTrackingInProgress() {
         return trackingInProgress.get();
+    }
+
+    private boolean willBeManualCheck(Shipment shipment) {
+        return manualCheckCarriers.contains(shipment.getCarrier());
+    }
+
+    private boolean isParallelExcluded(String trackingNumber) {
+        return "MSMU1804864".equals(trackingNumber) || "275792562".equals(trackingNumber);
     }
 
     @Autowired(required = false)
@@ -250,82 +268,161 @@ public class TrackingSchedulerService {
         log.info("Comenzando ciclo de monitoreo para {} embarques activos", total);
 
         boolean parallelCycle = parallelTrackingEnabled && carrierTrackingCoordinator != null;
-        java.util.Map<Integer, java.util.concurrent.CompletableFuture<TrackingResult>> pilotResults = new java.util.HashMap<>();
-        if (parallelCycle) {
-            carrierTrackingCoordinator.beginCycle();
-            for (int i = 0; i < total; i++) {
-                Shipment candidate = activeShipments.get(i);
-                if (manualCheckCarriers.contains(candidate.getCarrier())) continue;
-                if ((candidate.getCarrier() == Carrier.MSC || candidate.getCarrier() == Carrier.MAERSK)
-                        && activeShipments.subList(0, i).stream().noneMatch(previous -> previous.getCarrier() == candidate.getCarrier()
-                        && !manualCheckCarriers.contains(previous.getCarrier()))) {
-                    pilotResults.put(i, carrierTrackingCoordinator.submit(candidate.getCarrier(),
-                            adapterFactory.getAdapter(candidate.getCarrier()), candidate.getTrackingNumber()));
+        boolean interrupted = false;
+        List<DispatchRecord> records = new ArrayList<>(total);
+        for (int i = 0; i < total; i++) {
+            records.add(new DispatchRecord(i, activeShipments.get(i)));
+        }
+        boolean cycleComplete = false;
+        boolean cycleFailed = false;
+        boolean cycleStarted = false;
+        try {
+            if (parallelCycle) {
+                carrierTrackingCoordinator.beginCycle();
+                cycleStarted = true;
+            }
+            Set<Carrier> submitted = new HashSet<>();
+            for (DispatchRecord rec : records) {
+                Shipment ship = rec.shipment;
+                if (willBeManualCheck(ship)) {
+                    rec.state = DispatchState.MANUAL_SKIP;
+                    continue;
+                }
+                Carrier c = ship.getCarrier();
+                boolean pilotCandidate = parallelCycle && (c == Carrier.MSC || c == Carrier.MAERSK)
+                        && !isParallelExcluded(ship.getTrackingNumber());
+                if (!pilotCandidate) {
+                    rec.state = DispatchState.SERIAL_REQUIRED;
+                    continue;
+                }
+                if (submitted.contains(c)) continue;
+                try {
+                    CarrierTrackingAdapter adapter = adapterFactory.getAdapter(c);
+                    CompletableFuture<TrackingResult> future = carrierTrackingCoordinator.submit(c, adapter, ship.getTrackingNumber());
+                    rec.future = future;
+                    rec.state = DispatchState.PILOT_ACCEPTED;
+                    submitted.add(c);
+                } catch (RuntimeException ex) {
+                    log.warn("No se pudo despachar consulta piloto para {}: {}; se resolverá en serie", ship.getTrackingNumber(), ex.getMessage());
+                    rec.state = DispatchState.PILOT_DISPATCH_FAILED;
                 }
             }
-        }
-        try {
-            for (int i = 0; i < total; i++) {
-                Shipment shipment = activeShipments.get(i);
+            for (int i = 0; i < total && !interrupted && !cycleFailed; i++) {
+                DispatchRecord rec = records.get(i);
+                Shipment shipment = rec.shipment;
                 setCurrentTrackingNumber(shipment.getTrackingNumber());
 
                 try {
-                    if (manualCheckCarriers.contains(shipment.getCarrier())) {
+                    if (rec.state == DispatchState.MANUAL_SKIP) {
                         shipmentService.markForManualCheck(shipment);
                         details.add("Guía " + shipment.getTrackingNumber() + ": Omitida - verificar manual");
-                        processed = i + 1;
+                        rec.state = DispatchState.APPLIED;
+                        processed++;
                         updateProgress(total, processed, updated, failed, alerts);
+                        if (delayMs > 0 && i < total - 1) {
+                            try { Thread.sleep(delayMs); }
+                            catch (InterruptedException e) { interrupted = true; break; }
+                        }
                         continue;
                     }
 
-                    CarrierTrackingAdapter adapter = adapterFactory.getAdapter(shipment.getCarrier());
+                    Carrier carrier = shipment.getCarrier();
+                    boolean pilotCandidate = parallelCycle && (carrier == Carrier.MSC || carrier == Carrier.MAERSK)
+                            && !isParallelExcluded(shipment.getTrackingNumber());
                     TrackingResult result;
-                    if (parallelCycle && (shipment.getCarrier() == Carrier.MSC || shipment.getCarrier() == Carrier.MAERSK)) {
-                        // Wait for a bounded pilot lookup before advancing the ordered application loop.
-                        result = pilotResults.get(i).get();
+
+                    if (parallelCycle && !pilotCandidate) {
+                        carrierTrackingCoordinator.awaitWorkers();
+                    }
+
+                    if (pilotCandidate) {
+                        if (rec.state == DispatchState.PILOT_ACCEPTED && rec.future != null) {
+                            try {
+                                result = rec.future.get();
+                                rec.state = DispatchState.RESULT_READY;
+                            } catch (java.util.concurrent.ExecutionException ex) {
+                                Throwable cause = ex.getCause();
+                                String message = cause instanceof CarrierTrackingCoordinator.DispatchRejectedException
+                                        ? "No se pudo despachar la consulta piloto (RejectedExecutionException)"
+                                        : "Fallo del worker: " + cause.getClass().getSimpleName();
+                                result = TrackingResult.builder().success(false)
+                                        .trackingNumber(shipment.getTrackingNumber()).errorMessage(message).build();
+                                rec.state = DispatchState.RESULT_FAILED;
+                            } catch (InterruptedException ie) {
+                                Thread.currentThread().interrupt();
+                                interrupted = true;
+                                break;
+                            }
+                        } else if (rec.state == DispatchState.PILOT_DISPATCH_FAILED) {
+                            CarrierTrackingAdapter adapter = adapterFactory.getAdapter(carrier);
+                            result = adapter.track(shipment.getTrackingNumber());
+                            rec.state = DispatchState.RESULT_READY;
+                        } else {
+                            CarrierTrackingAdapter adapter = adapterFactory.getAdapter(carrier);
+                            result = adapter.track(shipment.getTrackingNumber());
+                            rec.state = DispatchState.RESULT_READY;
+                        }
                     } else {
-                        if (parallelCycle) carrierTrackingCoordinator.drain();
+                        CarrierTrackingAdapter adapter = adapterFactory.getAdapter(carrier);
                         result = adapter.track(shipment.getTrackingNumber());
                     }
 
                     Shipment updatedShipment = shipmentService.updateFromTrackingResult(shipment, result);
-
                     if (result.isSuccess()) {
                         updated++;
                         details.add("Guía " + shipment.getTrackingNumber() + ": Actualizado - " + updatedShipment.getStatus());
-
                         boolean alertTriggered = checkAndSendAlerts(updatedShipment);
-                        if (alertTriggered) {
-                            alerts++;
-                        }
+                        if (alertTriggered) alerts++;
                     } else {
                         failed++;
                         details.add("Guía " + shipment.getTrackingNumber() + ": Error - " + result.getErrorMessage());
                     }
+                    rec.state = DispatchState.APPLIED;
+                    processed++;
+                    updateProgress(total, processed, updated, failed, alerts);
+                    if (delayMs > 0 && i < total - 1) {
+                        try { Thread.sleep(delayMs); }
+                        catch (InterruptedException e) { interrupted = true; break; }
+                        catch (RuntimeException e) { failed++; cycleFailed = true; details.add("Fallo en pausa de cortesía: " + e.getMessage()); break; }
+                    }
+                } catch (InterruptedException ex) {
+                    interrupted = true;
+                    log.warn("Monitoreo interrumpido mientras esperaba un resultado");
+                    break;
                 } catch (Exception ex) {
                     failed++;
                     log.error("Error al procesar rastreo de guía {}: {}", shipment.getTrackingNumber(), ex.getMessage());
                     details.add("Guía " + shipment.getTrackingNumber() + ": Fallo inesperado - " + ex.getMessage());
-                }
-
-                processed = i + 1;
-                updateProgress(total, processed, updated, failed, alerts);
-
-                // Pausa de cortesía entre peticiones para evitar bloqueos por rate-limiting
-                if (delayMs > 0 && i < total - 1) {
-                    try {
-                        Thread.sleep(delayMs);
-                    } catch (InterruptedException e) {
-                        Thread.currentThread().interrupt();
-                        log.warn("Monitoreo interrumpido durante pausa de cortesía");
-                        break;
-                    }
+                    rec.state = DispatchState.APPLIED;
+                    processed++;
+                    updateProgress(total, processed, updated, failed, alerts);
                 }
             }
+            cycleComplete = processed == total && !interrupted;
+        } catch (RuntimeException ex) {
+            cycleFailed = true;
+            failed++;
+            details.add("Fallo del ciclo: " + ex.getMessage());
+            log.error("Fallo durante la preparación del ciclo", ex);
         } finally {
-            if (parallelCycle) {
-                try { carrierTrackingCoordinator.drain(); }
-                catch (InterruptedException ex) { Thread.currentThread().interrupt(); }
+            if (parallelCycle && cycleStarted) {
+                boolean restoreInterrupt = interrupted || Thread.interrupted();
+                boolean cancel = interrupted || cycleFailed;
+                boolean drained = false;
+                while (!drained) {
+                    try {
+                        if (cancel) carrierTrackingCoordinator.cancelAndDrain();
+                        else carrierTrackingCoordinator.drain();
+                        drained = true;
+                    } catch (InterruptedException ex) {
+                        restoreInterrupt = true;
+                        interrupted = true;
+                        cancel = true;
+                    }
+                }
+                if (restoreInterrupt) {
+                    Thread.currentThread().interrupt();
+                }
             }
             try {
                 adapterFactory.releaseResources();
@@ -336,7 +433,9 @@ public class TrackingSchedulerService {
             finishStatus(processed, total, updated, failed, alerts, duration, details);
         }
 
-        purgeExpiredShipments();
+        if (cycleComplete && !cycleFailed) {
+            purgeExpiredShipments();
+        }
 
         long duration = System.currentTimeMillis() - startTime;
         log.info("Ciclo de monitoreo finalizado. Procesados: {}, Actualizados: {}, Fallidos: {}, Alertas enviadas: {} en {} ms",
