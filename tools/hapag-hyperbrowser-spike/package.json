@@ -1,0 +1,12 @@
+{
+  "name": "hapag-hyperbrowser-spike",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test test/*.test.js",
+    "spike": "node src/spike.js"
+  },
+  "dependencies": {
+    "playwright-core": "^1.55.0"
+  }
+}
