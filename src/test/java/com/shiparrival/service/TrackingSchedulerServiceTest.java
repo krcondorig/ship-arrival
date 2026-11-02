@@ -98,6 +98,44 @@ class TrackingSchedulerServiceTest {
     }
 
     @Test
+    @DisplayName("Debe solapar MSC y Maersk y aplicar resultados en el orden original")
+    void shouldOverlapPilotCarriersAndApplyInInputOrder() throws Exception {
+        TrackingSchedulerService service = new TrackingSchedulerService(shipmentService, shipmentRepository,
+                adapterFactory, telegramService, discordService, Runnable::run, 0, "HAPAG_LLOYD");
+        CarrierTrackingCoordinator coordinator = new CarrierTrackingCoordinator(true);
+        service.setCarrierTrackingCoordinator(coordinator);
+        service.setParallelTrackingEnabled(true);
+        Shipment msc = Shipment.builder().id(1L).trackingNumber("msc").carrier(Carrier.MSC).active(true).build();
+        Shipment maersk = Shipment.builder().id(2L).trackingNumber("maersk").carrier(Carrier.MAERSK).active(true).build();
+        CarrierTrackingAdapter mscAdapter = mock(CarrierTrackingAdapter.class);
+        CarrierTrackingAdapter maerskAdapter = mock(CarrierTrackingAdapter.class);
+        java.util.concurrent.CountDownLatch entered = new java.util.concurrent.CountDownLatch(2);
+        java.util.concurrent.CountDownLatch release = new java.util.concurrent.CountDownLatch(1);
+        java.util.List<String> applied = new java.util.concurrent.CopyOnWriteArrayList<>();
+        TrackingResult mscResult = successfulResult("msc");
+        TrackingResult maerskResult = successfulResult("maersk");
+        when(shipmentService.getActiveShipments()).thenReturn(List.of(msc, maersk));
+        when(adapterFactory.getAdapter(Carrier.MSC)).thenReturn(mscAdapter);
+        when(adapterFactory.getAdapter(Carrier.MAERSK)).thenReturn(maerskAdapter);
+        when(mscAdapter.track("msc")).thenAnswer(inv -> { entered.countDown(); release.await(); return mscResult; });
+        when(maerskAdapter.track("maersk")).thenAnswer(inv -> { entered.countDown(); release.await(); return maerskResult; });
+        when(shipmentService.updateFromTrackingResult(msc, mscResult)).thenAnswer(inv -> { applied.add("msc"); return msc; });
+        when(shipmentService.updateFromTrackingResult(maersk, maerskResult)).thenAnswer(inv -> { applied.add("maersk"); return maersk; });
+        java.util.concurrent.atomic.AtomicReference<TrackingExecutionSummary> summary = new java.util.concurrent.atomic.AtomicReference<>();
+        Thread cycle = new Thread(() -> summary.set(service.runTrackingCycle()));
+        try {
+            cycle.start();
+            assertThat(entered.await(2, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+            assertThat(applied).isEmpty();
+            release.countDown();
+            cycle.join(3000);
+            assertThat(cycle.isAlive()).isFalse();
+            assertThat(applied).containsExactly("msc", "maersk");
+            assertThat(summary.get().getUpdatedCount()).isEqualTo(2);
+        } finally { release.countDown(); cycle.join(3000); coordinator.shutdown(); }
+    }
+
+    @Test
     @DisplayName("Debe ejecutar ciclo de rastreo, actualizar estados y enviar alerta si arriba en <= 3 días")
     void shouldRunTrackingCycleAndTriggerAlerts() {
         Shipment shipment = Shipment.builder()
@@ -336,6 +374,119 @@ class TrackingSchedulerServiceTest {
         assertThat(summary.getUpdatedCount()).isEqualTo(1);
         assertThat(summary.getFailedCount()).isZero();
         verify(shipmentService, never()).markForManualCheck(any());
+    }
+
+    @Test
+    @DisplayName("No despacha guías manuales al coordinador y nunca se rastrean")
+    void manualCheckGuidesAreNeverSubmittedToCoordinator() throws Exception {
+        TrackingSchedulerService service = new TrackingSchedulerService(shipmentService, shipmentRepository,
+                adapterFactory, telegramService, discordService, Runnable::run, 0, "HAPAG_LLOYD");
+        CarrierTrackingCoordinator coordinator = new CarrierTrackingCoordinator(true);
+        service.setCarrierTrackingCoordinator(coordinator);
+        service.setParallelTrackingEnabled(true);
+        Shipment manual1 = Shipment.builder().id(1L).trackingNumber("HAP1").carrier(Carrier.HAPAG_LLOYD).active(true).build();
+        Shipment manual2 = Shipment.builder().id(2L).trackingNumber("HAP2").carrier(Carrier.HAPAG_LLOYD).active(true).build();
+        when(shipmentService.getActiveShipments()).thenReturn(List.of(manual1, manual2));
+        TrackingExecutionSummary summary = service.runTrackingCycle();
+        assertThat(summary.getTotalProcessed()).isEqualTo(2);
+        assertThat(summary.getFailedCount()).isZero();
+        verify(shipmentService, times(2)).markForManualCheck(any());
+        verify(adapterFactory, never()).getAdapter(any());
+        coordinator.shutdown();
+    }
+
+    @Test
+    @DisplayName("Guías excluidas MSMU1804864 y 275792562 se rastrean en serie sin usar el coordinador paralelo")
+    void excludedGuidesAreTrackedSerially() throws Exception {
+        TrackingSchedulerService service = new TrackingSchedulerService(shipmentService, shipmentRepository,
+                adapterFactory, telegramService, discordService, Runnable::run, 0, "HAPAG_LLOYD");
+        CarrierTrackingCoordinator coordinator = new CarrierTrackingCoordinator(true);
+        service.setCarrierTrackingCoordinator(coordinator);
+        service.setParallelTrackingEnabled(true);
+        Shipment excluded = Shipment.builder().id(1L).trackingNumber("MSMU1804864").carrier(Carrier.MSC).active(true).build();
+        Shipment normal = Shipment.builder().id(2L).trackingNumber("NORMAL").carrier(Carrier.ONE).active(true).build();
+        when(shipmentService.getActiveShipments()).thenReturn(List.of(excluded, normal));
+        CarrierTrackingAdapter mscAdapter = mock(CarrierTrackingAdapter.class);
+        CarrierTrackingAdapter oneAdapter = mock(CarrierTrackingAdapter.class);
+        when(adapterFactory.getAdapter(Carrier.MSC)).thenReturn(mscAdapter);
+        when(adapterFactory.getAdapter(Carrier.ONE)).thenReturn(oneAdapter);
+        when(mscAdapter.track("MSMU1804864")).thenReturn(TrackingResult.builder().success(true).trackingNumber("MSMU1804864").build());
+        when(oneAdapter.track("NORMAL")).thenReturn(TrackingResult.builder().success(true).trackingNumber("NORMAL").build());
+        when(shipmentService.updateFromTrackingResult(any(), any())).thenAnswer(inv -> inv.getArgument(0));
+        TrackingExecutionSummary summary = service.runTrackingCycle();
+        assertThat(summary.getTotalProcessed()).isEqualTo(2);
+        verify(mscAdapter, times(1)).track("MSMU1804864");
+        coordinator.shutdown();
+    }
+
+    @Test
+    @DisplayName("Aplica resultados de piloto fuera de orden pero efectos en orden de entrada")
+    void shouldApplyPilotResultsInInputOrderEvenIfWorkersFinishOutOfOrder() throws Exception {
+        TrackingSchedulerService service = new TrackingSchedulerService(shipmentService, shipmentRepository,
+                adapterFactory, telegramService, discordService, Runnable::run, 0, "HAPAG_LLOYD");
+        CarrierTrackingCoordinator coordinator = new CarrierTrackingCoordinator(true);
+        service.setCarrierTrackingCoordinator(coordinator);
+        service.setParallelTrackingEnabled(true);
+        Shipment msc = Shipment.builder().id(1L).trackingNumber("msc-order").carrier(Carrier.MSC).active(true).build();
+        Shipment maersk = Shipment.builder().id(2L).trackingNumber("maersk-order").carrier(Carrier.MAERSK).active(true).build();
+        CarrierTrackingAdapter mscAdapter = mock(CarrierTrackingAdapter.class);
+        CarrierTrackingAdapter maerskAdapter = mock(CarrierTrackingAdapter.class);
+        java.util.concurrent.CountDownLatch maerskDone = new java.util.concurrent.CountDownLatch(1);
+        java.util.concurrent.CountDownLatch releaseMsc = new java.util.concurrent.CountDownLatch(1);
+        java.util.List<String> applied = new java.util.concurrent.CopyOnWriteArrayList<>();
+        TrackingResult mscResult = TrackingResult.builder().success(true).trackingNumber("msc-order").build();
+        TrackingResult maerskResult = TrackingResult.builder().success(true).trackingNumber("maersk-order").build();
+        when(shipmentService.getActiveShipments()).thenReturn(List.of(msc, maersk));
+        when(adapterFactory.getAdapter(Carrier.MSC)).thenReturn(mscAdapter);
+        when(adapterFactory.getAdapter(Carrier.MAERSK)).thenReturn(maerskAdapter);
+        when(mscAdapter.track("msc-order")).thenAnswer(inv -> { releaseMsc.await(); return mscResult; });
+        when(maerskAdapter.track("maersk-order")).thenAnswer(inv -> { maerskDone.countDown(); return maerskResult; });
+        when(shipmentService.updateFromTrackingResult(msc, mscResult)).thenAnswer(inv -> { applied.add("msc"); return msc; });
+        when(shipmentService.updateFromTrackingResult(maersk, maerskResult)).thenAnswer(inv -> { applied.add("maersk"); return maersk; });
+        Thread cycle = new Thread(service::runTrackingCycle);
+        cycle.start();
+        assertThat(maerskDone.await(2, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+        assertThat(applied).isEmpty();
+        releaseMsc.countDown();
+        cycle.join(3000);
+        assertThat(applied).containsExactly("msc", "maersk");
+        coordinator.shutdown();
+    }
+
+    @Test
+    @DisplayName("Despacho anticipado no invierte orden de aplicación")
+    void shouldNotApplyMaerskBeforeMscEvenWithEarlyDispatch() throws Exception {
+        TrackingSchedulerService service = new TrackingSchedulerService(shipmentService, shipmentRepository,
+                adapterFactory, telegramService, discordService, Runnable::run, 0, "HAPAG_LLOYD");
+        CarrierTrackingCoordinator coordinator = new CarrierTrackingCoordinator(true);
+        service.setCarrierTrackingCoordinator(coordinator);
+        service.setParallelTrackingEnabled(true);
+        Shipment msc = Shipment.builder().id(1L).trackingNumber("msc-early").carrier(Carrier.MSC).active(true).build();
+        Shipment maersk = Shipment.builder().id(2L).trackingNumber("maersk-early").carrier(Carrier.MAERSK).active(true).build();
+        CarrierTrackingAdapter mscAdapter = mock(CarrierTrackingAdapter.class);
+        CarrierTrackingAdapter maerskAdapter = mock(CarrierTrackingAdapter.class);
+        java.util.concurrent.CountDownLatch mscEntered = new java.util.concurrent.CountDownLatch(1);
+        java.util.concurrent.CountDownLatch maerskEntered = new java.util.concurrent.CountDownLatch(1);
+        java.util.concurrent.CountDownLatch releaseMsc = new java.util.concurrent.CountDownLatch(1);
+        java.util.List<String> applied = new java.util.concurrent.CopyOnWriteArrayList<>();
+        TrackingResult mscResult = TrackingResult.builder().success(true).trackingNumber("msc-early").build();
+        TrackingResult maerskResult = TrackingResult.builder().success(true).trackingNumber("maersk-early").build();
+        when(shipmentService.getActiveShipments()).thenReturn(List.of(msc, maersk));
+        when(adapterFactory.getAdapter(Carrier.MSC)).thenReturn(mscAdapter);
+        when(adapterFactory.getAdapter(Carrier.MAERSK)).thenReturn(maerskAdapter);
+        when(mscAdapter.track("msc-early")).thenAnswer(inv -> { mscEntered.countDown(); releaseMsc.await(); return mscResult; });
+        when(maerskAdapter.track("maersk-early")).thenAnswer(inv -> { maerskEntered.countDown(); return maerskResult; });
+        when(shipmentService.updateFromTrackingResult(msc, mscResult)).thenAnswer(inv -> { applied.add("msc"); return msc; });
+        when(shipmentService.updateFromTrackingResult(maersk, maerskResult)).thenAnswer(inv -> { applied.add("maersk"); return maersk; });
+        Thread cycle = new Thread(service::runTrackingCycle);
+        cycle.start();
+        assertThat(mscEntered.await(2, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+        assertThat(maerskEntered.await(2, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+        assertThat(applied).isEmpty();
+        releaseMsc.countDown();
+        cycle.join(3000);
+        assertThat(applied).containsExactly("msc", "maersk");
+        coordinator.shutdown();
     }
 
     @Test
