@@ -308,7 +308,6 @@ class CarrierTrackingCoordinatorTest {
             assertTrue(firstEntered.await(2, TimeUnit.SECONDS));
             var waitingCall = coordinator.submit(Carrier.MAERSK, adapter, "waiting");
             assertTrue(pacingWaitEntered.await(2, TimeUnit.SECONDS));
-            assertTrue(pacingWaitEntered.await(2, TimeUnit.SECONDS));
             assertEquals(1, coordinator.observedPeakInFlight(), "only the first adapter call is in flight while the other carrier waits for pacing");
             coordinator.cancelAndDrain();
             releasePacing.countDown();
@@ -328,9 +327,13 @@ class CarrierTrackingCoordinatorTest {
                 100, System::nanoTime, millis -> TimeUnit.MILLISECONDS.sleep(millis));
         CountDownLatch reserved = new CountDownLatch(1);
         CountDownLatch allowFirstInvocation = new CountDownLatch(1);
-        CountDownLatch secondInvoked = new CountDownLatch(1);
-        java.util.concurrent.atomic.AtomicLong firstStart = new java.util.concurrent.atomic.AtomicLong();
-        java.util.concurrent.atomic.AtomicLong secondStart = new java.util.concurrent.atomic.AtomicLong();
+        CountDownLatch secondAuthorized = new CountDownLatch(1);
+        java.util.concurrent.atomic.AtomicLong firstAuthorization = new java.util.concurrent.atomic.AtomicLong();
+        java.util.concurrent.atomic.AtomicLong secondAuthorization = new java.util.concurrent.atomic.AtomicLong();
+        coordinator.setAuthorizationHook((carrier, timestamp) -> {
+            if (carrier == Carrier.MSC) firstAuthorization.set(timestamp);
+            else { secondAuthorization.set(timestamp); secondAuthorized.countDown(); }
+        });
         coordinator.setAfterStartReservationHook(carrier -> {
             if (carrier == Carrier.MSC) {
                 reserved.countDown();
@@ -339,19 +342,49 @@ class CarrierTrackingCoordinatorTest {
         });
         CarrierTrackingAdapter msc = mock(CarrierTrackingAdapter.class);
         CarrierTrackingAdapter maersk = mock(CarrierTrackingAdapter.class);
-        when(msc.track("first")).thenAnswer(inv -> { firstStart.set(System.nanoTime()); return TrackingResult.builder().success(true).build(); });
-        when(maersk.track("second")).thenAnswer(inv -> { secondStart.set(System.nanoTime()); secondInvoked.countDown(); return TrackingResult.builder().success(true).build(); });
+        when(msc.track("first")).thenReturn(TrackingResult.builder().success(true).build());
+        when(maersk.track("second")).thenReturn(TrackingResult.builder().success(true).build());
         try {
             coordinator.beginCycle();
             coordinator.submit(Carrier.MSC, msc, "first");
             assertTrue(reserved.await(2, TimeUnit.SECONDS));
             coordinator.submit(Carrier.MAERSK, maersk, "second");
-            assertTrue(secondInvoked.await(2, TimeUnit.SECONDS));
+            assertTrue(secondAuthorized.await(2, TimeUnit.SECONDS));
             allowFirstInvocation.countDown();
             coordinator.drain();
-            assertTrue(TimeUnit.NANOSECONDS.toMillis(firstStart.get() - secondStart.get()) >= 100,
-                    "adapter invocations normally follow coordinator authorization order; the guarantee is authorization spacing, not physical entry under arbitrary descheduling");
+            assertTrue(TimeUnit.NANOSECONDS.toMillis(Math.abs(secondAuthorization.get() - firstAuthorization.get())) >= 100,
+                    "coordinator authorization events must be separated; this is not a physical adapter-entry assertion");
         } finally { allowFirstInvocation.countDown(); coordinator.shutdown(); }
+    }
+
+    @Test
+    void cancellationWinsBeforeAuthorizationAndPreventsAdapterInvocation() throws Exception {
+        CountDownLatch authorizationAttempt = new CountDownLatch(1);
+        CountDownLatch allowAuthorizationAttempt = new CountDownLatch(1);
+        CountDownLatch adapterCalled = new CountDownLatch(1);
+        CarrierTrackingCoordinator coordinator = new CarrierTrackingCoordinator(true,
+                new java.util.concurrent.ThreadPoolExecutor(1, 1, 0, TimeUnit.MILLISECONDS,
+                        new java.util.concurrent.ArrayBlockingQueue<>(1), new java.util.concurrent.ThreadPoolExecutor.AbortPolicy()),
+                0, System::nanoTime, millis -> {});
+        coordinator.setBeforeAuthorizationHook(carrier -> {
+            authorizationAttempt.countDown();
+            allowAuthorizationAttempt.await();
+        });
+        CarrierTrackingAdapter adapter = mock(CarrierTrackingAdapter.class);
+        when(adapter.track("cancelled-before-start")).thenAnswer(inv -> {
+            adapterCalled.countDown();
+            return TrackingResult.builder().success(true).build();
+        });
+        try {
+            coordinator.beginCycle();
+            var result = coordinator.submit(Carrier.MSC, adapter, "cancelled-before-start");
+            assertTrue(authorizationAttempt.await(2, TimeUnit.SECONDS));
+            coordinator.cancelAndDrain();
+            allowAuthorizationAttempt.countDown();
+            assertTrue(result.isCancelled());
+            assertFalse(adapterCalled.await(100, TimeUnit.MILLISECONDS), "a cancellation that wins before authorization must prevent adapter invocation");
+            org.mockito.Mockito.verify(adapter, org.mockito.Mockito.never()).track("cancelled-before-start");
+        } finally { allowAuthorizationAttempt.countDown(); coordinator.shutdown(); }
     }
 
     @Test

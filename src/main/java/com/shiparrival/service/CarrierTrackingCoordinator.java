@@ -80,11 +80,18 @@ public class CarrierTrackingCoordinator {
     private long lastCallStart = Long.MIN_VALUE;
     private final Map<Carrier, Long> carrierCompletion = new EnumMap<>(Carrier.class);
     private volatile StartReservationHook afterStartReservationHook = carrier -> {};
+    private volatile AuthorizationHook authorizationHook = (carrier, timestamp) -> {};
+    private volatile StartReservationHook beforeAuthorizationHook = carrier -> {};
 
     @FunctionalInterface
     interface StartReservationHook { void afterReservation(Carrier carrier) throws InterruptedException; }
 
     void setAfterStartReservationHook(StartReservationHook hook) { afterStartReservationHook = hook; }
+    void setAuthorizationHook(AuthorizationHook hook) { authorizationHook = hook; }
+    void setBeforeAuthorizationHook(StartReservationHook hook) { beforeAuthorizationHook = hook; }
+
+    @FunctionalInterface
+    interface AuthorizationHook { void authorized(Carrier carrier, long timestampNanos); }
 
     public void beginCycle() {
         drainLock.lock();
@@ -139,14 +146,7 @@ public class CarrierTrackingCoordinator {
                             try {
                                 awaitStart(carrier);
                                 afterStartReservationHook.afterReservation(carrier);
-                                synchronized (lifecycle) {
-                                    if (cycleCancelled || result.isCancelled()) {
-                                        worker.thread = null;
-                                        completion.complete(null);
-                                        return;
-                                    }
-                                }
-                                invocationStarted = reserveInvocationStart(carrier);
+                                beforeAuthorizationHook.afterReservation(carrier);
                             } catch (InterruptedException interrupted) {
                                 Thread.currentThread().interrupt();
                                 result.cancel(false);
@@ -155,8 +155,21 @@ public class CarrierTrackingCoordinator {
                                 return;
                             }
                             synchronized (lifecycle) {
+                                if (cycleCancelled || result.isCancelled()) {
+                                    worker.thread = null;
+                                    completion.complete(null);
+                                    return;
+                                }
+                                invocationStarted = reserveInvocationStart(carrier);
+                                if (invocationStarted == Long.MIN_VALUE) {
+                                    result.cancel(false);
+                                    worker.thread = null;
+                                    completion.complete(null);
+                                    return;
+                                }
                                 activeCalls++;
                                 peakInFlight = Math.max(peakInFlight, activeCalls);
+                                authorizationHook.authorized(carrier, invocationStarted);
                             }
                             try {
                                 TrackingResult tracked = adapter.track(trackingNumber);
@@ -300,7 +313,7 @@ public class CarrierTrackingCoordinator {
         }
     }
 
-    private long reserveInvocationStart(Carrier carrier) throws InterruptedException {
+    private long reserveInvocationStart(Carrier carrier) {
         synchronized (startGate) {
             while (true) {
                 long now = monotonicClock.getAsLong();
@@ -313,7 +326,12 @@ public class CarrierTrackingCoordinator {
                     lastCallStart = started;
                     return started;
                 }
-                sleeper.sleep(Math.max(1, TimeUnit.NANOSECONDS.toMillis(remaining)));
+                try {
+                    sleeper.sleep(Math.max(1, TimeUnit.NANOSECONDS.toMillis(remaining)));
+                } catch (InterruptedException interrupted) {
+                    Thread.currentThread().interrupt();
+                    return Long.MIN_VALUE;
+                }
             }
         }
     }
