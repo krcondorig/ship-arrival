@@ -215,8 +215,11 @@ public class ShipmentService {
             shipment.setActive(false);
         } else {
             // Si el estado detectado no es ARRIVED (ej. volvió a IN_TRANSIT por corrección de datos),
-            // nos aseguramos de que el embarque vuelva a estar activo para el scheduler.
+            // nos aseguramos de que el embarque vuelva a estar activo para el scheduler,
+            // se limpia el arribo real previo y se reinicia la alerta de arribo.
             shipment.setActive(true);
+            shipment.setActualArrival(null);
+            shipment.setAlertSentArrived(false);
             
             if (checkProximity(shipment, LocalDate.now())) {
                 shipment.setStatus(ShipmentStatus.NEAR_ARRIVAL);

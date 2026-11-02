@@ -270,6 +270,8 @@ class ShipmentServiceTest {
                 .carrier(Carrier.ONE)
                 .status(ShipmentStatus.ARRIVED)
                 .active(false)
+                .actualArrival(LocalDateTime.of(2026, 10, 20, 9, 0))
+                .alertSentArrived(true)
                 .estimatedArrival(LocalDateTime.of(2026, 10, 20, 9, 0))
                 .build();
 
@@ -286,6 +288,8 @@ class ShipmentServiceTest {
 
         assertThat(updated.getStatus()).isEqualTo(ShipmentStatus.IN_TRANSIT);
         assertThat(updated.isActive()).isTrue();
+        assertThat(updated.getActualArrival()).isNull();
+        assertThat(updated.isAlertSentArrived()).isFalse();
     }
 
     @Test

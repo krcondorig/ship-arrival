@@ -86,4 +86,17 @@ public interface ShipmentRepository extends JpaRepository<Shipment, Long> {
                               @Param("arrivedStatus") ShipmentStatus arrivedStatus,
                               @Param("cancelledStatus") ShipmentStatus cancelledStatus,
                               @Param("errorStatus") ShipmentStatus errorStatus);
+
+    /**
+     * Embarques marcados como arribados cuya fecha estimada de arribo aún está en el
+     * futuro. Corresponden a falsos arribos (ej. transbordos intermedios) y deben ser
+     * reactivados.
+     */
+    @Query("""
+            SELECT s FROM Shipment s
+            WHERE s.status = :arrivedStatus
+              AND s.estimatedArrival > :now
+            """)
+    List<Shipment> findFalseArrivedShipments(@Param("arrivedStatus") ShipmentStatus arrivedStatus,
+                                            @Param("now") LocalDateTime now);
 }
