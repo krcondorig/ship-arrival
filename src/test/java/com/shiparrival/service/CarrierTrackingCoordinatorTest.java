@@ -288,7 +288,40 @@ class CarrierTrackingCoordinatorTest {
     }
 
     @Test
-    void delayedWorkerCannotInvalidateSpacingAtActualAdapterInvocationBoundary() throws Exception {
+    void pacingWaitDoesNotCountAsInFlightAndInterruptionIsNotAnAdapterFailure() throws Exception {
+        CountDownLatch pacingWaitEntered = new CountDownLatch(1);
+        CountDownLatch releasePacing = new CountDownLatch(1);
+        CarrierTrackingCoordinator coordinator = new CarrierTrackingCoordinator(true,
+                new java.util.concurrent.ThreadPoolExecutor(2, 2, 0, TimeUnit.MILLISECONDS,
+                        new java.util.concurrent.ArrayBlockingQueue<>(2), new java.util.concurrent.ThreadPoolExecutor.AbortPolicy()),
+                60_000, System::nanoTime, millis -> {
+                    pacingWaitEntered.countDown();
+                    releasePacing.await();
+                });
+        CountDownLatch firstEntered = new CountDownLatch(1);
+        CountDownLatch releaseFirst = new CountDownLatch(1);
+        CarrierTrackingAdapter adapter = mock(CarrierTrackingAdapter.class);
+        when(adapter.track("first")).thenAnswer(inv -> { firstEntered.countDown(); releaseFirst.await(); return TrackingResult.builder().success(true).build(); });
+        try {
+            coordinator.beginCycle();
+            coordinator.submit(Carrier.MSC, adapter, "first");
+            assertTrue(firstEntered.await(2, TimeUnit.SECONDS));
+            var waitingCall = coordinator.submit(Carrier.MAERSK, adapter, "waiting");
+            assertTrue(pacingWaitEntered.await(2, TimeUnit.SECONDS));
+            assertTrue(pacingWaitEntered.await(2, TimeUnit.SECONDS));
+            assertEquals(1, coordinator.observedPeakInFlight(), "only the first adapter call is in flight while the other carrier waits for pacing");
+            coordinator.cancelAndDrain();
+            releasePacing.countDown();
+            assertTrue(waitingCall.isCancelled());
+            assertEquals(1, coordinator.observedPeakInFlight());
+            org.mockito.Mockito.verify(adapter, org.mockito.Mockito.never()).track("waiting");
+            coordinator.beginCycle();
+            coordinator.drain();
+        } finally { releaseFirst.countDown(); coordinator.shutdown(); }
+    }
+
+    @Test
+    void delayedWorkerCannotInvalidateSpacingAtCoordinatorAuthorizationBoundary() throws Exception {
         CarrierTrackingCoordinator coordinator = new CarrierTrackingCoordinator(true,
                 new java.util.concurrent.ThreadPoolExecutor(2, 2, 0, TimeUnit.MILLISECONDS,
                         new java.util.concurrent.ArrayBlockingQueue<>(2), new java.util.concurrent.ThreadPoolExecutor.AbortPolicy()),
@@ -317,7 +350,7 @@ class CarrierTrackingCoordinatorTest {
             allowFirstInvocation.countDown();
             coordinator.drain();
             assertTrue(TimeUnit.NANOSECONDS.toMillis(firstStart.get() - secondStart.get()) >= 100,
-                    "actual adapter invocations must remain spaced even if a worker pauses after reservation");
+                    "adapter invocations normally follow coordinator authorization order; the guarantee is authorization spacing, not physical entry under arbitrary descheduling");
         } finally { allowFirstInvocation.countDown(); coordinator.shutdown(); }
     }
 

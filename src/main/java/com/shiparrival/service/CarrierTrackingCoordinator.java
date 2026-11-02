@@ -134,36 +134,38 @@ public class CarrierTrackingCoordinator {
                     try {
                         executor.execute(() -> {
                             worker.thread = Thread.currentThread();
+                            boolean success = false;
+                            long invocationStarted;
                             try {
                                 awaitStart(carrier);
                                 afterStartReservationHook.afterReservation(carrier);
+                                synchronized (lifecycle) {
+                                    if (cycleCancelled || result.isCancelled()) {
+                                        worker.thread = null;
+                                        completion.complete(null);
+                                        return;
+                                    }
+                                }
+                                invocationStarted = reserveInvocationStart(carrier);
                             } catch (InterruptedException interrupted) {
                                 Thread.currentThread().interrupt();
-                                result.completeExceptionally(interrupted);
+                                result.cancel(false);
                                 worker.thread = null;
                                 completion.complete(null);
                                 return;
                             }
-                            boolean success = false;
-                            long[] invocationStarted = {0};
                             synchronized (lifecycle) {
-                                if (cycleCancelled || result.isCancelled()) {
-                                    worker.thread = null;
-                                    completion.complete(null);
-                                    return;
-                                }
                                 activeCalls++;
                                 peakInFlight = Math.max(peakInFlight, activeCalls);
                             }
                             try {
-                                invocationStarted[0] = reserveInvocationStart(carrier);
                                 TrackingResult tracked = adapter.track(trackingNumber);
                                 success = tracked != null && tracked.isSuccess();
                                 result.complete(tracked);
                             } catch (Throwable error) {
                                 result.completeExceptionally(error);
                             } finally {
-                                long elapsedMs = TimeUnit.NANOSECONDS.toMillis(monotonicClock.getAsLong() - invocationStarted[0]);
+                                long elapsedMs = TimeUnit.NANOSECONDS.toMillis(monotonicClock.getAsLong() - invocationStarted);
                                 int successes;
                                 int failures;
                                 int observedPeak;
