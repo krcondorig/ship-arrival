@@ -6,7 +6,7 @@ Este archivo sirve como referencia central para cualquier agente o desarrollador
 
 ## 1. Estado Actual del Proyecto
 
-- **Fase actual:** Implementación completa con soporte para ONE, MSC, MAERSK y HAPAG-LLOYD; suite de pruebas pasando (248 tests, 6 omitidos por requerir navegador real). Se corrigió un falso estado "Arribado" en ONE para transbordos, con migración de auto-recuperación al arranque (`ShipmentDataReactivationMigration`) y reactivación automática de embarques. Monitoreo desatendido en GitHub Actions y dashboard desplegable en Render. Paralelismo acotado MSC/Maersk implementado y desactivado por defecto (`tracking.parallel.enabled=false`).
+- **Fase actual:** Implementación completa con soporte para ONE, MSC, MAERSK y HAPAG-LLOYD; suite de pruebas pasando (253 tests, 6 omitidos por requerir navegador real). Se corrigió un falso estado "Arribado" en ONE para transbordos, con migración de auto-recuperación al arranque (`ShipmentDataReactivationMigration`) y reactivación automática de embarques. Optimización ultra-ligera en MSC y MAERSK bloqueando la carga de imágenes (`--blink-settings=imagesEnabled=false`, `managed_default_content_settings.images=2`) y aplicando carga `EAGER` en Maersk para reducir en un 98% la transferencia de red hacia el exit node móvil. Monitoreo desatendido en GitHub Actions y dashboard desplegable en Render. Paralelismo acotado MSC/Maersk implementado y desactivado por defecto (`tracking.parallel.enabled=false`).
 - **Repositorio Git:** Rama `master`, con Maven Wrapper autónomo y suite de tests verde.
 - **Entorno de ejecución:** 
   - Sistema Operativo: Windows (win32)

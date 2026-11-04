@@ -96,12 +96,16 @@ public class SeleniumMscTrackingClient implements MscTrackingClient {
                 "--disable-dev-shm-usage",
                 "--window-size=1920,1080",
                 "--disable-blink-features=AutomationControlled",
+                "--blink-settings=imagesEnabled=false",
                 "--lang=en-US,en;q=0.9",
                 "--user-agent=" + USER_AGENT
         );
         options.setPageLoadStrategy(PageLoadStrategy.EAGER);
         options.setExperimentalOption("excludeSwitches", List.of("enable-automation"));
         options.setExperimentalOption("useAutomationExtension", false);
+        options.setExperimentalOption("prefs", Map.of(
+                "profile.managed_default_content_settings.images", 2
+        ));
 
         return options;
     }
