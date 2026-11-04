@@ -44,6 +44,28 @@ jobs:
           fi
           google-chrome --version
 
+      - name: Cache Selenium Drivers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/selenium
+          key: selenium-cache-${{ runner.os }}-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            selenium-cache-${{ runner.os }}-
+
+      - name: Prefetch ChromeDriver and resolve driver before Tailscale
+        run: |
+          SM_JAR=$(find ~/.m2/repository -name "selenium-manager-*.jar" | head -n 1)
+          if [ -n "$SM_JAR" ]; then
+            echo "Extrayendo selenium-manager desde $SM_JAR..."
+            unzip -p "$SM_JAR" org/openqa/selenium/manager/linux/selenium-manager > /tmp/selenium-manager
+            chmod +x /tmp/selenium-manager
+            echo "Descargando y verificando compatibilidad de ChromeDriver..."
+            /tmp/selenium-manager --browser chrome --avoid-stats
+            echo "ChromeDriver pre-descargado con éxito antes de conectar Tailscale."
+          else
+            echo "Advertencia: No se encontró selenium-manager jar en ~/.m2"
+          fi
+
       - name: Connect to Tailscale (Phone Exit Node)
         uses: tailscale/github-action@v3
         with:
@@ -60,6 +82,8 @@ jobs:
 
       - name: Run tracking cycle once
         env:
+          SE_OFFLINE: "true"
+          SE_AVOID_STATS: "true"
           SUPABASE_DB_HOST: ${{ secrets.SUPABASE_DB_HOST }}
           SUPABASE_DB_PORT: ${{ secrets.SUPABASE_DB_PORT }}
           SUPABASE_DB_NAME: ${{ secrets.SUPABASE_DB_NAME }}

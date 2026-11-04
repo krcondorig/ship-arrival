@@ -88,4 +88,21 @@ class DeploymentConfigurationTest {
         assertThat(render).contains("GITHUB_DISPATCH_ENABLED");
         assertThat(render).contains("GITHUB_TOKEN");
     }
+
+    @Test
+    @DisplayName("El workflow pre-descarga ChromeDriver antes de Tailscale y desactiva telemetria/red en el ciclo")
+    void workflowShouldPrefetchChromeDriverBeforeTailscale() throws IOException {
+        String workflow = Files.readString(Path.of(".github/workflows/daily-monitoring.yml"));
+
+        int prefetchIdx = workflow.indexOf("Prefetch ChromeDriver and resolve driver before Tailscale");
+        int tailscaleIdx = workflow.indexOf("Connect to Tailscale (Phone Exit Node)");
+        int cycleIdx = workflow.indexOf("Run tracking cycle once");
+
+        assertThat(prefetchIdx).as("ChromeDriver prefetch step exists").isGreaterThan(0);
+        assertThat(tailscaleIdx).as("Tailscale connection step exists").isGreaterThan(prefetchIdx);
+        assertThat(cycleIdx).as("Tracking cycle step exists").isGreaterThan(tailscaleIdx);
+
+        assertThat(workflow).contains("SE_OFFLINE: \"true\"");
+        assertThat(workflow).contains("SE_AVOID_STATS: \"true\"");
+    }
 }
