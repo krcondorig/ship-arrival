@@ -12,14 +12,17 @@ import static org.assertj.core.api.Assertions.assertThat;
 class DeploymentConfigurationTest {
 
     @Test
-    @DisplayName("Carrier parallelism pilot remains disabled and is not enabled by deployment")
-    void carrierParallelismPilotDefaultsToDisabledAndIsNotEnabledByDeployment() throws IOException {
+    @DisplayName("El paralelismo está activo en GitHub Actions pero deshabilitado por defecto en la app y en Render")
+    void carrierParallelismIsEnabledInWorkflowAndDefaultsToDisabled() throws IOException {
         String properties = Files.readString(Path.of("src/main/resources/application.properties"));
         String workflow = Files.readString(Path.of(".github/workflows/daily-monitoring.yml"));
         String render = Files.readString(Path.of("render.yaml"));
 
         assertThat(properties).contains("tracking.parallel.enabled=${TRACKING_PARALLEL_ENABLED:false}");
-        assertThat(workflow).doesNotContain("TRACKING_PARALLEL_ENABLED");
+        assertThat(properties).contains("tracking.request.delay-ms=${TRACKING_REQUEST_DELAY_MS:2000}");
+        assertThat(workflow).contains("TRACKING_PARALLEL_ENABLED: \"true\"");
+        assertThat(workflow).contains("TRACKING_REQUEST_DELAY_MS: \"1000\"");
+        assertThat(workflow).contains("-Dmaven.test.skip=true package");
         assertThat(render).doesNotContain("TRACKING_PARALLEL_ENABLED");
     }
 
