@@ -70,7 +70,7 @@ jobs:
 
       - name: Activate Phone Exit Node
         run: |
-          sudo tailscale set --exit-node=100.77.93.94
+          sudo tailscale set --exit-node=${{ secrets.TAILSCALE_EXIT_NODE_IP }}
           echo "Estado de Tailscale y exit node:"
           tailscale status
           echo "IP publica visible para las navieras:"

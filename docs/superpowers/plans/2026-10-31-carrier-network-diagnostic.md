@@ -64,7 +64,7 @@ Expected: BUILD SUCCESS with the integration test skipped absent the opt-in flag
 - Modify: `src/test/java/com/shiparrival/CarrierNetworkDiagnosticTest.java` only if environment wiring requires a named helper.
 
 **Interfaces:**
-- Consumes: `CarrierNetworkDiagnosticTest`, `secrets.TAILSCALE_AUTHKEY`, phone exit node `100.77.93.94`.
+- Consumes: `CarrierNetworkDiagnosticTest`, `secrets.TAILSCALE_AUTHKEY`, phone exit node `secrets.TAILSCALE_EXIT_NODE_IP`.
 - Produces: Manual workflow with `without-tailscale` and `with-phone-exit-node` jobs; both run the same test command and test inputs. Only the latter connects to Tailscale and selects the phone exit node.
 
 - [ ] **Step 1: Write a workflow configuration test**
@@ -78,7 +78,7 @@ Expected: FAIL because the diagnostic workflow does not yet exist.
 
 - [ ] **Step 3: Implement the isolated diagnostic workflow**
 
-Each job checks out the branch, installs Java 21 and Chrome, builds/tests with `CARRIER_NETWORK_DIAGNOSTIC=true`, and has a bounded timeout. The Tailscale job connects with the existing secret and sets `--exit-node=100.77.93.94`. No database or notification secrets are passed.
+Each job checks out the branch, installs Java 21 and Chrome, builds/tests with `CARRIER_NETWORK_DIAGNOSTIC=true`, and has a bounded timeout. The Tailscale job connects with the existing secret and sets `--exit-node=${{ secrets.TAILSCALE_EXIT_NODE_IP }}`. No database or notification secrets are passed.
 
 - [ ] **Step 4: Verify workflow configuration tests pass**
 

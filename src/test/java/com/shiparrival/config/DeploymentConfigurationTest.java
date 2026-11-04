@@ -23,6 +23,8 @@ class DeploymentConfigurationTest {
         assertThat(workflow).contains("TRACKING_PARALLEL_ENABLED: \"true\"");
         assertThat(workflow).contains("TRACKING_REQUEST_DELAY_MS: \"1000\"");
         assertThat(workflow).contains("-Dmaven.test.skip=true package");
+        assertThat(workflow).contains("--exit-node=${{ secrets.TAILSCALE_EXIT_NODE_IP }}");
+        assertThat(workflow).doesNotMatch("(?s).*--exit-node=\\d+\\.\\d+\\.\\d+\\.\\d+.*");
         assertThat(render).doesNotContain("TRACKING_PARALLEL_ENABLED");
     }
 
@@ -38,9 +40,10 @@ class DeploymentConfigurationTest {
                 .contains("CarrierNetworkDiagnosticTest")
                 .contains("CARRIER_NETWORK_DIAGNOSTIC")
                 .contains("test-compile dependency:resolve dependency:resolve-plugins")
-                .contains("--exit-node=100.77.93.94")
+                .contains("--exit-node=${{ secrets.TAILSCALE_EXIT_NODE_IP }}")
                 .contains("xvfb-run -a ./mvnw -B -Dtest=CarrierNetworkDiagnosticTest test")
-                .contains("timeout-minutes: 20");
+                .contains("timeout-minutes: 20")
+                .doesNotMatch("(?s).*--exit-node=\\d+\\.\\d+\\.\\d+\\.\\d+.*");
 
         assertThat(workflow)
                 .doesNotContain("--tracking.run-once")

@@ -139,7 +139,7 @@ Aplicación web monolítica ligera en **Java 21** con **Spring Boot 3**, que per
 - [x] Workflow `.github/workflows/daily-monitoring.yml`: monitoreo diario a las 13:00 UTC (08:00 AM Perú) y disparo manual, compilando el JAR y ejecutándolo sin interfaz web.
 - [x] Salida de las navieras mediante Tailscale: el runner enruta todo su tráfico por el `exit node` del teléfono Android, evitando los bloqueos de Akamai y Cloudflare sobre IPs de datacenter.
 - [x] Chrome + `xvfb` en el runner para HAPAG-LLOYD, con caché del perfil `data/hapag-chrome-profile` entre ejecuciones.
-- [x] Credenciales en GitHub Secrets (`SUPABASE_DB_*`, `TELEGRAM_*`, `DISCORD_*`, `TAILSCALE_AUTHKEY`); nunca en el repositorio.
+- [x] Credenciales en GitHub Secrets (`SUPABASE_DB_*`, `TELEGRAM_*`, `DISCORD_*`, `TAILSCALE_AUTHKEY`, `TAILSCALE_EXIT_NODE_IP`); nunca en el repositorio.
 - [x] Dashboard desplegable en Render (`render.yaml` + `Dockerfile`) consumiendo la misma base PostgreSQL de Supabase.
 - [x] Acceso con cuentas por persona: filtro propio (`AuthFilter`) + BCrypt, sin Spring Security completo. Roles `ADMIN` (administra cuentas además de operar), `OPERADOR` (registra, importa Excel, elimina guías y dispara el monitoreo, sin tocar cuentas) y `USER` (solo consulta). Sesión deslizante de 1 h renovada en cada petición autenticada, cookie `HttpOnly` + `SameSite=Lax`, rotación del identificador tras el login y bloqueo de 15 minutos tras 5 intentos fallidos.
 - [x] El primer administrador nace de `ADMIN_USERNAME` / `ADMIN_PASSWORD`; no hay registro público ni recuperación por correo (un administrador restablece la clave).
