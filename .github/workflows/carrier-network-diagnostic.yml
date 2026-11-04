@@ -64,7 +64,7 @@ jobs:
           authkey: ${{ secrets.TAILSCALE_AUTHKEY }}
       - name: Activate phone exit node
         run: |
-          sudo tailscale set --exit-node=100.77.93.94
+          sudo tailscale set --exit-node=${{ secrets.TAILSCALE_EXIT_NODE_IP }}
           echo "Phone exit node selected; public egress IP:"
           curl -fsS --max-time 20 https://ifconfig.me/ip
       - name: Run isolated real-adapter diagnostics
