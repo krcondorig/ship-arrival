@@ -29,11 +29,8 @@ jobs:
       - name: Make Maven wrapper executable
         run: chmod +x mvnw
 
-      - name: Prefetch all Maven dependencies (before Tailscale)
-        run: ./mvnw -B test-compile dependency:resolve dependency:resolve-plugins
-
-      - name: Build application
-        run: ./mvnw -B -DskipTests package
+      - name: Build application (before Tailscale)
+        run: ./mvnw -B -Dmaven.test.skip=true package
 
       - name: Ensure Google Chrome is available
         run: |
@@ -100,6 +97,8 @@ jobs:
           APP_TIMEZONE: "America/Lima"
           TRACKING_RUN_ID: ${{ github.run_id }}
           TRACKING_ORIGIN: ci
+          TRACKING_PARALLEL_ENABLED: "true"
+          TRACKING_REQUEST_DELAY_MS: "1000"
         run: |
           JAR=$(ls target/*.jar | head -n 1)
           echo "Ejecutando ciclo de monitoreo con $JAR"

@@ -319,10 +319,6 @@ public class TrackingSchedulerService {
                         rec.state = DispatchState.APPLIED;
                         processed++;
                         updateProgress(total, processed, updated, failed, alerts);
-                        if (delayMs > 0 && i < total - 1) {
-                            try { Thread.sleep(delayMs); }
-                            catch (InterruptedException e) { interrupted = true; break; }
-                        }
                         continue;
                     }
 

@@ -396,6 +396,25 @@ class TrackingSchedulerServiceTest {
     }
 
     @Test
+    @DisplayName("Guías manuales no esperan el delay de cortesía y se procesan de inmediato")
+    void manualCheckGuidesDoNotWaitDelayMs() {
+        TrackingSchedulerService service = new TrackingSchedulerService(shipmentService, shipmentRepository,
+                adapterFactory, telegramService, discordService, Runnable::run, 5000L, "HAPAG_LLOYD");
+        Shipment manual1 = Shipment.builder().id(1L).trackingNumber("HAP1").carrier(Carrier.HAPAG_LLOYD).active(true).build();
+        Shipment manual2 = Shipment.builder().id(2L).trackingNumber("HAP2").carrier(Carrier.HAPAG_LLOYD).active(true).build();
+        when(shipmentService.getActiveShipments()).thenReturn(List.of(manual1, manual2));
+
+        long start = System.currentTimeMillis();
+        TrackingExecutionSummary summary = service.runTrackingCycle();
+        long elapsed = System.currentTimeMillis() - start;
+
+        assertThat(summary.getTotalProcessed()).isEqualTo(2);
+        assertThat(elapsed).isLessThan(1000L);
+        verify(shipmentService, times(2)).markForManualCheck(any());
+        verify(adapterFactory, never()).getAdapter(any());
+    }
+
+    @Test
     @DisplayName("Guías excluidas MSMU1804864 y 275792562 se rastrean en serie sin usar el coordinador paralelo")
     void excludedGuidesAreTrackedSerially() throws Exception {
         TrackingSchedulerService service = new TrackingSchedulerService(shipmentService, shipmentRepository,
