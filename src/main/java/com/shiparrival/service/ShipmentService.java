@@ -296,16 +296,16 @@ public class ShipmentService {
     public Page<Shipment> getVisibleShipments(ShipmentFilter filter, Pageable pageable) {
         ShipmentFilter safe = (filter == null) ? ShipmentFilter.empty() : filter;
         LocalDateTime cutoff = LocalDateTime.now().minusDays(3);
-        return shipmentRepository.findVisibleShipmentsFiltered(
-                cutoff,
-                ShipmentStatus.ARRIVED,
-                toSearchPattern(safe.search()),
-                safe.carrier(),
-                safe.status(),
-                toFilterPattern(safe.port()),
-                safe.etaFrom(),
-                safe.etaTo(),
-                pageable);
+        org.springframework.data.jpa.domain.Specification<Shipment> spec =
+                org.springframework.data.jpa.domain.Specification.where(
+                        com.shiparrival.repository.ShipmentSpecifications.visible(cutoff, ShipmentStatus.ARRIVED))
+                        .and(com.shiparrival.repository.ShipmentSpecifications.search(safe.search()))
+                        .and(com.shiparrival.repository.ShipmentSpecifications.carrier(safe.carrier()))
+                        .and(com.shiparrival.repository.ShipmentSpecifications.status(safe.status()))
+                        .and(com.shiparrival.repository.ShipmentSpecifications.port(safe.port()))
+                        .and(com.shiparrival.repository.ShipmentSpecifications.etaFrom(safe.etaFrom()))
+                        .and(com.shiparrival.repository.ShipmentSpecifications.etaTo(safe.etaTo()));
+        return shipmentRepository.findAll(spec, pageable);
     }
 
     /**
@@ -316,29 +316,20 @@ public class ShipmentService {
     public ShipmentStats getVisibleShipmentStats(ShipmentFilter filter) {
         ShipmentFilter safe = (filter == null) ? ShipmentFilter.empty() : filter;
         LocalDateTime cutoff = LocalDateTime.now().minusDays(3);
-        List<Object[]> rows = shipmentRepository.countVisibleByStatusFiltered(
-                cutoff, ShipmentStatus.ARRIVED, toSearchPattern(safe.search()),
-                safe.carrier(), safe.status(), toFilterPattern(safe.port()),
-                safe.etaFrom(), safe.etaTo());
-        long total = 0;
-        long inTransit = 0;
-        long nearArrival = 0;
-        long arrived = 0;
-
-        for (Object[] row : rows) {
-            ShipmentStatus status = (ShipmentStatus) row[0];
-            long count = ((Number) row[1]).longValue();
-            total += count;
-            switch (status) {
-                case IN_TRANSIT -> inTransit += count;
-                case NEAR_ARRIVAL -> nearArrival += count;
-                case ARRIVED -> arrived += count;
-                default -> {
-                    // PENDING_FIRST_CHECK, ERROR_CHECKING y CANCELLED solo suman al total
-                }
-            }
-        }
-
+        org.springframework.data.jpa.domain.Specification<Shipment> spec =
+                org.springframework.data.jpa.domain.Specification.where(
+                        com.shiparrival.repository.ShipmentSpecifications.visible(cutoff, ShipmentStatus.ARRIVED))
+                        .and(com.shiparrival.repository.ShipmentSpecifications.search(safe.search()))
+                        .and(com.shiparrival.repository.ShipmentSpecifications.carrier(safe.carrier()))
+                        .and(com.shiparrival.repository.ShipmentSpecifications.status(safe.status()))
+                        .and(com.shiparrival.repository.ShipmentSpecifications.port(safe.port()))
+                        .and(com.shiparrival.repository.ShipmentSpecifications.etaFrom(safe.etaFrom()))
+                        .and(com.shiparrival.repository.ShipmentSpecifications.etaTo(safe.etaTo()));
+        java.util.List<Shipment> all = shipmentRepository.findAll(spec);
+        long total = all.size();
+        long inTransit = all.stream().filter(s -> s.getStatus() == ShipmentStatus.IN_TRANSIT).count();
+        long nearArrival = all.stream().filter(s -> s.getStatus() == ShipmentStatus.NEAR_ARRIVAL).count();
+        long arrived = all.stream().filter(s -> s.getStatus() == ShipmentStatus.ARRIVED).count();
         return new ShipmentStats(total, inTransit, nearArrival, arrived);
     }
 
