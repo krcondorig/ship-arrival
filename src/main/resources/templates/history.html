@@ -35,7 +35,7 @@
             <div>
                 <span class="badge fs-6"
                       th:classappend="${shipment.status.name() == 'NEAR_ARRIVAL'} ? 'bg-danger' : (${shipment.status.name() == 'ARRIVED'} ? 'bg-success' : 'bg-primary')"
-                      th:text="${shipment.status}">IN_TRANSIT</span>
+                      th:text="${shipment.status.name() == 'NEAR_ARRIVAL' ? 'Arribo Próximo' : (shipment.status.name() == 'IN_TRANSIT' ? 'En Tránsito' : (shipment.status.name() == 'ARRIVED' ? 'Arribado' : (shipment.status.name() == 'PENDING_FIRST_CHECK' ? 'Pendiente Rastreo' : (shipment.status.name() == 'ERROR_CHECKING' ? 'Error al Consultar' : (shipment.status.name() == 'MANUAL_CHECK' ? 'Verificar manual' : (shipment.status.name() == 'CANCELLED' ? 'Cancelado' : shipment.status))))))}">IN_TRANSIT</span>
             </div>
         </div>
 
@@ -104,7 +104,7 @@
                         <td>
                             <span class="badge"
                                   th:classappend="${log.eventType == 'ETA_UPDATED'} ? 'bg-warning text-dark' : (${log.eventType == 'SCRAPE_FAILED'} ? 'bg-danger' : 'bg-secondary')"
-                                  th:text="${log.eventType}">ETA_UPDATED</span>
+                                  th:text="${log.eventType == 'ETA_UPDATED' ? 'ETA actualizado' : (log.eventType == 'SCRAPE_FAILED' ? 'Error de rastreo' : (log.eventType == 'SHIPMENT_REGISTERED' ? 'Registrado' : (log.eventType == 'EXCEL_IMPORTED' ? 'Importado Excel' : (log.eventType == 'AUTO_REACTIVATED' ? 'Reactivado' : (log.eventType == 'STATUS_CHANGE' ? 'Cambio de estado' : (log.eventType == 'SCRAPE_SUCCESS' ? 'Rastreo exitoso' : log.eventType))))))}">ETA_UPDATED</span>
                         </td>
                         <td class="small" th:text="${log.previousEta != null ? #temporals.format(log.previousEta, 'yyyy-MM-dd HH:mm') : '-'}">-</td>
                         <td class="small fw-bold" th:text="${log.newEta != null ? #temporals.format(log.newEta, 'yyyy-MM-dd HH:mm') : '-'}">-</td>
