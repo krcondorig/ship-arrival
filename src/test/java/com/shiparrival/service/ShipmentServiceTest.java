@@ -211,29 +211,34 @@ class ShipmentServiceTest {
     void shouldQueryVisibleShipmentsWithPagination() {
         Pageable pageable = PageRequest.of(0, 10);
         Page<Shipment> page = new PageImpl<>(List.of(new Shipment()));
-        when(shipmentRepository.findVisibleShipments(
-                any(LocalDateTime.class), eq(ShipmentStatus.ARRIVED), eq("%test%"), eq(pageable)))
+        when(shipmentRepository.findVisibleShipmentsFiltered(
+                any(LocalDateTime.class), eq(ShipmentStatus.ARRIVED), eq("%test%"),
+                eq(null), eq(null), eq(null), eq(null), eq(null), eq(pageable)))
                 .thenReturn(page);
 
-        Page<Shipment> result = shipmentService.getVisibleShipments("TEST", pageable);
+        Page<Shipment> result = shipmentService.getVisibleShipments(
+                new com.shiparrival.service.dto.ShipmentFilter("TEST", null, null, null, null, null), pageable);
 
         assertThat(result).isSameAs(page);
-        verify(shipmentRepository).findVisibleShipments(
-                any(LocalDateTime.class), eq(ShipmentStatus.ARRIVED), eq("%test%"), eq(pageable));
+        verify(shipmentRepository).findVisibleShipmentsFiltered(
+                any(LocalDateTime.class), eq(ShipmentStatus.ARRIVED), eq("%test%"),
+                eq(null), eq(null), eq(null), eq(null), eq(null), eq(pageable));
     }
 
     @Test
     @DisplayName("Debe calcular las estadísticas de los embarques visibles")
     void shouldCalculateVisibleShipmentStats() {
-        when(shipmentRepository.countVisibleByStatus(
-                any(LocalDateTime.class), eq(ShipmentStatus.ARRIVED), eq("%")))
+        when(shipmentRepository.countVisibleByStatusFiltered(
+                any(LocalDateTime.class), eq(ShipmentStatus.ARRIVED), eq("%"),
+                eq(null), eq(null), eq(null), eq(null), eq(null)))
                 .thenReturn(List.of(
                         new Object[]{ShipmentStatus.IN_TRANSIT, 5L},
                         new Object[]{ShipmentStatus.NEAR_ARRIVAL, 2L},
                         new Object[]{ShipmentStatus.ARRIVED, 1L},
                         new Object[]{ShipmentStatus.PENDING_FIRST_CHECK, 3L}));
 
-        ShipmentStats stats = shipmentService.getVisibleShipmentStats(null);
+        ShipmentStats stats = shipmentService.getVisibleShipmentStats(
+                new com.shiparrival.service.dto.ShipmentFilter(null, null, null, null, null, null));
 
         assertThat(stats.total()).isEqualTo(11);
         assertThat(stats.inTransit()).isEqualTo(5);
