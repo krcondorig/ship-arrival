@@ -2,6 +2,7 @@ package com.shiparrival.web;
 
 import com.shiparrival.domain.Carrier;
 import com.shiparrival.domain.Shipment;
+import com.shiparrival.domain.ShipmentStatus;
 import com.shiparrival.domain.ShipmentEventLog;
 import com.shiparrival.service.GitHubActionsClient;
 import com.shiparrival.service.GitHubRunState;
@@ -11,6 +12,7 @@ import com.shiparrival.service.TrackingSchedulerService;
 import com.shiparrival.service.dto.BatchImportSummary;
 import com.shiparrival.service.dto.LiveTrackingStatus;
 import com.shiparrival.service.dto.ShipmentDto;
+import com.shiparrival.service.dto.ShipmentFilter;
 import com.shiparrival.service.dto.ShipmentStats;
 import com.shiparrival.service.dto.TrackingStatus;
 import lombok.RequiredArgsConstructor;
@@ -29,6 +31,7 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import org.springframework.web.util.UriComponentsBuilder;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.IntStream;
@@ -50,6 +53,11 @@ public class ShipmentWebController {
 
     @GetMapping({"/", "/shipments"})
     public String dashboard(@RequestParam(required = false) String search,
+                            @RequestParam(required = false) String carrier,
+                            @RequestParam(required = false) String status,
+                            @RequestParam(required = false) String port,
+                            @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) LocalDate etaFrom,
+                            @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) LocalDate etaTo,
                             @RequestParam(defaultValue = "0") int page,
                             @RequestParam(defaultValue = "10") int size,
                             @RequestParam(required = false) String runId,
@@ -59,12 +67,20 @@ public class ShipmentWebController {
         int safeSize = Math.min(Math.max(size, 1), MAX_PAGE_SIZE);
         Pageable pageable = PageRequest.of(safePage, safeSize, Sort.by(Sort.Direction.DESC, "id"));
 
-        Page<Shipment> pageResult = shipmentService.getVisibleShipments(search, pageable);
+        Carrier carrierEnum = parseCarrier(carrier);
+        ShipmentStatus statusEnum = parseStatus(status);
+        LocalDateTime etaFromDt = (etaFrom == null) ? null : etaFrom.atStartOfDay();
+        LocalDateTime etaToDt = (etaTo == null) ? null : etaTo.atTime(23, 59, 59);
+
+        ShipmentFilter filter = new ShipmentFilter(
+                search, carrierEnum, statusEnum, port, etaFromDt, etaToDt);
+
+        Page<Shipment> pageResult = shipmentService.getVisibleShipments(filter, pageable);
 
         // Si la página solicitada quedó fuera de rango (por ejemplo, tras eliminar
         // el último registro de la última página), redirigimos a la última válida.
         if (pageResult.getTotalPages() > 0 && safePage >= pageResult.getTotalPages()) {
-            return redirectToDashboard(pageResult.getTotalPages() - 1, safeSize, search);
+            return redirectToDashboard(pageResult.getTotalPages() - 1, safeSize, filter);
         }
 
         LocalDate today = LocalDate.now();
@@ -87,7 +103,7 @@ public class ShipmentWebController {
                 .build()
         ).toList();
 
-        ShipmentStats stats = shipmentService.getVisibleShipmentStats(search);
+        ShipmentStats stats = shipmentService.getVisibleShipmentStats(filter);
 
         int windowStart = Math.max(0, pageResult.getNumber() - 2);
         int windowEnd = Math.min(pageResult.getTotalPages() - 1, pageResult.getNumber() + 2);
@@ -104,6 +120,12 @@ public class ShipmentWebController {
         model.addAttribute("isTrackingInProgress", trackingSchedulerService.isTrackingInProgress());
 
         model.addAttribute("searchQuery", search != null && !search.isBlank() ? search.trim() : null);
+        model.addAttribute("carrierFilter", carrier != null && !carrier.isBlank() ? carrier.trim() : null);
+        model.addAttribute("statusFilter", status != null && !status.isBlank() ? status.trim() : null);
+        model.addAttribute("portFilter", port != null && !port.isBlank() ? port.trim() : null);
+        model.addAttribute("etaFromFilter", etaFrom);
+        model.addAttribute("etaToFilter", etaTo);
+        model.addAttribute("statuses", ShipmentStatus.values());
         model.addAttribute("currentPage", pageResult.getNumber());
         model.addAttribute("totalPages", pageResult.getTotalPages());
         model.addAttribute("totalElements", pageResult.getTotalElements());
@@ -281,16 +303,54 @@ public class ShipmentWebController {
             log.error("Error al eliminar embarque ID {}: {}", id, ex.getMessage());
             redirectAttributes.addFlashAttribute("errorMessage", "Error al eliminar embarque: " + ex.getMessage());
         }
-        return redirectToDashboard(page, size, search);
+        return redirectToDashboard(page, size, new ShipmentFilter(search, null, null, null, null, null));
     }
 
-    private String redirectToDashboard(int page, int size, String search) {
+    private Carrier parseCarrier(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        try {
+            return Carrier.valueOf(value.trim().toUpperCase());
+        } catch (IllegalArgumentException ex) {
+            return null;
+        }
+    }
+
+    private ShipmentStatus parseStatus(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        try {
+            return ShipmentStatus.valueOf(value.trim().toUpperCase());
+        } catch (IllegalArgumentException ex) {
+            return null;
+        }
+    }
+
+    private String redirectToDashboard(int page, int size, ShipmentFilter filter) {
         UriComponentsBuilder builder = UriComponentsBuilder.fromPath("/")
                 .queryParam("page", Math.max(page, 0))
                 .queryParam("size", Math.min(Math.max(size, 1), MAX_PAGE_SIZE));
 
-        if (search != null && !search.isBlank()) {
-            builder.queryParam("search", search.trim());
+        ShipmentFilter safe = (filter == null) ? ShipmentFilter.empty() : filter;
+        if (safe.search() != null && !safe.search().isBlank()) {
+            builder.queryParam("search", safe.search().trim());
+        }
+        if (safe.carrier() != null) {
+            builder.queryParam("carrier", safe.carrier().name());
+        }
+        if (safe.status() != null) {
+            builder.queryParam("status", safe.status().name());
+        }
+        if (safe.port() != null && !safe.port().isBlank()) {
+            builder.queryParam("port", safe.port().trim());
+        }
+        if (safe.etaFrom() != null) {
+            builder.queryParam("etaFrom", safe.etaFrom().toLocalDate());
+        }
+        if (safe.etaTo() != null) {
+            builder.queryParam("etaTo", safe.etaTo().toLocalDate());
         }
 
         return "redirect:" + builder.build().encode().toUriString();

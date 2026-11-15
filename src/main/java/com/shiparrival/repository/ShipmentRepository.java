@@ -1,5 +1,6 @@
 package com.shiparrival.repository;
 
+import com.shiparrival.domain.Carrier;
 import com.shiparrival.domain.Shipment;
 import com.shiparrival.domain.ShipmentStatus;
 import org.springframework.data.domain.Page;
@@ -39,6 +40,29 @@ public interface ShipmentRepository extends JpaRepository<Shipment, Long> {
                                         @Param("search") String search,
                                         Pageable pageable);
 
+    @Query("""
+            SELECT s FROM Shipment s
+            WHERE ((s.active = true AND s.status <> :arrivedStatus)
+                   OR (s.status = :arrivedStatus
+                       AND COALESCE(s.actualArrival, s.lastCheckedAt, s.updatedAt) >= :cutoff))
+              AND (LOWER(s.trackingNumber) LIKE :search
+                   OR LOWER(s.containerNumber) LIKE :search
+                   OR LOWER(s.vesselName) LIKE :search)
+              AND (:carrier IS NULL OR s.carrier = :carrier)
+              AND (:status IS NULL OR s.status = :status)
+              AND (:port IS NULL OR LOWER(s.portOfDischarge) LIKE :port)
+              AND (:etaFrom IS NULL OR s.estimatedArrival >= :etaFrom)
+              AND (:etaTo IS NULL OR s.estimatedArrival <= :etaTo)
+            """)
+    Page<Shipment> findVisibleShipmentsFiltered(@Param("cutoff") LocalDateTime cutoff,
+                                                @Param("arrivedStatus") ShipmentStatus arrivedStatus,
+                                                @Param("search") String search,
+                                                @Param("carrier") Carrier carrier,
+                                                @Param("status") ShipmentStatus status,
+                                                @Param("port") String port,
+                                                @Param("etaFrom") LocalDateTime etaFrom,
+                                                @Param("etaTo") LocalDateTime etaTo,
+                                                Pageable pageable);
     /**
      * Conteo por estado de los embarques visibles, usado por las tarjetas
      * de métricas del dashboard.
@@ -57,6 +81,29 @@ public interface ShipmentRepository extends JpaRepository<Shipment, Long> {
                                         @Param("arrivedStatus") ShipmentStatus arrivedStatus,
                                         @Param("search") String search);
 
+    @Query("""
+            SELECT s.status, COUNT(s) FROM Shipment s
+            WHERE ((s.active = true AND s.status <> :arrivedStatus)
+                   OR (s.status = :arrivedStatus
+                       AND COALESCE(s.actualArrival, s.lastCheckedAt, s.updatedAt) >= :cutoff))
+              AND (LOWER(s.trackingNumber) LIKE :search
+                   OR LOWER(s.containerNumber) LIKE :search
+                   OR LOWER(s.vesselName) LIKE :search)
+              AND (:carrier IS NULL OR s.carrier = :carrier)
+              AND (:status IS NULL OR s.status = :status)
+              AND (:port IS NULL OR LOWER(s.portOfDischarge) LIKE :port)
+              AND (:etaFrom IS NULL OR s.estimatedArrival >= :etaFrom)
+              AND (:etaTo IS NULL OR s.estimatedArrival <= :etaTo)
+            GROUP BY s.status
+            """)
+    List<Object[]> countVisibleByStatusFiltered(@Param("cutoff") LocalDateTime cutoff,
+                                                @Param("arrivedStatus") ShipmentStatus arrivedStatus,
+                                                @Param("search") String search,
+                                                @Param("carrier") Carrier carrier,
+                                                @Param("status") ShipmentStatus status,
+                                                @Param("port") String port,
+                                                @Param("etaFrom") LocalDateTime etaFrom,
+                                                @Param("etaTo") LocalDateTime etaTo);
     /**
      * Embarques que ya cumplieron su ciclo de vida y pueden borrarse.
      *

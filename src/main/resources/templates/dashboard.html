@@ -212,18 +212,54 @@
                         <i class="bi bi-ship me-2 text-primary"></i>Lista de Buques y Guías Monitoreadas
                     </h5>
                 </div>
-                <div class="col-12 col-md-6">
-                    <form method="get" action="/" class="input-group input-group-sm">
-                        <input type="text" name="search" class="form-control" 
-                               placeholder="Buscar por guía, contenedor o buque..." 
-                               th:value="${searchQuery}"
-                               aria-label="Buscar embarques">
-                        <button class="btn btn-outline-primary" type="submit">
-                            <i class="bi bi-search"></i> Buscar
-                        </button>
-                        <a th:if="${searchQuery}" href="/" class="btn btn-outline-secondary">
-                            <i class="bi bi-x-lg"></i>
-                        </a>
+                <div class="col-12">
+                    <form method="get" action="/" class="row g-2 align-items-end">
+                        <div class="col-12 col-md-3">
+                            <label class="form-label small text-muted mb-1">Buscar</label>
+                            <input type="text" name="search" class="form-control form-control-sm"
+                                   placeholder="Guía, contenedor o buque..."
+                                   th:value="${searchQuery}">
+                        </div>
+                        <div class="col-6 col-md-2">
+                            <label class="form-label small text-muted mb-1">Naviera</label>
+                            <select name="carrier" class="form-select form-select-sm">
+                                <option value="" th:selected="${carrierFilter == null}">Todas</option>
+                                <option th:each="c : ${carriers}" th:value="${c}" th:text="${c}"
+                                        th:selected="${carrierFilter != null and carrierFilter == c.name()}"></option>
+                            </select>
+                        </div>
+                        <div class="col-6 col-md-2">
+                            <label class="form-label small text-muted mb-1">Estado</label>
+                            <select name="status" class="form-select form-select-sm">
+                                <option value="" th:selected="${statusFilter == null}">Todos</option>
+                                <option th:each="st : ${statuses}" th:value="${st}" th:text="${st}"
+                                        th:selected="${statusFilter != null and statusFilter == st.name()}"></option>
+                            </select>
+                        </div>
+                        <div class="col-6 col-md-2">
+                            <label class="form-label small text-muted mb-1">Puerto destino</label>
+                            <input type="text" name="port" class="form-control form-control-sm"
+                                   placeholder="Manzanillo..."
+                                   th:value="${portFilter}">
+                        </div>
+                        <div class="col-6 col-md-1">
+                            <label class="form-label small text-muted mb-1">ETA desde</label>
+                            <input type="date" name="etaFrom" class="form-control form-control-sm"
+                                   th:value="${etaFromFilter != null ? #temporals.format(etaFromFilter, 'yyyy-MM-dd') : ''}">
+                        </div>
+                        <div class="col-6 col-md-1">
+                            <label class="form-label small text-muted mb-1">ETA hasta</label>
+                            <input type="date" name="etaTo" class="form-control form-control-sm"
+                                   th:value="${etaToFilter != null ? #temporals.format(etaToFilter, 'yyyy-MM-dd') : ''}">
+                        </div>
+                        <div class="col-12 col-md-1 d-flex gap-1">
+                            <button class="btn btn-outline-primary btn-sm w-100" type="submit">
+                                <i class="bi bi-search"></i>
+                            </button>
+                            <a href="/" class="btn btn-outline-secondary btn-sm" title="Limpiar filtros">
+                                <i class="bi bi-x-lg"></i>
+                            </a>
+                        </div>
                     </form>
                 </div>
             </div>
@@ -342,7 +378,7 @@
                     <ul class="pagination pagination-sm mb-0">
                         <li class="page-item" th:classappend="${hasPrevious} ? '' : 'disabled'">
                             <a class="page-link"
-                               th:href="@{/(page=${currentPage - 1}, size=${pageSize}, search=${searchQuery})}"
+                               th:href="@{/(page=${currentPage - 1}, size=${pageSize}, search=${searchQuery}, carrier=${carrierFilter}, status=${statusFilter}, port=${portFilter}, etaFrom=${etaFromFilter}, etaTo=${etaToFilter})}"
                                aria-label="Página anterior">
                                 <i class="bi bi-chevron-left"></i>
                             </a>
@@ -351,12 +387,12 @@
                             th:each="p : ${pageNumbers}"
                             th:classappend="${p == currentPage} ? 'active'">
                             <a class="page-link"
-                               th:href="@{/(page=${p}, size=${pageSize}, search=${searchQuery})}"
+                               th:href="@{/(page=${p}, size=${pageSize}, search=${searchQuery}, carrier=${carrierFilter}, status=${statusFilter}, port=${portFilter}, etaFrom=${etaFromFilter}, etaTo=${etaToFilter})}"
                                th:text="${p + 1}">1</a>
                         </li>
                         <li class="page-item" th:classappend="${hasNext} ? '' : 'disabled'">
                             <a class="page-link"
-                               th:href="@{/(page=${currentPage + 1}, size=${pageSize}, search=${searchQuery})}"
+                               th:href="@{/(page=${currentPage + 1}, size=${pageSize}, search=${searchQuery}, carrier=${carrierFilter}, status=${statusFilter}, port=${portFilter}, etaFrom=${etaFromFilter}, etaTo=${etaToFilter})}"
                                aria-label="Página siguiente">
                                 <i class="bi bi-chevron-right"></i>
                             </a>
@@ -369,7 +405,7 @@
                     <select id="pageSizeSelect" class="form-select form-select-sm" style="width: auto;"
                             onchange="if (this.value) { window.location.href = this.value; }">
                         <option th:each="s : ${pageSizes}"
-                                th:value="@{/(page=0, size=${s}, search=${searchQuery})}"
+                                th:value="@{/(page=0, size=${s}, search=${searchQuery}, carrier=${carrierFilter}, status=${statusFilter}, port=${portFilter}, etaFrom=${etaFromFilter}, etaTo=${etaToFilter})}"
                                 th:text="${s}"
                                 th:selected="${pageSize == s}">10</option>
                     </select>

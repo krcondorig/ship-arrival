@@ -10,6 +10,7 @@ import com.shiparrival.repository.ShipmentRepository;
 import com.shiparrival.service.dto.BatchImportSummary;
 import com.shiparrival.service.dto.ExcelImportResult;
 import com.shiparrival.service.dto.ExcelShipmentRow;
+import com.shiparrival.service.dto.ShipmentFilter;
 import com.shiparrival.service.dto.ShipmentStats;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -285,11 +286,26 @@ public class ShipmentService {
      * Los embarques arribados hace más de 3 días se omiten automáticamente
      * (quedan archivados en la base de datos).
      */
+    /**
+     * Obtiene los embarques visibles en el dashboard de forma paginada, aplicando
+     * los criterios de {@link ShipmentFilter} (búsqueda de texto, naviera, estado,
+     * puerto y rango de ETA). Los embarques arribados hace más de 3 días se
+     * omiten automáticamente.
+     */
     @Transactional(readOnly = true)
-    public Page<Shipment> getVisibleShipments(String searchTerm, Pageable pageable) {
+    public Page<Shipment> getVisibleShipments(ShipmentFilter filter, Pageable pageable) {
+        ShipmentFilter safe = (filter == null) ? ShipmentFilter.empty() : filter;
         LocalDateTime cutoff = LocalDateTime.now().minusDays(3);
-        return shipmentRepository.findVisibleShipments(
-                cutoff, ShipmentStatus.ARRIVED, toSearchPattern(searchTerm), pageable);
+        return shipmentRepository.findVisibleShipmentsFiltered(
+                cutoff,
+                ShipmentStatus.ARRIVED,
+                toSearchPattern(safe.search()),
+                safe.carrier(),
+                safe.status(),
+                toFilterPattern(safe.port()),
+                safe.etaFrom(),
+                safe.etaTo(),
+                pageable);
     }
 
     /**
@@ -297,11 +313,13 @@ public class ShipmentService {
      * (no solo la página actual), respetando el filtro de búsqueda.
      */
     @Transactional(readOnly = true)
-    public ShipmentStats getVisibleShipmentStats(String searchTerm) {
+    public ShipmentStats getVisibleShipmentStats(ShipmentFilter filter) {
+        ShipmentFilter safe = (filter == null) ? ShipmentFilter.empty() : filter;
         LocalDateTime cutoff = LocalDateTime.now().minusDays(3);
-        List<Object[]> rows = shipmentRepository.countVisibleByStatus(
-                cutoff, ShipmentStatus.ARRIVED, toSearchPattern(searchTerm));
-
+        List<Object[]> rows = shipmentRepository.countVisibleByStatusFiltered(
+                cutoff, ShipmentStatus.ARRIVED, toSearchPattern(safe.search()),
+                safe.carrier(), safe.status(), toFilterPattern(safe.port()),
+                safe.etaFrom(), safe.etaTo());
         long total = 0;
         long inTransit = 0;
         long nearArrival = 0;
@@ -328,6 +346,18 @@ public class ShipmentService {
         return (searchTerm == null || searchTerm.isBlank())
                 ? "%"
                 : "%" + searchTerm.trim().toLowerCase() + "%";
+    }
+
+    /**
+     * Convierte un filtro de texto opcional en un patrón LIKE. Si está en blanco
+     * devuelve {@code null} para desactivar el filtro (en lugar de "%" que
+     * excluiría filas con valor nulo).
+     */
+    private String toFilterPattern(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        return "%" + value.trim().toLowerCase() + "%";
     }
 
     @Transactional
