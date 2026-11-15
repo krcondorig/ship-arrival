@@ -211,31 +211,33 @@ class ShipmentServiceTest {
     void shouldQueryVisibleShipmentsWithPagination() {
         Pageable pageable = PageRequest.of(0, 10);
         Page<Shipment> page = new PageImpl<>(List.of(new Shipment()));
-        when(shipmentRepository.findVisibleShipmentsFiltered(
-                any(LocalDateTime.class), eq(ShipmentStatus.ARRIVED), eq("%test%"),
-                eq(null), eq(null), eq(null), eq(null), eq(null), eq(pageable)))
+        when(shipmentRepository.findAll(any(org.springframework.data.jpa.domain.Specification.class), eq(pageable)))
                 .thenReturn(page);
 
         Page<Shipment> result = shipmentService.getVisibleShipments(
                 new com.shiparrival.service.dto.ShipmentFilter("TEST", null, null, null, null, null), pageable);
 
         assertThat(result).isSameAs(page);
-        verify(shipmentRepository).findVisibleShipmentsFiltered(
-                any(LocalDateTime.class), eq(ShipmentStatus.ARRIVED), eq("%test%"),
-                eq(null), eq(null), eq(null), eq(null), eq(null), eq(pageable));
+        verify(shipmentRepository).findAll(any(org.springframework.data.jpa.domain.Specification.class), eq(pageable));
     }
 
     @Test
     @DisplayName("Debe calcular las estadísticas de los embarques visibles")
     void shouldCalculateVisibleShipmentStats() {
-        when(shipmentRepository.countVisibleByStatusFiltered(
-                any(LocalDateTime.class), eq(ShipmentStatus.ARRIVED), eq("%"),
-                eq(null), eq(null), eq(null), eq(null), eq(null)))
-                .thenReturn(List.of(
-                        new Object[]{ShipmentStatus.IN_TRANSIT, 5L},
-                        new Object[]{ShipmentStatus.NEAR_ARRIVAL, 2L},
-                        new Object[]{ShipmentStatus.ARRIVED, 1L},
-                        new Object[]{ShipmentStatus.PENDING_FIRST_CHECK, 3L}));
+        Shipment s1 = Shipment.builder().status(ShipmentStatus.IN_TRANSIT).build();
+        Shipment s2 = Shipment.builder().status(ShipmentStatus.IN_TRANSIT).build();
+        Shipment s3 = Shipment.builder().status(ShipmentStatus.IN_TRANSIT).build();
+        Shipment s4 = Shipment.builder().status(ShipmentStatus.IN_TRANSIT).build();
+        Shipment s5 = Shipment.builder().status(ShipmentStatus.IN_TRANSIT).build();
+        Shipment n1 = Shipment.builder().status(ShipmentStatus.NEAR_ARRIVAL).build();
+        Shipment n2 = Shipment.builder().status(ShipmentStatus.NEAR_ARRIVAL).build();
+        Shipment a1 = Shipment.builder().status(ShipmentStatus.ARRIVED).build();
+        Shipment p1 = Shipment.builder().status(ShipmentStatus.PENDING_FIRST_CHECK).build();
+        Shipment p2 = Shipment.builder().status(ShipmentStatus.PENDING_FIRST_CHECK).build();
+        Shipment p3 = Shipment.builder().status(ShipmentStatus.PENDING_FIRST_CHECK).build();
+        java.util.List<Shipment> all = java.util.List.of(s1, s2, s3, s4, s5, n1, n2, a1, p1, p2, p3);
+        when(shipmentRepository.findAll(any(org.springframework.data.jpa.domain.Specification.class)))
+                .thenReturn(all);
 
         ShipmentStats stats = shipmentService.getVisibleShipmentStats(
                 new com.shiparrival.service.dto.ShipmentFilter(null, null, null, null, null, null));
