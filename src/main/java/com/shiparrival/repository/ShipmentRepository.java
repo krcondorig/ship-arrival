@@ -48,11 +48,11 @@ public interface ShipmentRepository extends JpaRepository<Shipment, Long> {
               AND (LOWER(s.trackingNumber) LIKE :search
                    OR LOWER(s.containerNumber) LIKE :search
                    OR LOWER(s.vesselName) LIKE :search)
-              AND (:carrier IS NULL OR s.carrier = :carrier)
-              AND (:status IS NULL OR s.status = :status)
-              AND (:port IS NULL OR LOWER(s.portOfDischarge) LIKE :port)
-              AND (:etaFrom IS NULL OR s.estimatedArrival >= :etaFrom)
-              AND (:etaTo IS NULL OR s.estimatedArrival <= :etaTo)
+              AND (CAST(:carrier AS string) IS NULL OR s.carrier = CAST(:carrier AS string))
+              AND (CAST(:status AS string) IS NULL OR s.status = CAST(:status AS string))
+              AND (CAST(:port AS string) IS NULL OR LOWER(s.portOfDischarge) LIKE CAST(:port AS string))
+              AND (CAST(:etaFrom AS timestamp) IS NULL OR s.estimatedArrival >= CAST(:etaFrom AS timestamp))
+              AND (CAST(:etaTo AS timestamp) IS NULL OR s.estimatedArrival <= CAST(:etaTo AS timestamp))
             """)
     Page<Shipment> findVisibleShipmentsFiltered(@Param("cutoff") LocalDateTime cutoff,
                                                 @Param("arrivedStatus") ShipmentStatus arrivedStatus,
@@ -89,11 +89,11 @@ public interface ShipmentRepository extends JpaRepository<Shipment, Long> {
               AND (LOWER(s.trackingNumber) LIKE :search
                    OR LOWER(s.containerNumber) LIKE :search
                    OR LOWER(s.vesselName) LIKE :search)
-              AND (:carrier IS NULL OR s.carrier = :carrier)
-              AND (:status IS NULL OR s.status = :status)
-              AND (:port IS NULL OR LOWER(s.portOfDischarge) LIKE :port)
-              AND (:etaFrom IS NULL OR s.estimatedArrival >= :etaFrom)
-              AND (:etaTo IS NULL OR s.estimatedArrival <= :etaTo)
+              AND (CAST(:carrier AS string) IS NULL OR s.carrier = CAST(:carrier AS string))
+              AND (CAST(:status AS string) IS NULL OR s.status = CAST(:status AS string))
+              AND (CAST(:port AS string) IS NULL OR LOWER(s.portOfDischarge) LIKE CAST(:port AS string))
+              AND (CAST(:etaFrom AS timestamp) IS NULL OR s.estimatedArrival >= CAST(:etaFrom AS timestamp))
+              AND (CAST(:etaTo AS timestamp) IS NULL OR s.estimatedArrival <= CAST(:etaTo AS timestamp))
             GROUP BY s.status
             """)
     List<Object[]> countVisibleByStatusFiltered(@Param("cutoff") LocalDateTime cutoff,
