@@ -3,51 +3,226 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Acceso - ShipArrival</title>
+    <title>ArriVix — Acceso a Consola</title>
+    <meta name="theme-color" content="#171717">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300..800;1,9..40,300..800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --font-sans: 'DM Sans', system-ui, -apple-system, sans-serif;
+            --brand-primary: #0d4fae;
+        }
+        body {
+            font-family: var(--font-sans);
+            margin: 0;
+            min-height: 100dvh;
+            display: grid;
+            place-items: center;
+            padding: clamp(16px, 4vw, 32px);
+            box-sizing: border-box;
+            /* Fondo base. La capa con degradado + foto la inyecta Thymeleaf mas
+               abajo (th:inline="css") para resolver la ruta con @{...} y que
+               funcione igual con o sin context path. */
+            background-color: #0a1423;
+            background-position: center center;
+            background-size: cover;
+            background-repeat: no-repeat;
+            background-attachment: fixed;
+            overflow-x: hidden;
+        }
+        .login-card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            width: 100%;
+            min-width: 280px;
+            max-width: 400px;
+            padding: clamp(20px, 4.5vw, 36px);
+            border-radius: clamp(12px, 2vw, 16px);
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.4);
+            box-sizing: border-box;
+        }
+        .brand-header {
+            text-align: center;
+            margin-bottom: clamp(16px, 3vw, 24px);
+        }
+        .brand-logo-wrap {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            margin-bottom: clamp(4px, 1.5vw, 8px);
+        }
+        .brand-logo-wrap svg {
+            width: clamp(26px, 4vw, 34px);
+            height: clamp(26px, 4vw, 34px);
+            flex-shrink: 0;
+        }
+        .brand-wordmark {
+            font-size: clamp(20px, 3.5vw, 24px);
+            font-weight: 700;
+            color: #0f172a;
+            letter-spacing: -0.02em;
+        }
+        .brand-header h1 {
+            font-size: clamp(18px, 3.2vw, 22px);
+            font-weight: 700;
+            color: #0f172a;
+            margin: clamp(4px, 1vw, 8px) 0 clamp(2px, 0.5vw, 4px) 0;
+        }
+        .brand-header p {
+            font-size: clamp(12px, 2.2vw, 13.5px);
+            color: #64748b;
+            margin: 0;
+        }
+
+        .input-group-label {
+            display: block;
+            font-size: clamp(12px, 2vw, 13px);
+            font-weight: 600;
+            margin-bottom: 6px;
+            color: #1e293b;
+        }
+        .input-wrap {
+            position: relative;
+            display: flex;
+            align-items: center;
+            margin-bottom: clamp(12px, 2.5vw, 16px);
+        }
+        .field-icon {
+            position: absolute;
+            left: 14px;
+            font-size: 15px;
+            color: #64748b;
+            pointer-events: none;
+        }
+        .form-input-custom {
+            width: 100%;
+            min-height: 44px;
+            padding: 10px 14px 10px 42px;
+            font-size: clamp(13px, 2.2vw, 14px);
+            border-radius: 8px;
+            border: 1px solid #cbd5e1;
+            font-variant-numeric: tabular-nums;
+            box-sizing: border-box;
+            background: #ffffff;
+        }
+        .form-input-custom:focus {
+            outline: none;
+            border-color: var(--brand-primary);
+            box-shadow: 0 0 0 3px rgba(13, 79, 174, 0.15);
+        }
+        .pass-toggle {
+            position: absolute;
+            right: 12px;
+            background: none;
+            border: none;
+            cursor: pointer;
+            color: #64748b;
+            padding: 4px;
+            display: flex;
+            align-items: center;
+        }
+        .btn-submit {
+            width: 100%;
+            min-height: 46px;
+            background: var(--brand-primary);
+            color: white;
+            border: none;
+            padding: 12px;
+            border-radius: 8px;
+            font-size: clamp(13.5px, 2.4vw, 14.5px);
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            margin-top: 8px;
+            box-sizing: border-box;
+            transition: background 0.15s ease;
+        }
+        .btn-submit:hover {
+            background: #0b3c8c;
+        }
+    </style>
+    <!-- Imagen de fondo resuelta por Thymeleaf: soporta context path. -->
+    <style th:inline="css">
+        body {
+            background-image: linear-gradient(rgba(10, 20, 35, 0.40), rgba(10, 20, 35, 0.60)),
+                              url([[@{/img/contecon_2.jpg}]]);
+        }
+    </style>
 </head>
-<body class="bg-dark d-flex align-items-center" style="min-height: 100vh;">
-
-<div class="container" style="max-width: 420px;">
-    <div class="card shadow-lg border-0">
-        <div class="card-body p-4">
-            <div class="text-center mb-4">
-                <i class="bi bi-water text-info" style="font-size: 2.5rem;"></i>
-                <h4 class="fw-bold mt-2 mb-0">ShipArrival</h4>
-                <p class="text-muted small mb-0">Monitoreo de arribo de buques</p>
+<body>
+    <div class="login-card">
+        <div class="brand-header">
+            <div class="brand-logo-wrap">
+              <!-- Variante CLARA del isotipo (tarjeta blanca): pértigo, cubierta y
+                   arcos en #0d4fae (7.65:1 sobre blanco) porque #38bdf8 daba
+                   2.14:1 y #7dd3fc 1.67:1 — invisibles sobre la tarjeta. -->
+              <svg viewBox="-1 -3 34 34" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="ArriVix">
+                <path d="M16 30V21" stroke="#0d4fae" stroke-width="1.8" stroke-linecap="round" />
+                <path d="M5 16L16 29L27 16V12L16 17L5 12V16Z" fill="#0284c7" />
+                <path d="M9 12.4V8.6H23V12.4L16 15.4L9 12.4Z" fill="#0d4fae" />
+                <path d="M11 11.4V9.6H14.6V11.4H11Z" fill="#ffffff" opacity="0.92" />
+                <path d="M15.4 11.4V9.6H19V11.4H15.4Z" fill="#ffffff" opacity="0.92" />
+                <path d="M19.4 11.4V9.6H21V11.4H19.4Z" fill="#ffffff" opacity="0.92" />
+                <path d="M12 7.4C14 6.2 18 6.2 20 7.4" stroke="#0d4fae" stroke-width="2" stroke-linecap="round" />
+                <path d="M9.6 4C13 1.9 19 1.9 22.4 4" stroke="#0d4fae" stroke-width="2" stroke-linecap="round" />
+              </svg>
+              <span class="brand-wordmark">ArriVix</span>
             </div>
-
-            <div th:if="${errorMessage}" class="alert alert-danger py-2 small" role="alert">
-                <i class="bi bi-exclamation-triangle-fill me-1"></i>
-                <span th:text="${errorMessage}">Usuario o contraseña incorrectos.</span>
-            </div>
-
-            <form th:action="@{/login}" method="post">
-                <input type="hidden" name="redirect" th:value="${redirect}">
-
-                <div class="mb-3">
-                    <label for="username" class="form-label small fw-semibold">Usuario</label>
-                    <input type="text" class="form-control" id="username" name="username"
-                           autocomplete="username" required autofocus>
-                </div>
-
-                <div class="mb-4">
-                    <label for="password" class="form-label small fw-semibold">Contraseña</label>
-                    <input type="password" class="form-control" id="password" name="password"
-                           autocomplete="current-password" required>
-                </div>
-
-                <button type="submit" class="btn btn-primary w-100 fw-semibold">
-                    <i class="bi bi-box-arrow-in-right me-1"></i>Entrar
-                </button>
-            </form>
+            <h1>Iniciar Sesión</h1>
+            <p>Seguimiento de guías y contenedores</p>
         </div>
-    </div>
-    <p class="text-center text-secondary small mt-3 mb-0">
-        Acceso restringido. Si no tienes cuenta, pídesela a un administrador.
-    </p>
-</div>
 
+        <div th:if="${errorMessage}" id="loginErrorBox" class="alert alert-danger py-2 px-3 small align-items-center gap-2 mb-3 rounded-2" role="alert" style="font-size: 13px;">
+            <i class="bi bi-exclamation-triangle-fill text-danger flex-shrink-0" aria-hidden="true"></i>
+            <span th:text="${errorMessage}">Usuario o contraseña incorrectos.</span>
+        </div>
+
+        <form th:action="@{/login}" method="post">
+            <input type="hidden" name="redirect" th:value="${redirect}">
+            <label class="input-group-label" for="username">Usuario</label>
+            <div class="input-wrap">
+                <i class="bi bi-person field-icon" aria-hidden="true"></i>
+                <input type="text" id="username" name="username" class="form-input-custom" placeholder="Usuario"
+                       autocomplete="username" required autofocus>
+            </div>
+            <label class="input-group-label" for="password">Contraseña</label>
+            <div class="input-wrap">
+                <i class="bi bi-lock field-icon" aria-hidden="true"></i>
+                <input type="password" id="password" name="password" class="form-input-custom pass-input"
+                       placeholder="••••••••••••" autocomplete="current-password" required>
+                <button type="button" class="pass-toggle" id="togglePass" aria-label="Mostrar contraseña"><i class="bi bi-eye" aria-hidden="true"></i></button>
+            </div>
+            <button type="submit" class="btn-submit">
+                <span>Ingresar</span>
+                <i class="bi bi-box-arrow-in-right" aria-hidden="true"></i>
+            </button>
+        </form>
+    </div>
+    <script>
+        (function () {
+            var box = document.getElementById('loginErrorBox');
+            if (!box) return;
+            var renderedByThymeleaf = !box.hasAttribute('th:if');
+            var demoError = /[?&]error=1/.test(window.location.search);
+            if (!renderedByThymeleaf && !demoError) {
+                box.style.display = 'none';
+            } else {
+                box.style.display = 'flex';
+            }
+        })();
+
+        document.getElementById('togglePass').addEventListener('click', function() {
+            const input = document.querySelector('.pass-input');
+            const icon = this.querySelector('i');
+            const isPassword = input.getAttribute('type') === 'password';
+            input.setAttribute('type', isPassword ? 'text' : 'password');
+            icon.className = isPassword ? 'bi bi-eye-slash' : 'bi bi-eye';
+        });
+    </script>
 </body>
 </html>

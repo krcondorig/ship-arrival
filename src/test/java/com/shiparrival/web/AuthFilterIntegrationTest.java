@@ -45,6 +45,12 @@ class AuthFilterIntegrationTest {
     }
 
     @Test
+    @DisplayName("La imagen de fondo del login es pública (visible sin sesión)")
+    void shouldAllowLoginBackgroundImageWithoutSession() throws Exception {
+        mockMvc.perform(get("/img/contecon_2.jpg")).andExpect(status().isOk());
+    }
+
+    @Test
     @DisplayName("Una petición autenticada renueva la reserva de sesión por una hora")
     void shouldExtendSessionAfterAuthenticatedRequest() throws Exception {
         java.time.LocalDateTime oldExpiry = java.time.LocalDateTime.now().plusMinutes(1);

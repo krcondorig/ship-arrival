@@ -3,120 +3,675 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title th:text="'Historial: ' + ${shipment.trackingNumber} + ' - ShipArrival'">Historial de Embarque</title>
-    <!-- Bootstrap 5 CSS -->
+    <title th:text="'Historial: ' + ${shipment.trackingNumber} + ' - ArriVix'">Historial de Embarque — ArriVix</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
-    <!-- Custom CSS -->
-    <link rel="stylesheet" th:href="@{/css/dashboard.css}">
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300..800;1,9..40,300..800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --font-sans: 'DM Sans', system-ui, -apple-system, sans-serif;
+            --brand-primary: #0d4fae;
+            --brand-primary-light: #1e6fcc;
+            --active: #0d4fae;
+            --bg-base: #f8fafc;
+            --card-bg: #ffffff;
+            --text-primary: #0f172a;
+            --text-secondary: #475569;
+            --text-muted: #475569;   /* 7.58:1 AAA (antes #94a3b8 = 2.56:1) */
+            --border-color: #e2e8f0;
+            --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.05);
+            --shadow-md: 0 4px 12px rgba(15, 23, 42, 0.08);
+            --shadow-lg: 0 12px 28px rgba(15, 23, 42, 0.12);
+            --radius-sm: 8px;
+            --radius-md: 12px;
+            --radius-lg: 16px;
+            /* Paleta de la topbar: idéntica a dashboard-single-action.html para
+               que ambas vistas compartan la misma barra oscura sticky. */
+            --nav-bg: #171717;
+            --nav-border: #404040;
+            --nav-text: #ffffff;
+            --nav-muted: #a3a3a3;
+        }
+        * { box-sizing: border-box; }
+        body {
+            font-family: var(--font-sans);
+            margin: 0;
+            min-height: 100dvh;
+            background: var(--bg-base);
+            color: var(--text-primary);
+            font-variant-numeric: tabular-nums lining-nums;
+            font-feature-settings: "zero" 0, "tnum" 1;
+        }
+        a { color: var(--brand-primary); text-decoration: none; }
+        a:hover { text-decoration: underline; }
+
+        /* ===== FLUID CONTAINER ===== */
+        .page-container {
+            width: 100%;
+            min-width: 320px;
+            max-width: 1180px;
+            margin: 0 auto;
+            padding: clamp(16px, 3vw, 32px) clamp(16px, 4vw, 40px);
+        }
+
+        /* ===== TOPBAR (idéntica a dashboard-single-action.html) ===== */
+        .topbar { background: var(--nav-bg); border-bottom: 1px solid var(--nav-border); position: sticky; top: 0; z-index: 100; }
+        .topbar-nav { display: flex; align-items: center; justify-content: space-between; padding: 10px 20px; min-height: 52px; gap: 16px; }
+        .topbar-brand { display: flex; align-items: center; gap: 8px; color: var(--nav-text); text-decoration: none; font-weight: 600; font-size: 17px; flex-shrink: 0; }
+        .topbar-brand:hover { text-decoration: none; }
+        /* Isotipo ArriVix (proa + radar) en topbar. El viewBox del logo es -1 -3 34 34,
+           así que el glifo ocupa 34 unidades: a 30px de caja el trazo queda nítido
+           sin invadir el padding vertical de la barra (52px min-height − 20px padding). */
+        .topbar-brand .brand-logo { width: 30px; height: 30px; display: block; flex-shrink: 0; }
+        .topbar-brand .brand-name { letter-spacing: -0.01em; color: var(--nav-text); }
+        .topbar-center { display: none; align-items: center; gap: 16px; flex: 1; min-width: 0; }
+        @media (min-width: 992px) { .topbar-center { display: flex; } }
+        /* --nav-muted #a3a3a3 sobre #171717 = 7.11:1 AAA. 13px: entre celdas (14px)
+           y page-subtitle (13px) queda por debajo de la marca (17px) sin competir. */
+        .topbar-desc { font-size: 13px; color: var(--nav-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .topbar-actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+        .user-avatar { width: 28px; height: 28px; border-radius: 50%; background: linear-gradient(135deg, var(--active), #3b82f6); display: flex; align-items: center; justify-content: center; color: white; font-weight: 600; font-size: 12px; flex-shrink: 0; }
+        .topbar-dropdown .btn { background: transparent; border: 1px solid rgba(255,255,255,0.15); color: var(--nav-text); padding: 6px 10px; border-radius: 6px; font-size: 12px; display: flex; align-items: center; gap: 6px; min-height: 40px; }
+        .topbar-dropdown .btn:hover { background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.25); }
+        .topbar-dropdown .dropdown-menu { background: #1f1f1f; border: 1px solid var(--nav-border); box-shadow: 0 10px 40px rgba(0,0,0,0.3); margin-top: 6px; min-width: 180px; }
+        .topbar-dropdown .dropdown-item { color: #e5e5e5; padding: 8px 14px; font-size: 12px; display: flex; align-items: center; gap: 8px; }
+        .topbar-dropdown .dropdown-item:hover { background: #333; color: #fff; text-decoration: none; }
+        .topbar-dropdown .dropdown-item i { width: 16px; text-align: center; }
+        .topbar-dropdown .dropdown-divider { border-color: var(--nav-border); }
+        .topbar-dropdown form { margin: 0; }
+
+        /* Botón secundario "Volver al Dashboard" dentro de la topbar oscura. */
+        .btn-back-topbar {
+            display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+            min-height: 40px; min-width: 40px;
+            padding: 6px 10px; border-radius: 6px;
+            font-size: 12px; font-weight: 600;
+            background: transparent; color: var(--nav-text);
+            border: 1px solid rgba(255,255,255,0.15);
+            text-decoration: none; white-space: nowrap;
+            transition: all 0.15s ease;
+        }
+        .btn-back-topbar:hover { background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.25); color: #fff; text-decoration: none; }
+        .btn-back-topbar .back-label { display: none; }
+        @media (min-width: 768px) { .btn-back-topbar .back-label { display: inline; } }
+
+        /* ===== SHIPMENT HEADER CARD ===== */
+        .shipment-header-card {
+            background: var(--card-bg);
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-md);
+            border: 1px solid var(--border-color);
+            padding: clamp(20px, 3.5vw, 28px);
+            margin-bottom: clamp(20px, 3vw, 28px);
+            overflow: hidden;
+        }
+        .header-top {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: space-between;
+            gap: clamp(12px, 2vw, 16px);
+            margin-bottom: clamp(16px, 2.5vw, 20px);
+            padding-bottom: clamp(16px, 2.5vw, 20px);
+            border-bottom: 1px solid var(--border-color);
+        }
+        .header-main {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: clamp(8px, 1.5vw, 12px);
+            min-width: 0;
+        }
+        .carrier-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 10px;
+            font-size: clamp(11px, 1.3vw, 12px);
+            font-weight: 600;
+            border-radius: 999px;
+            background: #e0f2fe;
+            color: #0369a1;
+        }
+        .carrier-badge.one { background: #e0f2fe; color: #0c4a6e; }   /* 8.24:1 AAA */
+        .carrier-badge.msc { background: #fef3c7; color: #78350f; }   /* 8.15:1 AAA */
+        .carrier-badge.maersk { background: #fee2e2; color: #8f1c1c; }   /* 7.31:1 AAA */
+        .carrier-badge.hapag-lloyd { background: #fce7f3; color: #831843; }   /* 8.21:1 AAA */
+        .tracking-number {
+            font-size: clamp(20px, 3vw, 26px);
+            font-weight: 700;
+            letter-spacing: -0.02em;
+            color: var(--text-primary);
+            font-family: var(--font-sans);
+            min-width: 0;
+            overflow-wrap: anywhere;
+        }
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: clamp(6px, 1vw, 8px) clamp(10px, 1.5vw, 14px);
+            font-size: clamp(11px, 1.3vw, 12.5px);
+            font-weight: 600;
+            border-radius: 999px;
+            white-space: nowrap;
+            flex-shrink: 0;
+            box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
+        }
+        .status-badge.near-arrival { background: #fee2e2; color: #8f1c1c; }   /* 7.31:1 AAA */
+        .status-badge.arrived { background: #dcfce7; color: #14532d; }  /* 8.30:1 AAA */
+        .status-badge.in-transit { background: #e0f2fe; color: #0c4a6e; }  /* 8.24:1 AAA */
+        .status-badge.pending { background: #fef3c7; color: #78350f; }  /* 8.15:1 AAA */
+        .status-badge.error { background: #fee2e2; color: #7f1d1d; }  /* 8.20:1 AAA */
+        .status-badge.manual { background: #fce7f3; color: #831843; }  /* 8.21:1 AAA */
+        .status-badge.cancelled { background: #f1f5f9; color: #334155; }  /* 9.45:1 AAA */
+
+        /* Grid de datos clave — 2 / 4 / 8 columnas fluidas.
+           Subgrid de 2 filas (etiqueta / valor): cuando una etiqueta cae a dos o
+           tres líneas, todos los valores siguen arrancando en el mismo eje
+           horizontal. Navegadores sin subgrid degradan a bloque normal. */
+        .data-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            grid-template-rows: auto auto;
+            align-items: start;
+            gap: clamp(12px, 2vw, 16px) clamp(16px, 2.5vw, 24px);
+        }
+        @media (min-width: 560px) {
+            .data-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+        }
+        @media (min-width: 900px) {
+            .data-grid { grid-template-columns: repeat(8, minmax(0, 1fr)); }
+        }
+        .data-item {
+            min-width: 0;
+            display: grid;
+            grid-row: span 2;
+            grid-template-rows: subgrid;
+            align-content: start;
+        }
+        .data-label {
+            display: block;
+            font-size: clamp(10px, 1.2vw, 11px);
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-muted);
+            margin-bottom: 4px;
+        }
+        .data-value {
+            display: block;
+            font-size: clamp(13px, 1.5vw, 14.5px);
+            font-weight: 600;
+            color: var(--text-primary);
+            word-break: break-word;
+            overflow-wrap: anywhere;
+        }
+        .data-value.eta { color: #991b1b; font-weight: 700; }   /* 8.31:1 AAA */
+        .data-value.ata { color: #14532d; font-weight: 700; }   /* 9.11:1 AAA */
+        .data-value.atd { color: #0c4a6e; }   /* 9.46:1 AAA */
+
+        /* ===== TIMELINE / EVENT LOG ===== */
+        .timeline-card {
+            background: var(--card-bg);
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-md);
+            border: 1px solid var(--border-color);
+            overflow: hidden;
+        }
+        .timeline-header {
+            padding: clamp(16px, 2.5vw, 20px) clamp(20px, 3vw, 28px);
+            border-bottom: 1px solid var(--border-color);
+            background: var(--bg-base);
+        }
+        .timeline-header h2 {
+            margin: 0;
+            font-size: clamp(16px, 2vw, 18px);
+            font-weight: 700;
+            display: flex;
+            /* center mantiene el icono a la altura del bloque completo cuando el
+               título cae a dos líneas en móvil; balance evita el huérfano "ETA". */
+            align-items: center;
+            gap: 10px;
+            color: var(--text-primary);
+            text-wrap: balance;
+        }
+        .timeline-header h2 i { flex-shrink: 0; }
+        .timeline-header h2 i { color: var(--brand-primary); }
+
+        .timeline-list { list-style: none; margin: 0; padding: 0; }
+        .timeline-item {
+            position: relative;
+            display: flex;
+            padding: clamp(14px, 2vw, 18px) clamp(20px, 3vw, 28px);
+            border-bottom: 1px solid var(--border-color);
+        }
+        .timeline-item:last-child { border-bottom: none; }
+
+        /* Riel del timeline: un único tramo por item que arranca bajo el punto y
+           llega hasta el divisor inferior (bottom:-1px lo solapa), de modo que la
+           línea se lee continua entre eventos y no como segmentos sueltos. */
+        .timeline-item:not(:last-child)::after {
+            content: "";
+            position: absolute;
+            left: calc(clamp(20px, 3vw, 28px) + 22px);
+            transform: translateX(-1px);
+            /* Arranca bajo el punto: padding-top del item + alto del dot. */
+            top: calc(clamp(14px, 2vw, 18px) + 12px);
+            bottom: -1px;
+            width: 2px;
+            background: var(--border-color);
+            z-index: 0;
+        }
+        
+        /* Colored connector segments based on event type */
+        .timeline-item .timeline-marker::after {
+            content: "";
+            position: absolute;
+            left: 50%;
+            top: 12px;
+            bottom: -14px;
+            width: 2px;
+            background: inherit;
+            z-index: -1;
+            opacity: 0.5;
+        }
+        .timeline-item:last-child .timeline-marker::after { display: none; }
+
+        .timeline-marker {
+            position: relative;
+            z-index: 1;
+            flex-shrink: 0;
+            width: 44px;
+            display: flex;
+            justify-content: center;
+        }
+        .timeline-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            border: 3px solid var(--card-bg);
+            box-shadow: 0 0 0 2px var(--border-color);
+        }
+        .timeline-dot.eta-updated { background: #b45309; }   /* 5.02:1 */
+        .timeline-dot.scrape-failed { background: #b91c1c; } /* 6.47:1 */
+        .timeline-dot.registered { background: #1d4ed8; }    /* 6.70:1 */
+        .timeline-dot.imported { background: #7e22ce; }      /* 6.98:1 */
+        .timeline-dot.reactivated { background: #15803d; }   /* 5.02:1 */
+        .timeline-dot.status-change { background: #0e7490; } /* 5.36:1 */
+        .timeline-dot.scrape-success { background: #047857; } /* 5.48:1 */
+        .timeline-dot.arrived { background: #15803d; }       /* 5.02:1 — mismo verde que el badge Arribado */
+        
+        /* Connector line colors per event */
+        .timeline-item .timeline-marker .timeline-dot.eta-updated ~ .timeline-marker::after,
+        .timeline-item .timeline-dot.eta-updated::after { background: #fbbf24; }
+        .timeline-item .timeline-dot.scrape-failed::after { background: #ef4444; }
+        .timeline-item .timeline-dot.registered::after { background: #3b82f6; }
+        .timeline-item .timeline-dot.imported::after { background: #8b5cf6; }
+        .timeline-item .timeline-dot.reactivated::after { background: #22c55e; }
+        .timeline-item .timeline-dot.status-change::after { background: #06b6d4; }
+        .timeline-item .timeline-dot.scrape-success::after { background: #10b981; }
+
+        .timeline-content {
+            flex: 1;
+            min-width: 0;
+            padding-left: clamp(12px, 2vw, 16px);
+        }
+        .timeline-row {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: clamp(8px, 1.5vw, 12px);
+            margin-bottom: 6px;
+        }
+        .event-type-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 3px 8px;
+            font-size: clamp(10px, 1.2vw, 11px);
+            font-weight: 600;
+            border-radius: 999px;
+            white-space: nowrap;
+        }
+        .event-type-badge.eta-updated { background: #fef3c7; color: #78350f; }  /* 8.15:1 AAA */
+        .event-type-badge.scrape-failed { background: #fee2e2; color: #7f1d1d; }  /* 8.20:1 AAA */
+        .event-type-badge.registered { background: #dbeafe; color: #1e40af; }  /* 7.15:1 AAA */
+        .event-type-badge.arrived { background: #dcfce7; color: #14532d; }  /* 8.30:1 AAA — mismo token que .status-badge.arrived */
+        .event-type-badge.imported { background: #f3e8ff; color: #6b21a8; }  /* 7.39:1 AAA */
+        .event-type-badge.reactivated { background: #dcfce7; color: #14532d; }  /* 8.30:1 AAA */
+        .event-type-badge.status-change { background: #cffafe; color: #0a566b; }  /* 7.34:1 AAA */
+        .event-type-badge.scrape-success { background: #d1fae5; color: #064e3b; }  /* 8.57:1 AAA */
+        .event-timestamp {
+            font-size: clamp(11px, 1.3vw, 12px);
+            color: var(--text-muted);
+            font-variant-numeric: tabular-nums;
+            white-space: nowrap;
+        }
+        /* Cada par etiqueta/valor se mantiene indivisible (nowrap) para que el
+           "Nuevo ETA" no se separe de su fecha en móvil. */
+        .eta-change {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 4px 8px;
+            margin-top: 4px;
+            font-size: clamp(12px, 1.4vw, 13px);
+        }
+        .eta-pair { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+        .eta-label { color: var(--text-muted); font-weight: 500; }
+        .eta-value {
+            font-weight: 600;
+            font-variant-numeric: tabular-nums;
+        }
+        .eta-value.prev { color: var(--text-secondary); text-decoration: line-through; }
+        .eta-value.new { color: #991b1b; }   /* 8.31:1 AAA */
+        .eta-arrow { color: var(--text-muted); }
+        .event-description {
+            margin-top: 4px;
+            font-size: clamp(12px, 1.4vw, 13px);
+            color: var(--text-secondary);
+            line-height: 1.5;
+        }
+
+        /* Empty state */
+        .timeline-empty {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: clamp(40px, 6vw, 60px) clamp(20px, 3vw, 28px);
+            text-align: center;
+            color: var(--text-muted);
+        }
+        .timeline-empty i { font-size: clamp(40px, 5vw, 56px); margin-bottom: 12px; opacity: 0.5; }
+        .timeline-empty p { margin: 0; font-size: clamp(14px, 1.6vw, 16px); }
+
+        /* Responsive adjustments */
+        @media (max-width: 480px) {
+            .timeline-item { padding-left: 14px; }
+            .timeline-item:not(:last-child)::after { left: calc(14px + 10px); }
+            .timeline-marker { width: 20px; }
+            .timeline-dot { width: 10px; height: 10px; }
+        }
+    </style>
 </head>
 <body>
+    <!-- ===== TOPBAR: misma barra oscura sticky que el dashboard ===== -->
+    <header class="topbar" role="banner">
+        <nav class="topbar-nav" aria-label="Navegación principal">
+            <a href="/" class="topbar-brand" aria-label="ArriVix - Inicio">
+                <!-- Isotipo oficial ArriVix: proa frontal de buque mercante con
+                     contenedores apilados y tres arcos concéntricos de radar
+                     satelital. Los fills son literales (no currentColor) porque la
+                     paleta azul corporativa debe leerse igual sobre #171717. -->
+                <svg class="brand-logo" viewBox="-1 -3 34 34" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false">
+                    <!-- Pértigo #38bdf8 sobre #171717 = 8.37:1 (antes #0369a1 = 3.02:1). -->
+                    <path d="M16 30V21" stroke="#38bdf8" stroke-width="1.8" stroke-linecap="round" />
+                    <path d="M5 16L16 29L27 16V12L16 17L5 12V16Z" fill="#0284c7" />
+                    <path d="M9 12.4V8.6H23V12.4L16 15.4L9 12.4Z" fill="#0ea5e9" />
+                    <path d="M11 11.4V9.6H14.6V11.4H11Z" fill="#ffffff" opacity="0.92" />
+                    <path d="M15.4 11.4V9.6H19V11.4H15.4Z" fill="#ffffff" opacity="0.92" />
+                    <path d="M19.4 11.4V9.6H21V11.4H19.4Z" fill="#ffffff" opacity="0.92" />
+                    <path d="M12 7.4C14 6.2 18 6.2 20 7.4" stroke="#38bdf8" stroke-width="2" stroke-linecap="round" />
+                    <path d="M9.6 4C13 1.9 19 1.9 22.4 4" stroke="#7dd3fc" stroke-width="2" stroke-linecap="round" />
+                </svg>
+                <span class="brand-name">ArriVix</span>
+            </a>
+            <div class="topbar-center" aria-hidden="true">
+                <span class="topbar-desc">Monitoreo automatizado de arribos</span>
+            </div>
+            <div class="topbar-actions">
+                <a href="/" class="btn-back-topbar" aria-label="Volver al Dashboard">
+                    <i class="bi bi-arrow-left" aria-hidden="true"></i>
+                    <span class="back-label">Volver al Dashboard</span>
+                </a>
+                <div class="topbar-dropdown dropdown" th:if="${currentUser != null}">
+                    <button class="btn" type="button" id="userMenu" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true"
+                            th:attr="aria-label=|Menú de usuario, ${currentUser.username}|">
+                        <span class="user-avatar" aria-hidden="true"
+                              th:text="${#strings.toUpperCase(#strings.substring(currentUser.username,0,1))}">A</span>
+                        <span class="d-none d-md-inline" th:text="${currentUser.username}">admin</span>
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userMenu" role="menu">
+                        <li><a class="dropdown-item" href="/profile" role="menuitem"><i class="bi bi-person-badge" aria-hidden="true"></i>Mi Perfil</a></li>
+                        <li><a class="dropdown-item" href="/settings" role="menuitem"><i class="bi bi-gear" aria-hidden="true"></i>Configuración</a></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li>
+                            <form th:action="@{/logout}" method="post">
+                                <button type="submit" class="dropdown-item" role="menuitem" aria-label="Cerrar sesión"><i class="bi bi-box-arrow-right" aria-hidden="true"></i>Cerrar sesión</button>
+                            </form>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </nav>
+    </header>
 
-<nav class="navbar navbar-dark bg-dark shadow-sm">
-    <div class="container px-4">
-        <a class="navbar-brand fw-bold" href="/">
-            <i class="bi bi-water me-2 text-info"></i>ShipArrival
-        </a>
-        <a href="/" class="btn btn-outline-light btn-sm">
-            <i class="bi bi-arrow-left me-1"></i>Volver al Dashboard
-        </a>
+    <div class="page-container">
+        <!-- Shipment Header Card -->
+        <section class="shipment-header-card">
+            <div class="header-top">
+                <div class="header-main">
+                    <span th:classappend="${shipment.carrier != null ? 'carrier-badge ' + #strings.toLowerCase(shipment.carrier.label) : 'carrier-badge'}" th:text="${shipment.carrier.label}">ONE</span>
+                    <span class="tracking-number" th:text="${shipment.trackingNumber}">TESTBL900001</span>
+                </div>
+                <span class="status-badge"
+                      th:classappend="
+                          ${shipment.status.name() == 'NEAR_ARRIVAL'} ? 'status-badge near-arrival' :
+                          (${shipment.status.name() == 'ARRIVED'} ? 'status-badge arrived' :
+                          (${shipment.status.name() == 'IN_TRANSIT'} ? 'status-badge in-transit' :
+                          (${shipment.status.name() == 'PENDING_FIRST_CHECK'} ? 'status-badge pending' :
+                          (${shipment.status.name() == 'ERROR_CHECKING'} ? 'status-badge error' :
+                          (${shipment.status.name() == 'MANUAL_CHECK'} ? 'status-badge manual' :
+                          'status-badge cancelled')))))"
+                      th:text="${shipment.status.name() == 'NEAR_ARRIVAL' ? 'Arribo Próximo' :
+                          (shipment.status.name() == 'ARRIVED' ? 'Arribado' :
+                          (shipment.status.name() == 'IN_TRANSIT' ? 'En Tránsito' :
+                          (shipment.status.name() == 'PENDING_FIRST_CHECK' ? 'Pendiente Rastreo' :
+                          (shipment.status.name() == 'ERROR_CHECKING' ? 'Error al Consultar' :
+                          (shipment.status.name() == 'MANUAL_CHECK' ? 'Verificar Manual' : 'Cancelado')))))}">IN_TRANSIT</span>
+            </div>
+
+            <div class="data-grid">
+                <div class="data-item">
+                    <span class="data-label">Buque</span>
+                    <span class="data-value" th:text="${shipment.vesselName != null ? shipment.vesselName : 'Pendiente'}">ONE FANTASTIC</span>
+                </div>
+                <div class="data-item">
+                    <span class="data-label">Viaje</span>
+                    <span class="data-value" th:text="${shipment.voyageNumber != null ? shipment.voyageNumber : '-'}">006E</span>
+                </div>
+                <div class="data-item">
+                    <span class="data-label">Puerto de Origen</span>
+                    <span class="data-value" th:text="${shipment.portOfLoading != null ? shipment.portOfLoading : '-'}">SHANGHAI, CHINA</span>
+                </div>
+                <div class="data-item">
+                    <span class="data-label">Puerto Destino</span>
+                    <span class="data-value" th:text="${shipment.portOfDischarge != null ? shipment.portOfDischarge : '-'}">MANZANILLO, MEXICO</span>
+                </div>
+                <div class="data-item">
+                    <span class="data-label">Fecha Salida (ATD)</span>
+                    <span class="data-value atd" th:text="${shipment.departureDate != null ? #temporals.format(shipment.departureDate, 'yyyy-MM-dd HH:mm') : '-'}">-</span>
+                </div>
+                <div class="data-item">
+                    <span class="data-label">ETA Estimado Actual</span>
+                    <span class="data-value eta" th:text="${shipment.estimatedArrival != null ? #temporals.format(shipment.estimatedArrival, 'yyyy-MM-dd HH:mm') : '-'}">-</span>
+                </div>
+                <div class="data-item">
+                    <span class="data-label">Arribo Confirmado (ATA)</span>
+                    <span class="data-value ata" th:text="${shipment.actualArrival != null ? #temporals.format(shipment.actualArrival, 'yyyy-MM-dd HH:mm') : '-'}">-</span>
+                </div>
+                <div class="data-item">
+                    <span class="data-label">Contenedor</span>
+                    <span class="data-value" th:text="${shipment.containerNumber != null ? shipment.containerNumber : '-'}">-</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- Timeline / Event History -->
+        <section class="timeline-card">
+            <header class="timeline-header">
+                <h2><i class="bi bi-clock-history"></i>Bitácora de Eventos y Cambios de ETA</h2>
+            </header>
+            <ul class="timeline-list">
+                <!-- Empty state: only rendered by Thymeleaf when logs is empty -->
+                <li th:if="${#lists.isEmpty(logs)}" class="timeline-empty" th:remove="tag">
+                    <i class="bi bi-journal-text"></i>
+                    <p>No hay eventos registrados para este embarque.</p>
+                </li>
+                <!-- Demo events for static prototype visualization (hidden in Thymeleaf production) -->
+                <li class="timeline-item" th:remove="all">
+                    <div class="timeline-marker">
+                        <span class="timeline-dot registered"> </span>
+                    </div>
+                    <div class="timeline-content">
+                        <div class="timeline-row">
+                            <span class="event-type-badge registered"><i class="bi bi-journal-plus me-1"></i>Registrado</span>
+                            <time class="event-timestamp">2026-01-15 09:30:00</time>
+                        </div>
+                        <p class="event-description">Embarque creado mediante importación Excel. B/L asignado y rastreo programado.</p>
+                    </div>
+                </li>
+                <li class="timeline-item" th:remove="all">
+                    <div class="timeline-marker">
+                        <span class="timeline-dot scrape-success"> </span>
+                    </div>
+                    <div class="timeline-content">
+                        <div class="timeline-row">
+                            <span class="event-type-badge scrape-success"><i class="bi bi-check-circle me-1"></i>Rastreo exitoso</span>
+                            <time class="event-timestamp">2026-01-16 02:15:00</time>
+                        </div>
+                        <p class="event-description">Consulta automática en portal ONE completada. Buque identificado: ONE FANTASTIC v006E.</p>
+                    </div>
+                </li>
+                <li class="timeline-item" th:remove="all">
+                    <div class="timeline-marker">
+                        <span class="timeline-dot eta-updated"> </span>
+                    </div>
+                    <div class="timeline-content">
+                        <div class="timeline-row">
+                            <span class="event-type-badge eta-updated"><i class="bi bi-arrow-clockwise me-1"></i>ETA actualizado</span>
+                            <time class="event-timestamp">2026-01-20 06:45:00</time>
+                        </div>
+                        <div class="eta-change">
+                            <span class="eta-pair"><span class="eta-label">ETA previo:</span><span class="eta-value prev">2026-02-10 14:00</span></span>
+                            <span class="eta-arrow">→</span>
+                            <span class="eta-pair"><span class="eta-label">Nuevo ETA:</span><span class="eta-value new">2026-02-12 08:00</span></span>
+                        </div>
+                        <p class="event-description">Naviera actualizó estimación por congestión en puerto de Manzanillo. Alerta preventiva activada (≤3 días).</p>
+                    </div>
+                </li>
+                <li class="timeline-item" th:remove="all">
+                    <div class="timeline-marker">
+                        <span class="timeline-dot scrape-failed"> </span>
+                    </div>
+                    <div class="timeline-content">
+                        <div class="timeline-row">
+                            <span class="event-type-badge scrape-failed"><i class="bi bi-exclamation-triangle me-1"></i>Error de rastreo</span>
+                            <time class="event-timestamp">2026-01-25 02:00:00</time>
+                        </div>
+                        <p class="event-description">Portal ONE devolvió CAPTCHA. Reintento programado en 4 horas. Sin impacto en alertas.</p>
+                    </div>
+                </li>
+                <li class="timeline-item" th:remove="all">
+                    <div class="timeline-marker">
+                        <span class="timeline-dot scrape-success"> </span>
+                    </div>
+                    <div class="timeline-content">
+                        <div class="timeline-row">
+                            <span class="event-type-badge scrape-success"><i class="bi bi-check-circle me-1"></i>Rastreo exitoso</span>
+                            <time class="event-timestamp">2026-01-25 06:10:00</time>
+                        </div>
+                        <p class="event-description">Reintento automático exitoso. ETA confirmado sin cambios.</p>
+                    </div>
+                </li>
+                <li class="timeline-item" th:remove="all">
+                    <div class="timeline-marker">
+                        <span class="timeline-dot eta-updated"> </span>
+                    </div>
+                    <div class="timeline-content">
+                        <div class="timeline-row">
+                            <span class="event-type-badge eta-updated"><i class="bi bi-arrow-clockwise me-1"></i>ETA actualizado</span>
+                            <time class="event-timestamp">2026-02-08 11:20:00</time>
+                        </div>
+                        <div class="eta-change">
+                            <span class="eta-pair"><span class="eta-label">ETA previo:</span><span class="eta-value prev">2026-02-12 08:00</span></span>
+                            <span class="eta-arrow">→</span>
+                            <span class="eta-pair"><span class="eta-label">Nuevo ETA:</span><span class="eta-value new">2026-02-11 22:00</span></span>
+                        </div>
+                        <p class="event-description">Adelanto de 10 horas por ventana de atraque confirmada. Preparar documentación aduanera.</p>
+                    </div>
+                </li>
+                <li class="timeline-item" th:remove="all">
+                    <div class="timeline-marker">
+                        <span class="timeline-dot status-change"> </span>
+                    </div>
+                    <div class="timeline-content">
+                        <div class="timeline-row">
+                            <span class="event-type-badge status-change"><i class="bi bi-flag me-1"></i>Cambio de estado</span>
+                            <time class="event-timestamp">2026-02-10 18:30:00</time>
+                        </div>
+                        <p class="event-description">Estado cambiado a <strong>Arribo Próximo</strong> (≤3 días). Notificación enviada a equipo de operaciones.</p>
+                    </div>
+                </li>
+                <li class="timeline-item" th:remove="all">
+                    <div class="timeline-marker">
+                        <span class="timeline-dot arrived"> </span>
+                    </div>
+                    <div class="timeline-content">
+                        <div class="timeline-row">
+                            <span class="event-type-badge arrived"><i class="bi bi-check2-circle me-1"></i>Arribado</span>
+                            <time class="event-timestamp">2026-02-11 22:15:00</time>
+                        </div>
+                        <p class="event-description">Arribo confirmado (ATA) en Terminal Contecon Manzanillo. Operaciones de descarga iniciadas.</p>
+                    </div>
+                </li>
+                <!-- Real events from model - only rendered by Thymeleaf -->
+                <li th:each="log : ${logs}" class="timeline-item" th:remove="tag">
+                    <div class="timeline-marker">
+                        <span class="timeline-dot"
+                              th:classappend="
+                                  ${log.eventType == 'ETA_UPDATED'} ? 'eta-updated' :
+                                  (${log.eventType == 'SCRAPE_FAILED'} ? 'scrape-failed' :
+                                  (${log.eventType == 'SHIPMENT_REGISTERED'} ? 'registered' :
+                                  (${log.eventType == 'EXCEL_IMPORTED'} ? 'imported' :
+                                  (${log.eventType == 'AUTO_REACTIVATED'} ? 'reactivated' :
+                                  (${log.eventType == 'STATUS_CHANGE'} ? 'status-change' :
+                                  'scrape-success')))))"> </span>
+                    </div>
+                    <div class="timeline-content">
+                        <div class="timeline-row">
+                            <span class="event-type-badge"
+                                  th:classappend="
+                                      ${log.eventType == 'ETA_UPDATED'} ? 'eta-updated' :
+                                      (${log.eventType == 'SCRAPE_FAILED'} ? 'scrape-failed' :
+                                      (${log.eventType == 'SHIPMENT_REGISTERED'} ? 'registered' :
+                                      (${log.eventType == 'EXCEL_IMPORTED'} ? 'imported' :
+                                      (${log.eventType == 'AUTO_REACTIVATED'} ? 'reactivated' :
+                                      (${log.eventType == 'STATUS_CHANGE'} ? 'status-change' :
+                                      'scrape-success')))))"
+                                  th:text="${log.eventType == 'ETA_UPDATED' ? 'ETA actualizado' :
+                                      (log.eventType == 'SCRAPE_FAILED' ? 'Error de rastreo' :
+                                      (log.eventType == 'SHIPMENT_REGISTERED' ? 'Registrado' :
+                                      (log.eventType == 'EXCEL_IMPORTED' ? 'Importado Excel' :
+                                      (log.eventType == 'AUTO_REACTIVATED' ? 'Reactivado' :
+                                      (log.eventType == 'STATUS_CHANGE' ? 'Cambio de estado' :
+                                      'Rastreo exitoso')))))}">ETA_UPDATED</span>
+                            <time class="event-timestamp" th:text="${#temporals.format(log.recordedAt, 'yyyy-MM-dd HH:mm:ss')}">2026-10-20 08:00:00</time>
+                        </div>
+                        <div th:if="${log.eventType == 'ETA_UPDATED'}" class="eta-change">
+                            <span class="eta-pair"><span class="eta-label">ETA previo:</span><span class="eta-value prev" th:text="${log.previousEta != null ? #temporals.format(log.previousEta, 'yyyy-MM-dd HH:mm') : '—'}">—</span></span>
+                            <span class="eta-arrow">→</span>
+                            <span class="eta-pair"><span class="eta-label">Nuevo ETA:</span><span class="eta-value new" th:text="${log.newEta != null ? #temporals.format(log.newEta, 'yyyy-MM-dd HH:mm') : '—'}">—</span></span>
+                        </div>
+                        <p class="event-description" th:text="${log.description != null ? log.description : '—'}">Actualización normal</p>
+                    </div>
+                </li>
+            </ul>
+        </section>
     </div>
-</nav>
 
-<div class="container py-4">
-
-    <!-- Shipment Header Summary Card -->
-    <div class="card card-stat bg-white p-4 mb-4">
-        <div class="d-flex flex-wrap justify-content-between align-items-center border-bottom pb-3 mb-3">
-            <div>
-                <span class="badge bg-secondary mb-1" th:text="${shipment.carrier}">ONE</span>
-                <h3 class="fw-bold mb-0 text-dark font-monospace" th:text="${shipment.trackingNumber}">TESTBL900001</h3>
-            </div>
-            <div>
-                <span class="badge fs-6"
-                      th:classappend="${shipment.status.name() == 'NEAR_ARRIVAL'} ? 'bg-danger' : (${shipment.status.name() == 'ARRIVED'} ? 'bg-success' : 'bg-primary')"
-                      th:text="${shipment.status.name() == 'NEAR_ARRIVAL' ? 'Arribo Próximo' : (shipment.status.name() == 'IN_TRANSIT' ? 'En Tránsito' : (shipment.status.name() == 'ARRIVED' ? 'Arribado' : (shipment.status.name() == 'PENDING_FIRST_CHECK' ? 'Pendiente Rastreo' : (shipment.status.name() == 'ERROR_CHECKING' ? 'Error al Consultar' : (shipment.status.name() == 'MANUAL_CHECK' ? 'Verificar manual' : (shipment.status.name() == 'CANCELLED' ? 'Cancelado' : shipment.status))))))}">IN_TRANSIT</span>
-            </div>
-        </div>
-
-        <div class="row g-3">
-            <div class="col-6 col-md-3">
-                <div class="small text-muted">Buque</div>
-                <div class="fw-semibold text-dark" th:text="${shipment.vesselName != null ? shipment.vesselName : 'Pendiente'}">ONE FANTASTIC</div>
-            </div>
-            <div class="col-6 col-md-3">
-                <div class="small text-muted">Viaje</div>
-                <div class="fw-semibold text-dark" th:text="${shipment.voyageNumber != null ? shipment.voyageNumber : '-'}">006E</div>
-            </div>
-            <div class="col-6 col-md-3">
-                <div class="small text-muted">Puerto de Origen</div>
-                <div class="fw-semibold text-dark" th:text="${shipment.portOfLoading != null ? shipment.portOfLoading : '-'}">SHANGHAI, CHINA</div>
-            </div>
-            <div class="col-6 col-md-3">
-                <div class="small text-muted">Puerto Destino</div>
-                <div class="fw-semibold text-dark" th:text="${shipment.portOfDischarge != null ? shipment.portOfDischarge : '-'}">MANZANILLO, MEXICO</div>
-            </div>
-            <div class="col-6 col-md-3">
-                <div class="small text-muted">Fecha Salida (ATD)</div>
-                <div class="fw-semibold text-dark" th:text="${shipment.departureDate != null ? #temporals.format(shipment.departureDate, 'yyyy-MM-dd HH:mm') : '-'}">-</div>
-            </div>
-            <div class="col-6 col-md-3">
-                <div class="small text-muted">ETA Estimado Actual</div>
-                <div class="fw-semibold text-danger" th:text="${shipment.estimatedArrival != null ? #temporals.format(shipment.estimatedArrival, 'yyyy-MM-dd HH:mm') : '-'}">-</div>
-            </div>
-            <div class="col-6 col-md-3">
-                <div class="small text-muted">Arribo Confirmado (ATA)</div>
-                <div class="fw-semibold text-success" th:text="${shipment.actualArrival != null ? #temporals.format(shipment.actualArrival, 'yyyy-MM-dd HH:mm') : '-'}">-</div>
-            </div>
-            <div class="col-6 col-md-3">
-                <div class="small text-muted">Contenedor</div>
-                <div class="fw-semibold text-dark" th:text="${shipment.containerNumber != null ? shipment.containerNumber : '-'}">-</div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Event History Timeline Card -->
-    <div class="card card-stat bg-white">
-        <div class="card-header bg-white py-3 border-0">
-            <h5 class="fw-bold mb-0 text-dark">
-                <i class="bi bi-clock-history me-2 text-primary"></i>Bitácora de Eventos y Cambios de ETA
-            </h5>
-        </div>
-        <div class="table-responsive">
-            <table class="table table-hover align-middle mb-0">
-                <thead class="table-light small text-uppercase text-muted">
-                    <tr>
-                        <th>Fecha de Registro</th>
-                        <th>Tipo de Evento</th>
-                        <th>ETA Previo</th>
-                        <th>Nuevo ETA</th>
-                        <th>Detalle / Descripción</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr th:if="${#lists.isEmpty(logs)}">
-                        <td colspan="5" class="text-center py-4 text-muted">
-                            No hay eventos registrados para este embarque.
-                        </td>
-                    </tr>
-                    <tr th:each="log : ${logs}">
-                        <td class="small text-muted" th:text="${#temporals.format(log.recordedAt, 'yyyy-MM-dd HH:mm:ss')}">2026-10-20 08:00:00</td>
-                        <td>
-                            <span class="badge"
-                                  th:classappend="${log.eventType == 'ETA_UPDATED'} ? 'bg-warning text-dark' : (${log.eventType == 'SCRAPE_FAILED'} ? 'bg-danger' : 'bg-secondary')"
-                                  th:text="${log.eventType == 'ETA_UPDATED' ? 'ETA actualizado' : (log.eventType == 'SCRAPE_FAILED' ? 'Error de rastreo' : (log.eventType == 'SHIPMENT_REGISTERED' ? 'Registrado' : (log.eventType == 'EXCEL_IMPORTED' ? 'Importado Excel' : (log.eventType == 'AUTO_REACTIVATED' ? 'Reactivado' : (log.eventType == 'STATUS_CHANGE' ? 'Cambio de estado' : (log.eventType == 'SCRAPE_SUCCESS' ? 'Rastreo exitoso' : log.eventType))))))}">ETA_UPDATED</span>
-                        </td>
-                        <td class="small" th:text="${log.previousEta != null ? #temporals.format(log.previousEta, 'yyyy-MM-dd HH:mm') : '-'}">-</td>
-                        <td class="small fw-bold" th:text="${log.newEta != null ? #temporals.format(log.newEta, 'yyyy-MM-dd HH:mm') : '-'}">-</td>
-                        <td th:text="${log.description != null ? log.description : '-'}">Actualización normal</td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
-    </div>
-
-</div>
-
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>

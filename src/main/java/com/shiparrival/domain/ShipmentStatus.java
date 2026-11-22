@@ -11,5 +11,28 @@ public enum ShipmentStatus {
      * La naviera no se puede rastrear automáticamente (por ejemplo, Hapag-Lloyd
      * por el bloqueo de su portal). Un operador debe consultar el ETA a mano.
      */
-    MANUAL_CHECK
+    MANUAL_CHECK;
+
+    /**
+     * Texto que ve el usuario final para este estado.
+     *
+     * <p>Se usa {@code getLabel()} para que Thymeleaf lo resuelva como propiedad
+     * ({@code ${st.label}}). El {@code switch} es exhaustivo: agregar una
+     * constante nueva rompe la compilación hasta que se le asigne su etiqueta,
+     * de modo que nunca se escapa un nombre crudo de enum a la interfaz.</p>
+     *
+     * <p>Los textos coinciden con los badges de la columna Estado del dashboard
+     * para no crear dos vocabularios distintos.</p>
+     */
+    public String getLabel() {
+        return switch (this) {
+            case PENDING_FIRST_CHECK -> "Pendiente";
+            case IN_TRANSIT -> "En Tránsito";
+            case NEAR_ARRIVAL -> "Arribo Próximo";
+            case ARRIVED -> "Arribado";
+            case CANCELLED -> "Cancelado";
+            case ERROR_CHECKING -> "Error";
+            case MANUAL_CHECK -> "Verificar manual";
+        };
+    }
 }
