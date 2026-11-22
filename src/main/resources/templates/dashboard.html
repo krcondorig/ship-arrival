@@ -3,49 +3,514 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ShipArrival - Sistema de Monitoreo de Buques</title>
+    <title>ArriVix — Monitor de Arribos</title>
+    <meta name="theme-color" content="#171717">
     <!-- Bootstrap 5 CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     <!-- Custom CSS -->
     <link rel="stylesheet" th:href="@{/css/dashboard.css}">
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300..800;1,9..40,300..800&display=swap" rel="stylesheet">
+    <style>
+        /* ===== Tokens ArriVix — portados de dashboard-single-action.html ===== */
+        :root {
+            --bg-page: #ffffff;
+            --bg-surface: #ffffff;
+            --bg-muted: #fafafa;
+            --bg-body: #f5f5f5;
+            --text-primary: #171717;
+            --text-secondary: #4d4d4d;
+            /* WCAG AAA: #808080 daba 3.95:1 — #525252 da 7.81:1 en blanco y 7.14:1 en crítico */
+            --text-muted: #525252;
+            --border-color: rgba(0, 0, 0, 0.08);
+            --border-light: #ebebeb;
+            /* WCAG AAA sobre blanco y sobre sus fondos tintados */
+            --critical: #991b1b;
+            --active: #0d4fae;
+            --success: #14532d;
+            --error: #991b1b;
+            --critical-bg: #fef2f2;
+            --active-bg: #eff6ff;
+            --success-bg: #f0fdf4;
+            --error-bg: #fef2f2;
+            --nav-bg: #171717;
+            --nav-border: #404040;
+            --nav-text: #ffffff;
+            --nav-muted: #a3a3a3;
+            --font-sans: 'DM Sans', system-ui, -apple-system, sans-serif;
+            --font-mono: 'DM Sans', system-ui, -apple-system, sans-serif;
+            /* Rail horizontal único: card-header, celdas y paginación comparten
+               este valor para que todo el contenido arranque en el mismo píxel. */
+            --pad-card: 14px;
+            --shadow-border: rgba(0, 0, 0, 0.08) 0px 0px 0px 1px;
+            --shadow-elevation: rgba(0, 0, 0, 0.04) 0px 2px 2px;
+            --shadow-ambient: rgba(0, 0, 0, 0.04) 0px 8px 8px -8px;
+            --shadow-inner: #fafafa 0px 0px 0px 1px;
+            --shadow-card: var(--shadow-border), var(--shadow-elevation), var(--shadow-ambient), var(--shadow-inner);
+        }
+        /* body de dashboard.css tiene menor prioridad por orden de carga:
+           esto gana y fija la base tipográfica del prototipo. */
+        body {
+            background: var(--bg-page); color: var(--text-primary);
+            font-family: var(--font-sans); margin: 0; line-height: 1.5;
+            min-height: 100vh; display: flex; flex-direction: column;
+        }
+        * { box-sizing: border-box; -webkit-font-smoothing: antialiased; }
+        .topbar {
+            background: var(--nav-bg);
+            border-bottom: 1px solid var(--nav-border);
+            position: sticky; top: 0; z-index: 100;
+            font-family: 'DM Sans', system-ui, -apple-system, sans-serif;
+        }
+        .topbar-nav { display: flex; align-items: center; justify-content: space-between; padding: 10px 20px; min-height: 52px; gap: 16px; }
+        .topbar-brand { display: flex; align-items: center; gap: 8px; color: var(--nav-text); text-decoration: none; font-weight: 600; font-size: 17px; flex-shrink: 0; }
+        .topbar-brand:hover { text-decoration: none; }
+        .topbar-brand .brand-logo { width: 30px; height: 30px; display: block; flex-shrink: 0; }
+        .topbar-brand .brand-name { letter-spacing: -0.01em; color: var(--nav-text); }
+        .topbar-center { display: none; align-items: center; gap: 16px; flex: 1; min-width: 0; }
+        @media (min-width: 992px) { .topbar-center { display: flex; } }
+        /* --nav-muted #a3a3a3 sobre #171717 = 7.11:1 AAA. 13px: entre celdas (14px)
+           y page-subtitle (13px) queda por debajo de la marca (17px) sin competir. */
+        .topbar-desc { font-size: 13px; color: var(--nav-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .topbar-actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+        .user-avatar { width: 28px; height: 28px; border-radius: 50%; background: linear-gradient(135deg, #0d4fae, #3b82f6); display: flex; align-items: center; justify-content: center; color: white; font-weight: 600; font-size: 12px; flex-shrink: 0; }
+        .topbar-dropdown .btn { background: transparent; border: 1px solid rgba(255,255,255,0.15); color: var(--nav-text); padding: 6px 10px; border-radius: 6px; font-size: 12px; display: flex; align-items: center; gap: 6px; min-height: 40px; }
+        .topbar-dropdown .btn:hover { background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.25); }
+        .topbar-dropdown .dropdown-menu { background: #1f1f1f; border: 1px solid var(--nav-border); box-shadow: 0 10px 40px rgba(0,0,0,0.3); margin-top: 6px; min-width: 180px; }
+        .topbar-dropdown .dropdown-item { color: #e5e5e5; padding: 8px 14px; font-size: 12px; display: flex; align-items: center; gap: 8px; }
+        .topbar-dropdown .dropdown-item:hover { background: #333; color: #fff; text-decoration: none; }
+        .topbar-dropdown .dropdown-item i { width: 16px; text-align: center; }
+        .topbar-dropdown .dropdown-divider { border-color: var(--nav-border); }
+        .topbar-dropdown form { margin: 0; }
+
+        /* Botones de acción dentro de la topbar oscura. */
+        .btn-track-now {
+            display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+            min-height: 40px; min-width: 40px;
+            padding: 6px 10px; border-radius: 6px;
+            font-size: 12px; font-weight: 600;
+            text-decoration: none; white-space: nowrap;
+            transition: all 0.15s ease;
+        }
+        /* Azul --active #0d4fae con texto #fff = 7.65:1 (AAA). */
+        .btn-track-now { background: var(--active); color: #fff; border: 1px solid var(--active); }
+        .btn-track-now:hover:not(:disabled) { background: #0959c4; border-color: #0959c4; color: #fff; }
+        .btn-track-now:disabled { opacity: 0.65; cursor: not-allowed; }
+
+        /* En móvil la etiqueta de "Monitorear Ahora" se oculta: sin esto la
+           topbar mide 382px y desborda a 320px (documento crecía a 362px).
+           El botón conserva aria-label, así que sigue siendo accesible. */
+        @media (max-width: 575.98px) {
+            .topbar-nav { padding: 10px 12px; gap: 8px; }
+            .topbar-actions { gap: 4px; }
+            .btn-track-now .track-label { display: none; }
+            .btn-track-now { min-width: 40px; padding: 6px 8px; }
+        }
+
+        /* ===== LAYOUT: portado de dashboard-single-action.html ===== */
+        .main-container { flex: 1; max-width: 100%; width: 100%; margin: 0 auto; padding: 24px 20px; }
+        .page-header { display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 12px; margin-bottom: 24px; }
+        .page-title { font-size: 24px; font-weight: 600; letter-spacing: -0.02em; margin: 0; }
+        .page-subtitle { color: var(--text-muted); font-size: 13px; margin: 2px 0 0 0; }
+        .page-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+        /* ===== Modal "Nuevo Embarque" =====
+           Bootstrap pone el armazón (overlay, focus-trap, Escape); estos
+           valores alinean el acabado con el prototipo: radio 12px, título
+           17px, pie sobre --bg-muted con su borde superior, y un ancho
+           máximo que respira en móvil sin tocar los bordes. */
+        #modalNewShipment .modal-content {
+            border: none; border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+            max-height: 90vh; overflow: auto;
+        }
+        #modalNewShipment .modal-header { padding: 16px 20px; border-bottom: 1px solid var(--border-light); }
+        /* .fs-5 de Bootstrap declara font-size con !important, así que el
+           tamaño del prototipo (17px) necesita la misma prioridad. */
+        #modalNewShipment .modal-title { font-size: 17px !important; font-weight: 600; }
+        #modalNewShipment .modal-body { padding: 20px; }
+        #modalNewShipment .modal-footer {
+            display: flex; gap: 10px; padding: 14px 20px;
+            border-top: 1px solid var(--border-light); background: var(--bg-muted);
+        }
+        #modalNewShipment .modal-footer .btn { padding: 8px 14px; font-size: 13px; }
+
+        /* ===== KPIs: tarjeta-filtro (icono + cifra + micro-contexto) ===== */
+        .metrics-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-bottom: 20px; }
+        .kpi-card {
+            /* reset de <button> para que herede el lenguaje visual de las tarjetas */
+            appearance: none; -webkit-appearance: none;
+            font-family: inherit; text-align: left;
+            display: flex; justify-content: space-between; align-items: center; gap: 10px;
+            min-width: 0; width: 100%;
+            padding: 10px var(--pad-card);
+            background: var(--bg-surface);
+            border: 1px solid var(--border-light);
+            border-radius: 8px;
+            box-shadow: var(--shadow-border);
+            cursor: pointer;
+            transition: border-color 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease;
+            text-decoration: none;
+        }
+        .kpi-card:hover { border-color: #d4d4d4; background: #fcfcfc; text-decoration: none; }
+        .kpi-card[aria-pressed="true"] {
+            border-color: var(--kpi-accent);
+            background: var(--kpi-tint);
+            box-shadow: inset 0 0 0 1px var(--kpi-accent), var(--shadow-elevation);
+        }
+        .kpi-icon {
+            flex: 0 0 48px; width: 48px; height: 48px;
+            display: grid; place-items: center;
+            border-radius: 12px;
+            background: var(--kpi-tint);
+            color: var(--kpi-accent);
+            font-size: 25px;
+            transition: background-color 0.15s ease;
+        }
+        .kpi-icon svg { width: 30px; height: 30px; display: block; }
+        .kpi-card[aria-pressed="true"] .kpi-icon { background: #ffffff; }
+        .kpi-lead { display: flex; align-items: center; gap: 10px; flex: 1 1 auto; min-width: 0; }
+        .kpi-body { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+        .kpi-value {
+            flex: 0 0 auto; text-align: right;
+            font-size: 34px; font-weight: 700;
+            line-height: 1.05; letter-spacing: -0.02em;
+            color: var(--text-primary);
+            font-variant-numeric: lining-nums tabular-nums;
+            font-feature-settings: "zero" 0, "ss01" 0;
+        }
+        .kpi-label {
+            font-size: 17px; font-weight: 600; line-height: 1.2;
+            color: var(--text-primary);
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+        .kpi-context {
+            font-size: 14px; font-weight: 500; line-height: 1.25;
+            color: var(--text-muted);
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+        .kpi-total   { --kpi-accent: var(--text-secondary); --kpi-tint: #f5f5f5; }
+        .kpi-transit { --kpi-accent: var(--active);         --kpi-tint: var(--active-bg); }
+        .kpi-critical{ --kpi-accent: var(--critical);       --kpi-tint: var(--critical-bg); }
+        .kpi-arrived { --kpi-accent: var(--success);        --kpi-tint: var(--success-bg); }
+        .kpi-total   .kpi-value { color: var(--text-primary); }
+        .kpi-transit .kpi-value { color: var(--active); }
+        .kpi-critical .kpi-value { color: var(--critical); }
+        .kpi-arrived .kpi-value { color: var(--success); }
+        .kpi-critical .kpi-context { color: var(--critical); font-weight: 600; }
+        @media (max-width: 1024px) { .metrics-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+        @media (max-width: 1280px) {
+            .metrics-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+            .kpi-card { padding: 10px 12px; }
+        }
+        @media (min-width: 1280px) and (max-width: 1440px) {
+            .kpi-label { font-size: 16px; } .kpi-context { font-size: 13px; } .kpi-value { font-size: 32px; }
+        }
+        @media (min-width: 600px) and (max-width: 1023px) {
+            .kpi-label { font-size: 16px; } .kpi-context { font-size: 13px; } .kpi-value { font-size: 32px; }
+        }
+
+        /* ===== Grid: aside 280px + tabla ===== */
+        .dashboard-grid { display: grid; grid-template-columns: 280px 1fr; gap: 20px; }
+        .card { background: var(--bg-surface); border-radius: 8px; box-shadow: var(--shadow-card); overflow: hidden; }
+        .card-header { padding: 12px var(--pad-card); border-bottom: 1px solid var(--border-light); background: var(--bg-muted); }
+        .card-title { font-size: 16.5px; font-weight: 600; color: var(--text-primary); text-transform: none; letter-spacing: 0.01em; margin: 0; display: flex; align-items: center; gap: 6px; }
+        .card-body { padding: 16px var(--pad-card); }
+        @media (max-width: 1024px) { .dashboard-grid { grid-template-columns: 1fr; } }
+
+        /* ===== Formularios del aside ===== */
+        .form-field { margin-bottom: 14px; }
+        .form-label { display: block; font-size: 11px; font-weight: 500; color: var(--text-secondary); margin-bottom: 4px; }
+        .form-input { width: 100%; padding: 8px 10px; border-radius: 6px; border: 1px solid var(--border-light); font-family: var(--font-sans); font-size: 13px; background: var(--bg-surface); transition: all 0.15s ease; }
+        .form-input:focus { outline: none; border-color: var(--active); box-shadow: 0 0 0 2px rgba(13, 79, 174, 0.15); }
+        .form-input.mono { font-family: var(--font-mono); }
+
+        /* ===== Botones ===== */
+        .btn { cursor: pointer; font-family: var(--font-sans); font-size: 13px; font-weight: 500; padding: 8px 14px; border-radius: 6px; border: 1px solid transparent; display: inline-flex; align-items: center; justify-content: center; gap: 6px; transition: all 0.15s ease; }
+        .btn-primary { background: var(--text-primary); color: white; }
+        .btn-primary:hover { background: #333; color: #fff; }
+        .btn-ghost { background: white; color: var(--text-primary); border-color: var(--border-light); box-shadow: var(--shadow-border); }
+        .btn-ghost:hover { background: #fafafa; border-color: var(--text-muted); color: var(--text-primary); }
+        .btn-warning { background: #f59e0b; color: #171717; border-color: #f59e0b; }
+        .btn-warning:hover { background: #e08900; border-color: #e08900; color: #171717; }
+        .btn-success { background: var(--success); color: white; border-color: var(--success); }
+        .btn-success:hover { background: #0f3d21; border-color: #0f3d21; color: #fff; }
+        /* Estado disabled devuelto a ArriVix. Bootstrap 5 define .btn:disabled (0,2,0),
+           que gana a .btn-primary (0,1,0) y pintaba el botón de #0d6efd / #198754 de
+           Bootstrap con opacity .65. Igualamos especificidad (clase + pseudoclase) y
+           quedamos después del <link> de Bootstrap, así que gana ArriVix.
+           Un disabled no debe parecer habilitado (ni azul ni verde), pero SÍ debe tener
+           forma visible. Ojo con los tokens: --bg-muted (#fafafa) y --border-light
+           (#ebebeb) son escala de superficie y sobre una tarjeta blanca pura (#ffffff)
+           dan 1.04:1 y 1.19:1 — el botón desaparece. Por eso van hex literales:
+           #f0f0f0 fondo (1.14:1 vs blanco) y #cccccc borde (1.61:1 vs blanco), que es
+           el que le da contorno al botón. El texto NO usa --text-muted (#525252): sobre
+           #f0f0f0 da 6.86:1 y no alcanza AAA (7:1), así que va #4d4d4d = 7.42:1. */
+        .btn:disabled, .btn.disabled, .btn[disabled] { opacity: 1; cursor: not-allowed; }
+        .btn-primary:disabled, .btn-primary.disabled, .btn-primary[disabled],
+        .btn-success:disabled, .btn-success.disabled, .btn-success[disabled],
+        .btn-warning:disabled, .btn-warning.disabled, .btn-warning[disabled],
+        .btn-ghost:disabled, .btn-ghost.disabled, .btn-ghost[disabled] {
+            background: #f0f0f0; color: #4d4d4d;
+            border-color: #cccccc; box-shadow: none;
+        }
+        .btn-sm { padding: 6px 10px; font-size: 12px; }
+
+        /* ===== Tabla ===== */
+        .table-section { display: flex; flex-direction: column; min-width: 0; }
+        .table-header-row { display: flex; flex-wrap: wrap; gap: 10px 12px; align-items: center; padding: 12px var(--pad-card); border-bottom: 1px solid var(--border-light); background: var(--bg-muted); }
+        /* El título toma su propia línea y los filtros la siguiente completa. */
+        .table-header-row > .card-title { flex: 1 1 100%; }
+        /* Fila de filtros en 2 bloques: buscador (protagonista) | facetas + acciones.
+           align-items: stretch estira cada bloque a la altura del más alto (el
+           grupo ETA, que lleva 2 líneas de rótulo). Dentro, cada campo reparte
+           con space-between: rótulo arriba, control abajo. Así los 5 rótulos
+           comparten y y los 8 controles comparten borde inferior. */
+        .table-filters { display: flex; flex: 1 1 100%; flex-wrap: nowrap; gap: 10px; align-items: stretch; justify-content: flex-end; min-width: 0; }
+        .filter-main { display: flex; align-items: stretch; flex: 1 1 auto; min-width: 0; }
+        /* Separador tenue entre el buscador y las facetas: jerarquía visual
+           sin gastar ancho en una línea propia. */
+        .filter-facets { display: flex; align-items: stretch; gap: 8px; flex: 0 1 auto; min-width: 0; padding-left: 10px; border-left: 1px solid var(--border-light); }
+        .filter-actions { display: flex; align-items: flex-end; gap: 6px; flex: 0 0 auto; }
+        /* Cada campo es una columna que reparte: micro-etiqueta ARRIBA y control
+           ABAJO. Así todos los rótulos comparten la misma y aunque el grupo ETA
+           tenga una línea extra (Desde/Hasta) que los demás no tienen. */
+        .filter-field { display: flex; flex-direction: column; justify-content: space-between; min-width: 0; }
+        .filter-field-search { flex: 1 1 145px; min-width: 72px; }
+        /* Micro-etiquetas visibles: 10 px, mayúsculas y color muted. No rompen
+           la fila porque nunca se encogen ni envuelven. */
+        .filter-label { font-size: 10px; font-weight: 600; line-height: 1; letter-spacing: 0.04em; text-transform: uppercase; color: var(--text-muted); white-space: nowrap; }
+        /* Rango de fechas: columna con "ETA" arriba (en la MISMA línea que
+           Naviera/Estado/Destino), "Desde"/"Hasta" en la franja intermedia y
+           los 2 inputs anclados abajo como el resto de controles. */
+        .filter-group-dates { display: flex; flex-direction: column; justify-content: space-between; flex: 0 0 auto; }
+        .filter-label-group { align-self: flex-start; color: var(--text-secondary); }
+        .filter-dates { display: flex; align-items: stretch; gap: 4px; }
+        /* Mismo reparto que .filter-field: "Desde"/"Hasta" arriba dentro de su
+           franja, input abajo. Con justify-content: space-between el input
+           siempre queda anclado al borde inferior común. */
+        .date-cell { display: flex; flex-direction: column; justify-content: space-between; min-width: 0; }
+        /* 10 px igual que .filter-label: así el borde superior coincide exacto
+           con BUSCAR/NAVIERA/ESTADO y las 3 micro-etiquetas comparten línea. */
+        .date-sublabel { font-size: 10px; font-weight: 600; line-height: 1; letter-spacing: 0.04em; text-transform: uppercase; color: var(--text-muted); white-space: nowrap; }
+        .date-arrow { align-self: flex-end; padding-bottom: 9px; font-size: 11px; line-height: 1; color: var(--text-muted); }
+        .table-filters .form-input { width: auto; min-width: 0; font-size: 12px; padding: 6px 10px; flex: 0 0 auto; }
+        /* El ancho lo aporta .filter-field-search (flex 1 1 145px); el input lo
+           llena con width:100% y flex:0 0 auto para que su altura quede en 32 px
+           y no se estire con el reparto vertical de la columna. */
+        .table-filters .form-input.search { flex: 0 0 auto; width: 100%; min-width: 72px; }
+        /* Los selects necesitan 142 px: 102 px de texto ("Todas las navieras")
+           + 20 de padding + 2 de borde + ~18 que el navegador reserva para la
+           flecha nativa. Con menos, el texto se recorta. */
+        .table-filters select.form-input { flex: 0 1 auto; min-width: 142px; }
+        .table-filters input[type="date"].form-input { flex: 0 0 auto; width: 118px; min-width: 118px !important; }
+        .table-filters input[name="port"].form-input { min-width: 88px !important; }
+        .table-filters .btn { flex: 0 0 auto; }
+        /* "Limpiar" separado del submit para que no parezca control huérfano. */
+        .table-filters .btn-clear { margin-left: 2px; }
+        /* Bajo 1024 px los controles no caben sin recortar texto: se apilan por
+           bloques (buscador / facetas / acciones) en vez de dejar una X suelta. */
+        @media (max-width: 1023.98px) {
+            .table-filters { flex-wrap: wrap; }
+            .filter-main { flex: 1 1 100%; }
+            .filter-facets { flex: 1 1 100%; padding-left: 0; padding-top: 10px; border-left: 0; border-top: 1px solid var(--border-light); flex-wrap: wrap; }
+            .filter-actions { margin-left: auto; }
+        }
+        .table-wrapper { overflow-x: auto; flex: 1; }
+        .table-wrapper::-webkit-scrollbar { height: 8px; }
+        .table-wrapper::-webkit-scrollbar-track { background: var(--bg-muted); }
+        .table-wrapper::-webkit-scrollbar-thumb { background: var(--border-light); border-radius: 4px; }
+        .table-wrapper::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+        .table-card-title { text-transform: none; font-size: 16.5px; font-weight: 600; color: var(--text-primary); margin: 0; }
+
+        /* ===== Pie de paginación ===== */
+        .pagination-row { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; padding: 12px var(--pad-card); border-top: 1px solid var(--border-light); background: var(--bg-muted); font-size: 14px; }
+        .pagination-info { color: var(--text-primary); }
+        .pagination-info strong { color: var(--text-primary); font-weight: 600; }
+        .pagination-controls { display: flex; align-items: center; gap: 6px; }
+        .pagination-controls .page-item .page-link { color: var(--text-primary); border-color: var(--border-color); background: var(--bg-surface); }
+        .pagination-controls .page-item:hover .page-link { background: var(--bg-muted); }
+        .pagination-controls .page-item.active .page-link { background: var(--active); border-color: var(--active); color: #ffffff; }
+        .page-size-select { display: flex; align-items: center; gap: 6px; font-size: 14px; color: var(--text-primary); }
+        .page-size-select select { font-size: 14px; padding: 6px 10px; min-width: 70px; }
+
+        /* ===== Utilidades ===== */
+        .d-flex { display: flex; }
+        .align-center { align-items: center; }
+        .justify-between { justify-content: space-between; }
+        .gap-1 { gap: 4px; }
+        .gap-2 { gap: 8px; }
+        .flex-wrap { flex-wrap: wrap; }
+        .w-100 { width: 100%; }
+        .text-end { text-align: right; }
+        .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+
+        /* ===== Tabla de embarques (portada del prototipo aprobado) ===== */
+        table { width: max-content; min-width: 100%; border-collapse: collapse; font-size: 12px; }
+        col.col-bl { width: 125px; }
+        col.col-carrier { width: 60px; }
+        col.col-vessel { width: 136px; }
+        col.col-port { width: 138px; }
+        col.col-atd { width: 115px; }
+        col.col-eta { width: 131px; }
+        col.col-days { width: 88px; }
+        col.col-status { width: 110px; }
+        /* Último Check y Acción se ajustan a su min-content real (98 y 78 px):
+           el encabezado no puede truncarse y los dos botones de 28 px + gap
+           tampoco. Suma exacta = 1079 px ≤ 1083 px útiles a 1440 px. */
+        col.col-check { width: 98px; }
+        col.col-actions { width: 78px; }
+
+        thead th { background: var(--bg-muted); color: var(--text-primary); font-weight: 700; font-size: 14px; text-transform: none; letter-spacing: 0.01em; padding: 10px 2px; text-align: left; border-bottom: 2px solid var(--border-color); white-space: nowrap; position: sticky; top: 0; z-index: 10; }
+        thead th:first-child, tbody td:first-child { padding-left: var(--pad-card); }
+        thead th:last-child, tbody td:last-child { padding-right: var(--pad-card); }
+        tbody td { padding: 6px 2px; border-bottom: 1px solid var(--border-light); vertical-align: middle; font-size: 14px; }
+        tbody tr[hidden] { display: none !important; }
+        tbody tr.empty-row:hover td { background: transparent; }
+        tbody tr:last-child td { border-bottom: none; }
+        tbody tr:hover td { background: var(--bg-muted); }
+        tbody tr.critical-row { background: var(--critical-bg); }
+        tbody tr.critical-row:hover td { background: #fee2e2; }
+        tbody tr.arrived-row { background: var(--success-bg); }
+        tbody tr.error-row { background: var(--error-bg); }
+        td.empty-row { padding: 32px var(--pad-card); text-align: center; color: var(--text-muted); font-size: 14px; }
+
+        .bl-primary { font-family: var(--font-mono); font-size: 14px; font-weight: 600; color: var(--text-primary); letter-spacing: 0.01em; line-height: 1.3; font-variant-numeric: lining-nums tabular-nums; font-feature-settings: "zero" 0; }
+        .bl-secondary { font-family: var(--font-mono); font-size: 13px; color: var(--text-muted); line-height: 1.3; font-variant-numeric: lining-nums tabular-nums; font-feature-settings: "zero" 0; }
+        .vessel-name { font-family: var(--font-sans); font-weight: 600; font-size: 14px; color: var(--text-primary); line-height: 1.3; }
+        .voyage { font-family: var(--font-mono); font-size: 14px; color: var(--text-muted); line-height: 1.3; font-variant-numeric: lining-nums tabular-nums; font-feature-settings: "zero" 0; }
+        .eta-value { font-family: var(--font-mono); font-size: 14px; font-weight: 600; white-space: nowrap; font-variant-numeric: lining-nums tabular-nums; font-feature-settings: "zero" 0; }
+        .days-badge { font-family: var(--font-mono); font-size: 14px; font-weight: 600; padding: 2px 6px; border-radius: 4px; white-space: nowrap; font-variant-numeric: lining-nums tabular-nums; font-feature-settings: "zero" 0; }
+        .status-badge { font-family: var(--font-sans); font-size: 13px; font-weight: 600; padding: 4px 10px; border-radius: 9999px; text-transform: uppercase; letter-spacing: 0.01em; white-space: nowrap; display: inline-block; }
+        .carrier-badge { font-family: var(--font-sans); font-size: 11px; font-weight: 600; padding: 2px 6px; border-radius: 4px; text-transform: uppercase; white-space: nowrap; background: var(--bg-muted); color: var(--text-secondary); border: 1px solid var(--border-light); }
+
+        .cell-bl { vertical-align: middle; }
+        .cell-bl .bl-primary { display: block; }
+        .cell-bl .bl-secondary { display: block; margin-top: 2px; }
+        .cell-vessel { vertical-align: middle; }
+        .cell-vessel .vessel-name { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 150px; }
+        .cell-vessel .voyage { display: block; margin-top: 2px; }
+        /* max-width en celdas de tabla solo actúa si supera el ancho fijado en col.col-port
+           (138px): por debajo de eso se ignora y la celda queda clavada en 138. El texto
+           "MANZANILLO, MEXICO" necesita ~147px, así que el piso real es 148px; con 150 la
+           celda toma 147.2 por contenido y entra completa. La tabla crece solo 9.3px
+           (1168.2 → 1177.5) y ninguna otra columna se mueve. */
+        .cell-port { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 150px; color: var(--text-secondary); font-size: 14px; font-family: var(--font-sans); }
+        .cell-atd { white-space: nowrap; color: var(--text-primary); font-size: 14px; font-family: var(--font-mono); font-variant-numeric: lining-nums tabular-nums; font-feature-settings: "zero" 0; }
+        .cell-eta { white-space: nowrap; color: var(--text-primary); font-size: 14px; font-family: var(--font-mono); font-variant-numeric: lining-nums tabular-nums; font-feature-settings: "zero" 0; }
+        .cell-days { white-space: nowrap; }
+        .cell-days .days-badge { display: inline-flex; align-items: center; justify-content: center; padding: 2px 6px; border-radius: 4px; font-size: 12px; font-weight: 600; font-family: var(--font-sans); font-variant-numeric: lining-nums tabular-nums; font-feature-settings: "zero" 0; }
+        /* WCAG AAA: #931919 (7.18:1) y #155e2f (7.15:1) sobre sus tintes */
+        .badge-urgent { background: #fee2e2; color: #931919; }
+        .badge-success { background: #dcfce7; color: #155e2f; }
+        .badge-neutral { background: var(--active-bg); color: var(--active); }
+        .badge-muted { background: var(--bg-muted); color: var(--text-secondary); border: 1px solid var(--border-light); }
+        .cell-status { white-space: nowrap; font-family: var(--font-sans); }
+        .cell-check { white-space: nowrap; font-size: 14px; font-family: var(--font-mono); font-variant-numeric: lining-nums tabular-nums; font-feature-settings: "zero" 0; }
+        .cell-actions { text-align: right; white-space: nowrap; }
+
+        .action-group { display: inline-flex; gap: 4px; }
+        .btn-icon { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; padding: 0; border-radius: 6px; border: 1px solid var(--border-light); background: var(--bg-surface); color: var(--text-secondary); cursor: pointer; transition: all 0.15s ease; }
+        .btn-icon:hover { background: var(--bg-muted); color: var(--text-primary); border-color: var(--border-light); }
+        .btn-icon:focus-visible { outline: 2px solid var(--active); outline-offset: 2px; }
+        .btn-icon i { font-size: 14px; }
+        .btn-icon-primary { color: var(--active); }
+        .btn-icon-primary:hover { background: var(--active-bg); color: var(--active); border-color: var(--active); }
+
+        /* ===== Drop zone para Excel ===== */
+        .drop-zone { border: 2px dashed var(--border-light); border-radius: 8px; padding: 20px 12px; text-align: center; cursor: pointer; transition: all 0.15s ease; background: var(--bg-muted); }
+        .drop-zone:hover, .drop-zone.drag-over { border-color: var(--active); background: var(--active-bg); }
+        .drop-zone:focus-visible { outline: 2px solid var(--active); outline-offset: 2px; }
+        .drop-zone i { font-size: 24px; color: var(--text-muted); margin-bottom: 8px; display: block; }
+        .drop-zone p { font-size: 14px; font-weight: 600; color: var(--text-secondary); margin: 0 0 4px 0; }
+        .drop-zone strong { color: var(--text-primary); }
+        .drop-zone span { font-size: 12px; color: var(--text-muted); }
+        .drop-zone.has-file { border-color: var(--success); background: var(--success-bg); }
+        .drop-zone.has-file i { color: var(--success); }
+        /* El prototipo (dashboard-single-action.html:747) refuerza el paso a "listo" en verde
+           solo después de elegir archivo. Aquí se conserva ese refuerzo sobre el botón de acción,
+           pero la acción en reposo es .btn-primary. En :disabled se mantiene la escala apagada. */
+        .drop-zone.has-file ~ #excelSubmit:not(:disabled),
+        #excelSubmit.is-ready:not(:disabled) { background: var(--success); color: #fff; border-color: var(--success); }
+
+        .excel-spec { margin-top: 14px; border-top: 1px solid var(--border-light); padding-top: 12px; }
+        .excel-spec-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+        .excel-spec-title { font-size: 14px; font-weight: 600; color: var(--text-primary); margin: 0; display: flex; align-items: center; gap: 6px; }
+        .excel-spec-file { font-size: 11px; font-weight: 600; color: var(--text-secondary); background: var(--bg-muted); border: 1px solid var(--border-light); border-radius: 4px; padding: 1px 6px; }
+        .excel-rules-text { margin: 0; padding-left: 16px; font-size: 12px; line-height: 1.5; color: var(--text-secondary); }
+        .excel-rules-text li { margin-bottom: 3px; }
+    </style>
 </head>
 <body>
 
-<!-- Navbar -->
-<nav class="navbar navbar-expand-lg navbar-dark bg-dark shadow-sm">
-    <div class="container-fluid px-4">
-        <a class="navbar-brand fw-bold" href="/">
-            <i class="bi bi-water me-2 text-info"></i>ShipArrival
+<!-- Topbar ArriVix (misma barra oscura sticky que history.html) -->
+<header class="topbar" role="banner">
+    <nav class="topbar-nav" aria-label="Navegación principal">
+        <a th:href="@{/}" class="topbar-brand" aria-label="ArriVix - Inicio">
+            <!-- Isotipo oficial ArriVix: proa frontal de buque mercante con
+                 contenedores apilados y tres arcos concéntricos de radar
+                 satelital. Fills literales: la paleta azul corporativa debe
+                 leerse igual sobre #171717 (pértigo #38bdf8 = 8.37:1). -->
+            <svg class="brand-logo" viewBox="-1 -3 34 34" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false">
+                <path d="M16 30V21" stroke="#38bdf8" stroke-width="1.8" stroke-linecap="round" />
+                <path d="M5 16L16 29L27 16V12L16 17L5 12V16Z" fill="#0284c7" />
+                <path d="M9 12.4V8.6H23V12.4L16 15.4L9 12.4Z" fill="#0ea5e9" />
+                <path d="M11 11.4V9.6H14.6V11.4H11Z" fill="#ffffff" opacity="0.92" />
+                <path d="M15.4 11.4V9.6H19V11.4H15.4Z" fill="#ffffff" opacity="0.92" />
+                <path d="M19.4 11.4V9.6H21V11.4H19.4Z" fill="#ffffff" opacity="0.92" />
+                <path d="M12 7.4C14 6.2 18 6.2 20 7.4" stroke="#38bdf8" stroke-width="2" stroke-linecap="round" />
+                <path d="M9.6 4C13 1.9 19 1.9 22.4 4" stroke="#7dd3fc" stroke-width="2" stroke-linecap="round" />
+            </svg>
+            <span class="brand-name">ArriVix</span>
         </a>
-        <span class="navbar-text text-light-50 small d-none d-md-inline">
-            Monitoreo Desatendido de Arribo de Buques (ONE / MSC / MAERSK / HAPAG-LLOYD)
-        </span>
-        <div class="ms-auto d-flex align-items-center gap-2">
-            <span th:if="${currentUser != null}" class="navbar-text text-light-50 small d-none d-md-inline">
-                <i class="bi bi-person-circle me-1"></i><span th:text="${currentUser.username}">usuario</span>
-            </span>
-            <a th:if="${currentUser != null and currentUser.isAdmin()}"
-               class="btn btn-outline-light btn-sm" th:href="@{/users}">
-                <i class="bi bi-people me-1"></i>Usuarios
-            </a>
+        <div class="topbar-center" aria-hidden="true">
+            <span class="topbar-desc">Monitoreo automatizado de arribos</span>
+        </div>
+        <div class="topbar-actions">
             <form th:if="${currentUser == null or currentUser.canOperate()}"
                   th:action="@{/shipments/track-now}" method="post" class="m-0" id="trackNowForm">
-                <button type="submit" id="trackNowButton" class="btn btn-warning btn-sm fw-semibold" th:disabled="${isTrackingInProgress}">
-                    <i class="bi bi-arrow-repeat me-1"></i>
-                    <span id="trackNowButtonText" th:text="${isTrackingInProgress ? 'Monitoreando...' : 'Monitorear Ahora'}">Monitorear Ahora</span>
+                <button type="submit" id="trackNowButton" class="btn-track-now" th:disabled="${isTrackingInProgress}"
+                        th:attr="aria-label=${isTrackingInProgress ? 'Monitoreando embarques' : 'Monitorear Ahora'}">
+                    <i class="bi bi-arrow-repeat" aria-hidden="true"></i>
+                    <span id="trackNowButtonText" class="track-label" th:text="${isTrackingInProgress ? 'Monitoreando...' : 'Monitorear Ahora'}">Monitorear Ahora</span>
                 </button>
             </form>
-            <form th:if="${currentUser != null}" th:action="@{/logout}" method="post" class="m-0">
-                <button type="submit" class="btn btn-outline-light btn-sm" title="Cerrar sesión">
-                    <i class="bi bi-box-arrow-right"></i>
+            <div class="topbar-dropdown dropdown" th:if="${currentUser != null}">
+                <button class="btn" type="button" id="userMenu" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true"
+                        th:attr="aria-label=|Menú de usuario, ${currentUser.username}|">
+                    <span class="user-avatar" aria-hidden="true"
+                          th:text="${#strings.toUpperCase(#strings.substring(currentUser.username,0,1))}">A</span>
+                    <span class="d-none d-md-inline" th:text="${currentUser.username}">admin</span>
                 </button>
-            </form>
+                <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userMenu" role="menu">
+                    <li><a class="dropdown-item" th:href="@{/users}" role="menuitem"
+                           th:if="${currentUser.isAdmin()}"><i class="bi bi-people" aria-hidden="true"></i>Usuarios</a></li>
+                    <li><hr class="dropdown-divider"></li>
+                    <li>
+                        <form th:action="@{/logout}" method="post">
+                            <button type="submit" class="dropdown-item" role="menuitem" aria-label="Cerrar sesión"><i class="bi bi-box-arrow-right" aria-hidden="true"></i>Cerrar sesión</button>
+                        </form>
+                    </li>
+                </ul>
+            </div>
         </div>
-    </div>
-</nav>
+    </nav>
+</header>
 
-<div class="container-fluid px-4 py-4">
+<main class="main-container" role="main">
+
+    <header class="page-header">
+        <div>
+            <h1 class="page-title">Dashboard</h1>
+            <p class="page-subtitle" th:text="|${totalCount} ${totalCount == 1 ? 'embarque' : 'embarques'} · Monitoreo automatizado de arribos|">Monitoreo automatizado de arribos</p>
+        </div>
+        <div class="page-actions" th:if="${currentUser == null or currentUser.canOperate()}">
+            <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#modalNewShipment"
+                    aria-label="Crear nuevo embarque">
+                <i class="bi bi-plus-lg" aria-hidden="true"></i>Nuevo Embarque
+            </button>
+        </div>
+    </header>
 
     <!-- Flash Alert Messages -->
     <div th:if="${successMessage}" class="alert alert-success alert-dismissible fade show" role="alert">
@@ -98,264 +563,319 @@
         </div>
     </div>
 
-    <!-- Metric Cards -->
-    <div class="row g-3 mb-4">
-        <div class="col-12 col-sm-6 col-xl-3">
-            <div class="card card-stat bg-white p-3">
-                <div class="d-flex justify-content-between align-items-center">
-                    <div>
-                        <div class="text-muted small text-uppercase fw-bold">Total Embarques</div>
-                        <h2 class="fw-bold mb-0 text-dark" th:text="${totalCount}">0</h2>
-                    </div>
-                    <div class="fs-1 text-primary"><i class="bi bi-boxes"></i></div>
-                </div>
-            </div>
-        </div>
-        <div class="col-12 col-sm-6 col-xl-3">
-            <div class="card card-stat bg-white p-3">
-                <div class="d-flex justify-content-between align-items-center">
-                    <div>
-                        <div class="text-muted small text-uppercase fw-bold">En Tránsito</div>
-                        <h2 class="fw-bold mb-0 text-info" th:text="${inTransitCount}">0</h2>
-                    </div>
-                    <div class="fs-1 text-info"><i class="bi bi-navigation"></i></div>
-                </div>
-            </div>
-        </div>
-        <div class="col-12 col-sm-6 col-xl-3">
-            <div class="card card-stat bg-white p-3 border-start border-danger border-4">
-                <div class="d-flex justify-content-between align-items-center">
-                    <div>
-                        <div class="text-danger small text-uppercase fw-bold">Próximos (≤ 3 Días)</div>
-                        <h2 class="fw-bold mb-0 text-danger" th:text="${nearArrivalCount}">0</h2>
-                    </div>
-                    <div class="fs-1 text-danger"><i class="bi bi-bell-fill"></i></div>
-                </div>
-            </div>
-        </div>
-        <div class="col-12 col-sm-6 col-xl-3">
-            <div class="card card-stat bg-white p-3">
-                <div class="d-flex justify-content-between align-items-center">
-                    <div>
-                        <div class="text-muted small text-uppercase fw-bold">Arribados</div>
-                        <h2 class="fw-bold mb-0 text-success" th:text="${arrivedCount}">0</h2>
-                    </div>
-                    <div class="fs-1 text-success"><i class="bi bi-check2-circle"></i></div>
-                </div>
-            </div>
-        </div>
-    </div>
+    <!-- KPIs = filtros de la tabla (cada tarjeta navega a ?status=<enum>) -->
+    <section class="metrics-grid" role="group" aria-label="Filtro y resumen de embarques">
+        <a th:href="@{/(search=${searchQuery}, carrier=${carrierFilter}, port=${portFilter}, etaFrom=${etaFromFilter}, etaTo=${etaToFilter})}"
+           class="kpi-card kpi-total"
+           th:attr="aria-pressed=${statusFilter == null ? 'true' : 'false'}">
+            <span class="kpi-lead">
+                <span class="kpi-icon" aria-hidden="true"><i class="bi bi-boxes"></i></span>
+                <span class="kpi-body">
+                    <span class="kpi-label">Total Embarques</span>
+                    <span class="kpi-context">Bajo seguimiento activo</span>
+                </span>
+            </span>
+            <span class="kpi-value" aria-hidden="true" th:text="${totalCount}">0</span>
+            <span class="sr-only" th:text="|Mostrar todos los embarques: ${totalCount} en total|">Mostrar todos los embarques</span>
+        </a>
 
-    <!-- Action Forms (Manual + Excel) -->
-    <div class="row g-3 mb-4">
-        <!-- Registro Manual -->
-        <div class="col-12 col-lg-6" th:if="${currentUser == null or currentUser.canOperate()}">
-            <div class="card card-stat bg-white p-3 h-100">
-                <h6 class="card-title fw-bold text-dark mb-3">
-                    <i class="bi bi-plus-circle me-1 text-primary"></i>Registrar Embarque Individual
-                </h6>
-                <form th:action="@{/shipments}" method="post" class="row g-2">
-                    <div class="col-12 col-sm-6">
-                        <label class="form-label small text-muted">Número de Guía (B/L)</label>
-                        <input type="text" name="trackingNumber" class="form-control form-control-sm text-uppercase" placeholder="Ej. TESTBL900001" required>
-                    </div>
-                    <div class="col-12 col-sm-4">
-                        <label class="form-label small text-muted">Naviera</label>
-                        <select name="carrier" class="form-select form-select-sm">
-                            <option th:each="c : ${carriers}" th:value="${c}" th:text="${c}" th:selected="${c.name() == 'ONE'}"></option>
-                        </select>
-                    </div>
-                    <div class="col-12 col-sm-2 d-flex align-items-end">
-                        <button type="submit" class="btn btn-primary btn-sm w-100">Registrar</button>
-                    </div>
-                </form>
-            </div>
-        </div>
+        <a th:href="@{/(status='IN_TRANSIT', search=${searchQuery}, carrier=${carrierFilter}, port=${portFilter}, etaFrom=${etaFromFilter}, etaTo=${etaToFilter})}"
+           class="kpi-card kpi-transit"
+           th:attr="aria-pressed=${statusFilter == 'IN_TRANSIT' ? 'true' : 'false'}">
+            <!-- Buque portacontenedores: SVG inline porque Bootstrap Icons
+                 1.11.3 no incluye barco. Usa currentColor, así hereda el
+                 acento azul del estado y funciona en modo activo/hover. -->
+            <span class="kpi-lead">
+                <span class="kpi-icon" aria-hidden="true">
+                    <svg viewBox="2 7 20 14" fill="none" stroke="currentColor" stroke-width="2.1"
+                         stroke-linecap="round" stroke-linejoin="round" focusable="false">
+                        <path d="M3.2 15.4h17.6l-1.7 3.3a2.4 2.4 0 0 1-2.1 1.3H7a2.4 2.4 0 0 1-2.1-1.3l-1.7-3.3Z"/>
+                        <path d="M7.4 15.4v-2.6h13.4"/>
+                        <path d="M11.8 15.4v-2.6"/>
+                        <path d="M16.2 15.4v-2.6"/>
+                        <path d="M8.9 12.8V10.6h8.9v2.2"/>
+                        <path d="M13.3 10.6V8.4"/>
+                        <path d="M18.9 12.8V9.6h2.2v5.8"/>
+                    </svg>
+                </span>
+                <span class="kpi-body">
+                    <span class="kpi-label">En Tránsito</span>
+                    <span class="kpi-context">Navegando a destino</span>
+                </span>
+            </span>
+            <span class="kpi-value" aria-hidden="true" th:text="${inTransitCount}">0</span>
+            <span class="sr-only" th:text="|Filtrar solo embarques en tránsito: ${inTransitCount}|">Filtrar solo embarques en tránsito</span>
+        </a>
 
-        <!-- Carga Masiva Excel -->
-        <div class="col-12 col-lg-6" th:if="${currentUser == null or currentUser.canOperate()}">
-            <div class="card card-stat bg-white p-3 h-100">
-                <h6 class="card-title fw-bold text-dark mb-3">
-                    <i class="bi bi-file-earmark-spreadsheet me-1 text-success"></i>Carga Masiva desde Excel (.xlsx)
-                </h6>
-                <form th:action="@{/shipments/upload-excel}" method="post" enctype="multipart/form-data" class="row g-2">
-                    <div class="col-12 col-sm-6">
-                        <label class="form-label small text-muted">Seleccionar Archivo</label>
-                        <input type="file" name="file" accept=".xlsx" class="form-control form-control-sm" required>
-                    </div>
-                    <div class="col-12 col-sm-4">
-                        <label class="form-label small text-muted">Naviera Predeterminada</label>
-                        <select name="carrier" class="form-select form-select-sm">
-                            <option th:each="c : ${carriers}" th:value="${c}" th:text="${c}" th:selected="${c.name() == 'ONE'}"></option>
-                        </select>
-                    </div>
-                    <div class="col-12 col-sm-2 d-flex align-items-end">
-                        <button type="submit" class="btn btn-success btn-sm w-100">Subir</button>
-                    </div>
-                    <div class="col-12">
-                        <div class="form-text">
-                            Opcional: agrega una columna <strong>NAVIERA</strong> (ONE, MSC, MAERSK, HAPAG_LLOYD o UNKNOWN)
-                            para asignar la naviera fila por fila. Si está vacía, se usa la naviera predeterminada.
+        <a th:href="@{/(status='NEAR_ARRIVAL', search=${searchQuery}, carrier=${carrierFilter}, port=${portFilter}, etaFrom=${etaFromFilter}, etaTo=${etaToFilter})}"
+           class="kpi-card kpi-critical"
+           th:attr="aria-pressed=${statusFilter == 'NEAR_ARRIVAL' ? 'true' : 'false'}">
+            <span class="kpi-lead">
+                <span class="kpi-icon" aria-hidden="true"><i class="bi bi-exclamation-triangle-fill"></i></span>
+                <span class="kpi-body">
+                    <span class="kpi-label">Próximos a Arribar (≤3 d)</span>
+                    <span class="kpi-context">Requieren seguimiento</span>
+                </span>
+            </span>
+            <span class="kpi-value" aria-hidden="true" th:text="${nearArrivalCount}">0</span>
+            <span class="sr-only" th:text="|Filtrar solo embarques próximos a arribar con ETA en 3 días o menos: ${nearArrivalCount}|">Filtrar próximos a arribar</span>
+        </a>
+
+        <a th:href="@{/(status='ARRIVED', search=${searchQuery}, carrier=${carrierFilter}, port=${portFilter}, etaFrom=${etaFromFilter}, etaTo=${etaToFilter})}"
+           class="kpi-card kpi-arrived"
+           th:attr="aria-pressed=${statusFilter == 'ARRIVED' ? 'true' : 'false'}">
+            <span class="kpi-lead">
+                <span class="kpi-icon" aria-hidden="true"><i class="bi bi-check2-circle"></i></span>
+                <span class="kpi-body">
+                    <span class="kpi-label">Arribados</span>
+                    <span class="kpi-context">Confirmados en puerto</span>
+                </span>
+            </span>
+            <span class="kpi-value" aria-hidden="true" th:text="${arrivedCount}">0</span>
+            <span class="sr-only" th:text="|Filtrar solo embarques arribados: ${arrivedCount}|">Filtrar arribados</span>
+        </a>
+    </section>
+
+    <div class="dashboard-grid">
+        <aside style="display: flex; flex-direction: column; gap: 16px;">
+
+            <!-- Carga Masiva Excel -->
+            <section class="card" th:if="${currentUser == null or currentUser.canOperate()}">
+                <header class="card-header">
+                    <h2 class="card-title"><i class="bi bi-file-earmark-spreadsheet" aria-hidden="true"></i>Carga Masiva Excel</h2>
+                </header>
+                <div class="card-body">
+                    <form th:action="@{/shipments/upload-excel}" method="post" enctype="multipart/form-data" id="excelForm">
+                        <div class="drop-zone" id="dropZone" tabindex="0" role="button"
+                             aria-label="Subir archivo Excel, arrastrar y soltar o clic para seleccionar">
+                            <i class="bi bi-file-earmark-spreadsheet" aria-hidden="true"></i>
+                            <p>Arrastrar <strong>.xlsx</strong> aquí</p>
+                            <span>o clic para seleccionar</span>
+                            <input type="file" accept=".xlsx" id="fileInput" name="file"
+                                   style="display: none;" required aria-hidden="true">
                         </div>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
-
-    <!-- Shipments Table -->
-    <div class="card card-stat bg-white">
-        <div class="card-header bg-white py-3 border-0">
-            <div class="row align-items-center">
-                <div class="col-12 col-md-6 mb-2 mb-md-0">
-                    <h5 class="card-title fw-bold text-dark mb-0">
-                        <i class="bi bi-ship me-2 text-primary"></i>Lista de Buques y Guías Monitoreadas
-                    </h5>
-                </div>
-                <div class="col-12">
-                    <form method="get" action="/" class="row g-2 align-items-end">
-                        <div class="col-12 col-md-3">
-                            <label class="form-label small text-muted mb-1">Buscar</label>
-                            <input type="text" name="search" class="form-control form-control-sm"
-                                   placeholder="Guía, contenedor o buque..."
-                                   th:value="${searchQuery}">
-                        </div>
-                        <div class="col-6 col-md-2">
-                            <label class="form-label small text-muted mb-1">Naviera</label>
-                            <select name="carrier" class="form-select form-select-sm">
-                                <option value="" th:selected="${carrierFilter == null}">Todas</option>
-                                <option th:each="c : ${carriers}" th:value="${c}" th:text="${c}"
-                                        th:selected="${carrierFilter != null and carrierFilter == c.name()}"></option>
+                        <div class="excel-default-carrier" style="margin-top: 12px;">
+                            <label for="defaultCarrierSelect" class="form-label">Naviera Predeterminada</label>
+                            <select id="defaultCarrierSelect" name="carrier" class="form-input">
+                                <option th:each="c : ${carriers}" th:value="${c}" th:text="${c.label}"
+                                        th:selected="${c.name() == 'ONE'}"></option>
                             </select>
                         </div>
-                        <div class="col-6 col-md-2">
-                            <label class="form-label small text-muted mb-1">Estado</label>
-                            <select name="status" class="form-select form-select-sm">
-                                <option value="" th:selected="${statusFilter == null}">Todos</option>
-                                <option th:each="st : ${statuses}" th:value="${st}" th:text="${st}"
-                                        th:selected="${statusFilter != null and statusFilter == st.name()}"></option>
-                            </select>
-                        </div>
-                        <div class="col-6 col-md-2">
-                            <label class="form-label small text-muted mb-1">Puerto destino</label>
-                            <input type="text" name="port" class="form-control form-control-sm"
-                                   placeholder="Manzanillo..."
-                                   th:value="${portFilter}">
-                        </div>
-                        <div class="col-6 col-md-1">
-                            <label class="form-label small text-muted mb-1">ETA desde</label>
-                            <input type="date" name="etaFrom" class="form-control form-control-sm"
-                                   th:value="${etaFromFilter != null ? #temporals.format(etaFromFilter, 'yyyy-MM-dd') : ''}">
-                        </div>
-                        <div class="col-6 col-md-1">
-                            <label class="form-label small text-muted mb-1">ETA hasta</label>
-                            <input type="date" name="etaTo" class="form-control form-control-sm"
-                                   th:value="${etaToFilter != null ? #temporals.format(etaToFilter, 'yyyy-MM-dd') : ''}">
-                        </div>
-                        <div class="col-12 col-md-1 d-flex gap-1">
-                            <button class="btn btn-outline-primary btn-sm w-100" type="submit">
-                                <i class="bi bi-search"></i>
-                            </button>
-                            <a href="/" class="btn btn-outline-secondary btn-sm" title="Limpiar filtros">
-                                <i class="bi bi-x-lg"></i>
-                            </a>
+                        <!-- Acción principal en .btn-primary (negro ArriVix): --success queda
+                             reservado para ESTADO (filas "Arribado"), no para acción. El refuerzo
+                             verde del prototipo se aplica solo en #dropZone.has-file.
+                             El botón arranca disabled y el JS lo habilita al elegir archivo. -->
+                        <button type="submit" class="btn btn-primary w-100" id="excelSubmit" style="margin-top: 12px;" disabled>
+                            <i class="bi bi-upload" aria-hidden="true"></i>Subir Excel
+                        </button>
+                        <div class="excel-spec">
+                            <div class="excel-spec-head">
+                                <h3 class="excel-spec-title"><i class="bi bi-info-circle" aria-hidden="true"></i>Formato requerido</h3>
+                                <span class="excel-spec-file">.xlsx</span>
+                            </div>
+                            <ul class="excel-rules-text">
+                                <li><strong>Columna A:</strong> GUIA, BL, B/L, TRACKING, EMBARQUE.</li>
+                                <li><strong>Columna B:</strong> NAVIERA, CARRIER (opcional).</li>
+                                <li>Sin columna Naviera se usa la predeterminada del selector.</li>
+                            </ul>
                         </div>
                     </form>
                 </div>
-            </div>
-            <div th:if="${searchQuery}" class="mt-2">
-                <small class="text-muted">
-                    <i class="bi bi-filter-circle me-1"></i>
+            </section>
+
+            <!-- Leyenda de Estados -->
+            <section class="card">
+                <header class="card-header">
+                    <h2 class="card-title"><i class="bi bi-info-circle" aria-hidden="true"></i>Leyenda de Estados</h2>
+                </header>
+                <div class="card-body">
+                    <div style="display: flex; flex-direction: column; gap: 12px; font-size: 13px; color: var(--text-secondary);">
+                        <div class="d-flex align-center gap-2 flex-wrap"><span class="status-badge" style="background: var(--critical-bg); color: var(--critical);">Próximo Arribo</span><span>≤ 3 días para ETA</span></div>
+                        <div class="d-flex align-center gap-2 flex-wrap"><span class="status-badge" style="background: var(--active-bg); color: var(--active);">En Tránsito</span><span>Navegando a destino</span></div>
+                        <div class="d-flex align-center gap-2 flex-wrap"><span class="status-badge" style="background: var(--success-bg); color: var(--success);">Arribado</span><span>Confirmado en puerto</span></div>
+                        <div class="d-flex align-center gap-2 flex-wrap"><span class="status-badge" style="background: var(--error-bg); color: var(--error);">Error</span><span>Fallo al consultar naviera</span></div>
+                    </div>
+                </div>
+            </section>
+
+        </aside>
+
+        <!-- Shipments Table -->
+        <section class="card table-section">
+            <header class="table-header-row">
+                <h2 class="card-title table-card-title">Embarques Monitoreados</h2>
+                <form method="get" action="/" class="table-filters">
+                    <div class="filter-main">
+                        <div class="filter-field filter-field-search">
+                            <label class="filter-label" for="filterSearch">Buscar</label>
+                            <input type="text" name="search" id="filterSearch" class="form-input search"
+                                   placeholder="Buscar B/L, buque, contenedor..."
+                                   aria-label="Buscar embarques" th:value="${searchQuery}">
+                        </div>
+                    </div>
+                    <div class="filter-facets">
+                        <div class="filter-field">
+                            <label class="filter-label" for="filterCarrier">Naviera</label>
+                            <select name="carrier" id="filterCarrier" class="form-input" aria-label="Filtrar por naviera">
+                                <option value="" th:selected="${carrierFilter == null}">Todas las navieras</option>
+                                <option th:each="c : ${carriers}" th:value="${c}" th:text="${c.label}"
+                                        th:selected="${carrierFilter != null and carrierFilter == c.name()}"></option>
+                            </select>
+                        </div>
+                        <div class="filter-field">
+                            <label class="filter-label" for="statusFilter">Estado</label>
+                            <select name="status" class="form-input" id="statusFilter" aria-label="Filtrar por estado">
+                                <option value="" th:selected="${statusFilter == null}">Todos los estados</option>
+                                <option th:each="st : ${statuses}" th:value="${st}" th:text="${st.label}"
+                                        th:selected="${statusFilter != null and statusFilter == st.name()}"></option>
+                            </select>
+                        </div>
+                        <div class="filter-field">
+                            <label class="filter-label" for="filterPort">Destino</label>
+                            <input type="text" name="port" id="filterPort" class="form-input"
+                                   placeholder="Puerto..." aria-label="Filtrar por puerto destino"
+                                   th:value="${portFilter}">
+                        </div>
+                        <div class="filter-group-dates">
+                            <span class="filter-label filter-label-group" id="etaRangeLabel">ETA</span>
+                            <div class="filter-dates" role="group" aria-labelledby="etaRangeLabel">
+                                <span class="date-cell">
+                                    <span class="date-sublabel" aria-hidden="true">Desde</span>
+                                    <input type="date" name="etaFrom" class="form-input"
+                                           aria-label="ETA desde"
+                                           th:value="${etaFromFilter != null ? #temporals.format(etaFromFilter, 'yyyy-MM-dd') : ''}">
+                                </span>
+                                <span class="date-arrow" aria-hidden="true">&rarr;</span>
+                                <span class="date-cell">
+                                    <span class="date-sublabel" aria-hidden="true">Hasta</span>
+                                    <input type="date" name="etaTo" class="form-input"
+                                           aria-label="ETA hasta"
+                                           th:value="${etaToFilter != null ? #temporals.format(etaToFilter, 'yyyy-MM-dd') : ''}">
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="filter-actions">
+                        <button class="btn btn-primary btn-sm" type="submit" aria-label="Aplicar filtros">
+                            <i class="bi bi-search" aria-hidden="true"></i>
+                        </button>
+                        <a th:href="@{/}" class="btn btn-ghost btn-sm btn-clear" title="Limpiar filtros" aria-label="Limpiar filtros">
+                            <i class="bi bi-x-lg" aria-hidden="true"></i>
+                        </a>
+                    </div>
+                </form>
+            </header>
+            <div th:if="${searchQuery}" style="padding: 8px var(--pad-card); border-bottom: 1px solid var(--border-light);">
+                <small style="color: var(--text-muted); font-size: 13px;">
+                    <i class="bi bi-filter-circle me-1" aria-hidden="true"></i>
                     Mostrando resultados para: <strong th:text="${searchQuery}"></strong>
                     (<span th:text="${totalElements}"></span> encontrados)
                 </small>
             </div>
-        </div>
-        <div class="table-responsive">
-            <table class="table table-hover align-middle mb-0">
-                <thead class="table-light small text-uppercase text-muted">
-                    <tr>
-                        <th>Guía (B/L)</th>
-                        <th>Naviera</th>
-                        <th>Buque / Viaje</th>
-                        <th>Destino</th>
-                        <th>Salida (ATD)</th>
-                        <th>ETA Estimado</th>
-                        <th>Días Restantes</th>
-                        <th>Estatus</th>
-                        <th>Último Chequeo</th>
-                        <th class="text-end">Acciones</th>
-                    </tr>
-                </thead>
-                <tbody>
+            <div class="table-wrapper">
+                <table>
+                    <colgroup>
+                        <col class="col-bl"><col class="col-carrier"><col class="col-vessel"><col class="col-port">
+                        <col class="col-atd"><col class="col-eta"><col class="col-days"><col class="col-status"><col class="col-check"><col class="col-actions">
+                    </colgroup>
+                    <thead>
+                        <tr>
+                            <th scope="col">Guía (B/L)</th>
+                            <th scope="col">Naviera</th>
+                            <th scope="col">Buque / Viaje</th>
+                            <th scope="col">Puerto Destino</th>
+                            <th scope="col">Salida (ATD)</th>
+                            <th scope="col">ETA Estimada</th>
+                            <th scope="col">Días (Plazo)</th>
+                            <th scope="col">Estado</th>
+                            <th scope="col">Último Check</th>
+                            <th scope="col" class="text-end">Acción</th>
+                        </tr>
+                    </thead>
+                    <tbody>
                     <tr th:if="${#lists.isEmpty(shipments)}">
-                        <td colspan="10" class="text-center py-4 text-muted">
-                            <i class="bi bi-inbox fs-3 d-block mb-2"></i>
-                            No hay embarques registrados todavía. Usa el formulario de arriba o carga un archivo Excel.
+                        <td colspan="10" class="empty-row">
+                            <i class="bi bi-inbox" aria-hidden="true" style="font-size: 24px; display: block; margin-bottom: 8px;"></i>
+                            No hay embarques registrados todavía. Usa el formulario de la izquierda o carga un archivo Excel.
                         </td>
                     </tr>
-                    <tr th:each="s : ${shipments}">
-                        <td>
-                            <strong class="text-dark font-monospace" th:text="${s.trackingNumber}">TESTBL900001</strong>
-                            <div th:if="${s.containerNumber}" class="small text-muted" th:text="'Cont: ' + ${s.containerNumber}"></div>
+                    <tr th:each="s : ${shipments}"
+                        th:classappend="${s.status.name() == 'NEAR_ARRIVAL' ? 'critical-row' : (s.status.name() == 'ARRIVED' ? 'arrived-row' : (s.status.name() == 'ERROR_CHECKING' ? 'error-row' : ''))}">
+                        <td class="cell-bl">
+                            <span class="bl-primary" th:text="${s.trackingNumber}">TESTBL900001</span>
+                            <span class="bl-secondary" th:if="${s.containerNumber}" th:text="'Cont: ' + ${s.containerNumber}"></span>
                         </td>
                         <td>
-                            <span class="badge bg-secondary" th:text="${s.carrier}">ONE</span>
+                            <span class="carrier-badge" th:text="${s.carrier.label}">ONE</span>
                         </td>
-                        <td>
-                            <div class="fw-semibold text-dark" th:text="${s.vesselName != null ? s.vesselName : '-'}">-</div>
-                            <div class="small text-muted" th:if="${s.voyageNumber}" th:text="'Viaje: ' + ${s.voyageNumber}"></div>
+                        <td class="cell-vessel">
+                            <span class="vessel-name" th:title="${s.vesselName != null ? s.vesselName : '-'}" th:text="${s.vesselName != null ? s.vesselName : '-'}">-</span>
+                            <span class="voyage" th:if="${s.voyageNumber}" th:text="${s.voyageNumber}"></span>
                         </td>
-                        <td>
-                            <span th:text="${s.portOfDischarge != null ? s.portOfDischarge : '-'}">-</span>
+                        <td class="cell-port" th:title="${s.portOfDischarge != null ? s.portOfDischarge : '-'}" th:text="${s.portOfDischarge != null ? s.portOfDischarge : '-'}">-</td>
+                        <td class="cell-atd" th:text="${s.departureDate != null ? #temporals.format(s.departureDate, 'yyyy-MM-dd HH:mm') : '-'}">-</td>
+                        <td class="cell-eta">
+                            <span class="eta-value" th:text="${s.estimatedArrival != null ? #temporals.format(s.estimatedArrival, 'yyyy-MM-dd HH:mm') : '-'}">-</span>
                         </td>
-                        <td class="small" th:text="${s.departureDate != null ? #temporals.format(s.departureDate, 'yyyy-MM-dd HH:mm') : '-'}">-</td>
-                        <td>
-                            <span class="fw-bold" th:classappend="${s.status.name() == 'NEAR_ARRIVAL'} ? 'text-danger' : 'text-dark'"
-                                  th:text="${s.estimatedArrival != null ? #temporals.format(s.estimatedArrival, 'yyyy-MM-dd HH:mm') : '-'}">-</span>
-                        </td>
-                        <td>
+                        <td class="cell-days">
                             <span th:if="${s.daysRemaining != null}">
-                                <span th:if="${s.daysRemaining &lt;= 3 and s.daysRemaining &gt;= 0}" class="badge bg-danger">
-                                    <i class="bi bi-hourglass-split me-1"></i><span th:text="${s.daysRemaining} + ' d'">2 d</span>
-                                </span>
-                                <span th:if="${s.daysRemaining &gt; 3}" class="badge bg-light text-dark border" th:text="${s.daysRemaining} + ' días'">5 días</span>
-                                <span th:if="${s.daysRemaining &lt; 0}" class="badge bg-secondary" th:text="'Pasó hace ' + ${-s.daysRemaining} + ' d'">-</span>
+                                <!-- Arribó hoy: el barco ya atracó y la ETA es hoy -->
+                                <span th:if="${s.daysRemaining == 0 and s.status.name() == 'ARRIVED'}"
+                                      class="days-badge badge-success">Arribó Hoy</span>
+                                <!-- Llega hoy: arribo programado para hoy, aún en el mar -->
+                                <span th:if="${s.daysRemaining == 0 and s.status.name() != 'ARRIVED'}"
+                                      class="days-badge badge-urgent">Llega Hoy</span>
+                                <!-- Arribó hace N días (sobrestadía): daysRemaining negativo -->
+                                <span th:if="${s.daysRemaining &lt; 0}"
+                                      class="days-badge badge-success"
+                                      th:text="|Hace ${-s.daysRemaining} d|">Hace 3 d</span>
+                                <!-- Futuro: ventana de alerta ETA ≤ 3 días -->
+                                <span th:if="${s.daysRemaining &gt; 0 and s.daysRemaining &lt;= 3}"
+                                      class="days-badge badge-urgent"
+                                      th:text="|Faltan ${s.daysRemaining} d|">Faltan 2 d</span>
+                                <!-- Futuro: tránsito normal -->
+                                <span th:if="${s.daysRemaining &gt; 3}"
+                                      class="days-badge badge-neutral"
+                                      th:text="|Faltan ${s.daysRemaining} d|">Faltan 8 d</span>
                             </span>
-                            <span th:if="${s.daysRemaining == null}" class="text-muted small">-</span>
+                            <span th:if="${s.daysRemaining == null}" style="color: var(--text-muted);">-</span>
                         </td>
-                        <td>
-                            <span th:if="${s.status.name() == 'NEAR_ARRIVAL'}" class="badge badge-near-arrival">
-                                <i class="bi bi-exclamation-circle me-1"></i>Arribo Próximo
-                            </span>
-                            <span th:if="${s.status.name() == 'IN_TRANSIT'}" class="badge badge-in-transit">En Tránsito</span>
-                            <span th:if="${s.status.name() == 'ARRIVED'}" class="badge badge-arrived">Arribado</span>
-                            <span th:if="${s.status.name() == 'PENDING_FIRST_CHECK'}" class="badge badge-pending">Pendiente Rastreo</span>
-                            <span th:if="${s.status.name() == 'ERROR_CHECKING'}" class="badge badge-error">Error al Consultar</span>
-                            <span th:if="${s.status.name() == 'MANUAL_CHECK'}" class="badge badge-manual">
-                                <i class="bi bi-person-check me-1"></i>Verificar manual
-                            </span>
+                        <td class="cell-status">
+                            <span th:if="${s.status.name() == 'NEAR_ARRIVAL'}" class="status-badge badge-urgent">Arribo Próximo</span>
+                            <span th:if="${s.status.name() == 'IN_TRANSIT'}" class="status-badge badge-neutral">En Tránsito</span>
+                            <span th:if="${s.status.name() == 'ARRIVED'}" class="status-badge badge-success">Arribado</span>
+                            <span th:if="${s.status.name() == 'PENDING_FIRST_CHECK'}" class="status-badge badge-muted">Pendiente</span>
+                            <span th:if="${s.status.name() == 'ERROR_CHECKING'}" class="status-badge badge-urgent">Error</span>
+                            <span th:if="${s.status.name() == 'MANUAL_CHECK'}" class="status-badge badge-muted">Verificar manual</span>
+                            <span th:if="${s.status.name() == 'CANCELLED'}" class="status-badge badge-muted">Cancelado</span>
                         </td>
-                        <td class="small text-muted" th:text="${s.lastCheckedAt != null ? #temporals.format(s.lastCheckedAt, 'yyyy-MM-dd HH:mm') : 'Nunca'}">Nunca</td>
-                        <td class="text-end">
-                            <div class="btn-group btn-group-sm" role="group">
-                                <a th:href="@{'/shipments/' + ${s.id} + '/history'}" 
-                                   class="btn btn-outline-secondary" 
-                                   title="Ver Historial de Cambios">
-                                    <i class="bi bi-clock-history"></i>
+                        <td class="cell-check" th:text="${s.lastCheckedAt != null ? #temporals.format(s.lastCheckedAt, 'yyyy-MM-dd HH:mm') : 'Nunca'}">Nunca</td>
+                        <td class="cell-actions">
+                            <div class="action-group">
+                                <a th:href="@{'/shipments/' + ${s.id} + '/history'}"
+                                   class="btn-icon btn-icon-primary"
+                                   th:attr="aria-label=|Ver ficha de ${s.trackingNumber}|"
+                                   title="Ver ficha completa (estado actual + historial)">
+                                    <i class="bi bi-eye" aria-hidden="true"></i>
                                 </a>
-                                <form th:if="${currentUser == null or currentUser.canOperate()}"
-                                      th:action="@{'/shipments/' + ${s.id} + '/delete'}" 
-                                      method="post" 
+                                <!-- Eliminar es una acción destructiva: solo se ofrece en filas
+                                     ERROR_CHECKING, el estado que sí requiere intervención del
+                                     operador. En el resto de estados la columna Acciones queda con
+                                     un único icono (ojo), como en dashboard-icon-buttons.html.
+                                     El filtro de rol (canOperate) se conserva intacto. -->
+                                <form th:if="${(currentUser == null or currentUser.canOperate()) and s.status.name() == 'ERROR_CHECKING'}"
+                                      th:action="@{'/shipments/' + ${s.id} + '/delete'}"
+                                      method="post"
                                       style="display: inline;"
                                       onsubmit="return confirm('¿Estás seguro de eliminar el embarque ' + [[${s.trackingNumber}]] + '?');">
                                     <input type="hidden" name="page" th:value="${currentPage}">
                                     <input type="hidden" name="size" th:value="${pageSize}">
                                     <input type="hidden" name="search" th:value="${searchQuery}">
-                                    <button type="submit" 
-                                            class="btn btn-outline-danger" 
+                                    <button type="submit"
+                                            class="btn-icon"
+                                            th:attr="aria-label=|Eliminar ${s.trackingNumber}|"
                                             title="Eliminar Embarque">
-                                        <i class="bi bi-trash"></i>
+                                        <i class="bi bi-trash" aria-hidden="true"></i>
                                     </button>
                                 </form>
                             </div>
@@ -363,24 +883,24 @@
                     </tr>
                 </tbody>
             </table>
-        </div>
+            </div>
 
         <!-- Paginación -->
-        <div class="card-footer bg-white border-top-0 py-3">
-            <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
-                <small class="text-muted">
-                    <i class="bi bi-list-ol me-1"></i>
-                    Mostrando <strong th:text="${startItem}">1</strong>–<strong th:text="${endItem}">10</strong>
-                    de <strong th:text="${totalElements}">0</strong> registros
-                </small>
+        <div class="pagination-row">
+            <div class="pagination-info">
+                <i class="bi bi-list-ol me-1" aria-hidden="true"></i>
+                Mostrando <strong th:text="${startItem}">1</strong>–<strong th:text="${endItem}">10</strong>
+                de <strong th:text="${totalElements}">0</strong> <span th:text="${totalElements == 1 ? 'registro' : 'registros'}">registros</span>
+            </div>
 
+            <div class="pagination-controls">
                 <nav th:if="${totalPages > 1}" aria-label="Paginación de embarques">
                     <ul class="pagination pagination-sm mb-0">
                         <li class="page-item" th:classappend="${hasPrevious} ? '' : 'disabled'">
                             <a class="page-link"
                                th:href="@{/(page=${currentPage - 1}, size=${pageSize}, search=${searchQuery}, carrier=${carrierFilter}, status=${statusFilter}, port=${portFilter}, etaFrom=${etaFromFilter}, etaTo=${etaToFilter})}"
                                aria-label="Página anterior">
-                                <i class="bi bi-chevron-left"></i>
+                                <i class="bi bi-chevron-left" aria-hidden="true"></i>
                             </a>
                         </li>
                         <li class="page-item"
@@ -394,15 +914,15 @@
                             <a class="page-link"
                                th:href="@{/(page=${currentPage + 1}, size=${pageSize}, search=${searchQuery}, carrier=${carrierFilter}, status=${statusFilter}, port=${portFilter}, etaFrom=${etaFromFilter}, etaTo=${etaToFilter})}"
                                aria-label="Página siguiente">
-                                <i class="bi bi-chevron-right"></i>
+                                <i class="bi bi-chevron-right" aria-hidden="true"></i>
                             </a>
                         </li>
                     </ul>
                 </nav>
 
-                <div class="d-flex align-items-center gap-2">
-                    <label class="small text-muted mb-0" for="pageSizeSelect">Filas por página:</label>
-                    <select id="pageSizeSelect" class="form-select form-select-sm" style="width: auto;"
+                <div class="page-size-select">
+                    <label for="pageSizeSelect">Filas:</label>
+                    <select id="pageSizeSelect" class="form-input"
                             onchange="if (this.value) { window.location.href = this.value; }">
                         <option th:each="s : ${pageSizes}"
                                 th:value="@{/(page=0, size=${s}, search=${searchQuery}, carrier=${carrierFilter}, status=${statusFilter}, port=${portFilter}, etaFrom=${etaFromFilter}, etaTo=${etaToFilter})}"
@@ -412,8 +932,48 @@
                 </div>
             </div>
         </div>
+        </section>
+
     </div>
 
+</main>
+
+<!-- Modal: Nuevo Embarque. Solo 2 campos porque el backend persiste
+     únicamente trackingNumber y carrier; Contenedor/Puerto/ETA del
+     prototipo se descartarían en silencio. El guard repite el del botón
+     del header: un USER de solo lectura no debe recibir este formulario. -->
+<div class="modal fade" id="modalNewShipment" tabindex="-1" aria-labelledby="modalNewShipmentTitle" aria-hidden="true"
+     th:if="${currentUser == null or currentUser.canOperate()}">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <form th:action="@{/shipments}" method="post">
+                <div class="modal-header">
+                    <h2 class="modal-title fs-5" id="modalNewShipmentTitle">Nuevo Embarque</h2>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="form-field">
+                        <label class="form-label" for="modalTrackingNumber">Número de Guía (B/L)</label>
+                        <input type="text" id="modalTrackingNumber" name="trackingNumber"
+                               class="form-input mono text-uppercase" placeholder="Ej. TESTBL900001" required>
+                    </div>
+                    <div class="form-field">
+                        <label class="form-label" for="modalCarrier">Naviera</label>
+                        <select id="modalCarrier" name="carrier" class="form-input">
+                            <option th:each="c : ${carriers}" th:value="${c}" th:text="${c.label}"
+                                    th:selected="${c.name() == 'ONE'}"></option>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-ghost" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-plus-lg" aria-hidden="true"></i>Registrar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
 </div>
 
 <!-- Bootstrap 5 JS Bundle -->
@@ -682,6 +1242,54 @@
         } else {
             refreshStatus();
         }
+    })();
+</script>
+<script>
+    // Carga Masiva Excel: arrastrar y soltar + clic en la zona
+    (function () {
+        const zone = document.getElementById('dropZone');
+        const input = document.getElementById('fileInput');
+        const submit = document.getElementById('excelSubmit');
+        if (!zone || !input || !submit) return;
+
+        function syncFile(file) {
+            if (!file) return;
+            if (!/\.xlsx$/i.test(file.name)) {
+                zone.querySelector('p').textContent = 'Solo se aceptan archivos .xlsx';
+                return;
+            }
+            const dt = new DataTransfer();
+            dt.items.add(file);
+            input.files = dt.files;
+            zone.classList.add('has-file');
+            zone.querySelector('p').innerHTML = '<strong>' + file.name + '</strong>';
+            zone.querySelector('span').textContent =
+                (file.size / 1024).toFixed(1) + ' KB · clic para cambiar';
+            submit.disabled = false;
+        }
+
+        zone.addEventListener('click', function () { input.click(); });
+        zone.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); input.click(); }
+        });
+        input.addEventListener('change', function () { syncFile(input.files[0]); });
+
+        ['dragenter', 'dragover'].forEach(function (evt) {
+            zone.addEventListener(evt, function (e) {
+                e.preventDefault(); e.stopPropagation();
+                zone.classList.add('drag-over');
+            });
+        });
+        ['dragleave', 'drop'].forEach(function (evt) {
+            zone.addEventListener(evt, function (e) {
+                e.preventDefault(); e.stopPropagation();
+                zone.classList.remove('drag-over');
+            });
+        });
+        zone.addEventListener('drop', function (e) {
+            const files = e.dataTransfer && e.dataTransfer.files;
+            if (files && files.length) syncFile(files[0]);
+        });
     })();
 </script>
 </body>

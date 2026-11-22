@@ -132,7 +132,12 @@ class ShipArrivalE2EIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(view().name("history"))
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("TESTBL900001")))
-                .andExpect(content().string(org.hamcrest.Matchers.containsString("ETA_UPDATED")));
+                // El evento se muestra al usuario con su etiqueta traducida al
+                // español; el código interno ETA_UPDATED nunca debe filtrarse
+                // al HTML renderizado.
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("ETA actualizado")))
+                .andExpect(content().string(org.hamcrest.Matchers.not(
+                        org.hamcrest.Matchers.containsString("ETA_UPDATED"))));
     }
 
     private void awaitTrackingCompletion() throws InterruptedException {

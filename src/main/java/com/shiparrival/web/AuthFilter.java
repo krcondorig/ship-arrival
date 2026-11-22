@@ -27,7 +27,7 @@ public class AuthFilter extends OncePerRequestFilter {
     public static final String SESSION_EPOCH = "auth.sessionEpoch";
     public static final String CURRENT_USER_ATTRIBUTE = "currentUser";
 
-    private static final List<String> PUBLIC_PREFIXES = List.of("/css/", "/js/");
+    private static final List<String> PUBLIC_PREFIXES = List.of("/css/", "/js/", "/img/");
     private static final List<String> PUBLIC_PATHS = List.of("/login", "/error", "/favicon.ico");
 
     private final AppUserRepository repository;

@@ -3,6 +3,7 @@ package com.shiparrival.web;
 import com.shiparrival.domain.AppUser;
 import com.shiparrival.domain.Carrier;
 import com.shiparrival.domain.Shipment;
+import com.shiparrival.domain.ShipmentStatus;
 import com.shiparrival.domain.UserRole;
 import com.shiparrival.repository.AppUserRepository;
 import com.shiparrival.repository.ShipmentRepository;
@@ -66,7 +67,7 @@ class DashboardUserRenderingTest {
         mockMvc.perform(get("/").sessionAttr(AuthFilter.SESSION_USER_ID, user.getId()))
                 .andExpect(status().isOk())
                 .andExpect(content().string(not(containsString("id=\"trackNowForm\""))))
-                .andExpect(content().string(not(containsString("Registrar Embarque Individual"))));
+                .andExpect(content().string(not(containsString("id=\"modalNewShipment\""))));
 
         AppUser admin = repository.save(AppUser.builder()
                 .username("jefa2").passwordHash("h").role(UserRole.ADMIN).enabled(true)
@@ -75,7 +76,8 @@ class DashboardUserRenderingTest {
         mockMvc.perform(get("/").sessionAttr(AuthFilter.SESSION_USER_ID, admin.getId()))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("id=\"trackNowForm\"")))
-                .andExpect(content().string(containsString("Registrar Embarque Individual")));
+                .andExpect(content().string(containsString("id=\"modalNewShipment\"")))
+                .andExpect(content().string(containsString("Nuevo Embarque")));
     }
 
     @Test
@@ -97,13 +99,14 @@ class DashboardUserRenderingTest {
                 .username("operador").passwordHash("h").role(UserRole.OPERADOR).enabled(true)
                 .activeSessionExpiresAt(java.time.LocalDateTime.now().plusHours(1)).build());
         Shipment shipment = shipmentRepository.save(Shipment.builder()
-                .trackingNumber("TESTBL700001").carrier(Carrier.ONE).build());
+                .trackingNumber("TESTBL700001").carrier(Carrier.ONE)
+                .status(ShipmentStatus.ERROR_CHECKING).build());
 
         mockMvc.perform(get("/").sessionAttr(AuthFilter.SESSION_USER_ID, operator.getId()))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("id=\"trackNowForm\"")))
-                .andExpect(content().string(containsString("Registrar Embarque Individual")))
-                .andExpect(content().string(containsString("Carga Masiva desde Excel")))
+                .andExpect(content().string(containsString("Nuevo Embarque")))
+                .andExpect(content().string(containsString("Carga Masiva Excel")))
                 .andExpect(content().string(containsString("/shipments/" + shipment.getId() + "/delete")))
                 .andExpect(content().string(not(containsString("href=\"/users\""))));
     }
