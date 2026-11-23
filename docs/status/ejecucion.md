@@ -1,8 +1,8 @@
 # Estado de ejecución
 
-**Actualizado:** 2026-11-22
-**Fase:** Borrado condicionado de guías: botón "Eliminar" habilitado en guías no monitoreadas. Ciclo cerrado y listo para despliegue.
-**Último commit:** c3688cc — "fix(history): translate status and event type labels to Spanish"
+**Actualizado:** 2026-11-23
+**Fase:** Borrado condicionado de guías: botón "Eliminar" habilitado en guías no monitoreadas. Integrado a `master` por el PR #35 y desplegado.
+**Último commit:** ba3fdfd — "feat(dashboard): eliminar habilitado en guías no monitoreadas" (`master`)
 
 ## Migración UI (ArriVix)
 
@@ -11,7 +11,7 @@
 | Dashboard | src/main/resources/templates/dashboard.html | Migrado — tokens portados de dashboard-single-action.html |
 | Historial | src/main/resources/templates/history.html | Migrado |
 | Login | src/main/resources/templates/login.html | Migrado |
-| Usuarios | src/main/resources/templates/users.html | En curso (frontend-dev) |
+| Usuarios | src/main/resources/templates/users.html | Migrado en el PR #34; refinamientos locales sin commitear (ver deuda técnica) |
 
 ## Borrado condicionado de guías
 
@@ -23,11 +23,25 @@
 | Plantilla | src/main/resources/templates/dashboard.html | Hecho — botón visible solo si `canBeDeletedManually()` |
 | Tests | src/test/java/com/shiparrival/{domain,service,web}/… | Hecho — suite completa 279 tests, 0 fallos, 6 omitidos |
 
+## Integración
+
+| Paso | Evidencia |
+|---|---|
+| Commit original | `0002102` en `feature/delete-unmonitored-guides`, colgado de `fedd6a1` |
+| Reconstrucción | `fedd6a1` y `origin/master` (`7c6c4f0`) comparten árbol `e41a0922`; el cherry-pick aplicó limpio |
+| Commit integrado | `ba3fdfd`, padre directo `7c6c4f0` (PR #34). Sin `fedd6a1` en la historia |
+| PR | #35 abierto sobre `feature/delete-guides-clean`; `mergeable_state: clean`, 10 archivos, +378/−18 |
+| Merge | Fast-forward por refs (`git push origin feature/delete-guides-clean:master`). Sin commit de merge |
+| `master` | `ba3fdfd` — confirmado con `git ls-remote` y `GET /repos/…/pulls/35` (`merged: true`, `merged_at` 2026-11-23T05:42:11Z) |
+| Suite post-cherry-pick | 279 tests, 0 fallos, 6 omitidos, `BUILD SUCCESS` en 44.4 s sobre `ba3fdfd` |
+
+Los 6 omitidos son los de navegador/red real: `MscTrackingBrowserIntegrationTest` (1), `MaerskTrackingBrowserIntegrationTest` (1), `HapagLloydTrackingBrowserIntegrationTest` (1) y `CarrierNetworkDiagnosticTest` (3).
+
 ## Gates
 
-- QA: aprobado — suite completa 279 tests, 0 fallos, 0 errores, 6 omitidos (navegador real).
+- QA: aprobado — suite completa 279 tests, 0 fallos, 0 errores, 6 omitidos (navegador real). Re-ejecutada sobre `ba3fdfd` tras el cherry-pick.
 - Code review: aprobado con observaciones. Cerrados el TOCTOU (validación y borrado en la misma transacción), el mensaje de rechazo con `getLabel()` y la cobertura de rol ADMIN y de los estados restantes. Pendiente como deuda: pérdida de filtros en el redirect.
-- Deploy: pendiente.
+- Deploy: hecho — `master` en `ba3fdfd`; Render reconstruye desde esa rama.
 
 ## Bloqueos
 
@@ -41,13 +55,15 @@ Ninguno.
 
 ## Próximo paso
 
-Desplegar. La funcionalidad está cerrada: código, tests, gate de QA y gate de code review aprobados.
+Ciclo cerrado. La funcionalidad está en `master` (`ba3fdfd`) y desplegada; no requiere acción adicional. Cuando se retome trabajo, lo pendiente es `users.html` (migración ArriVix sin commitear, 217 inserciones / 62 borrados) en su propia rama.
 
 ## Deuda técnica registrada
 
 - **El borrado pierde los filtros del dashboard**: el formulario solo envía `page`, `size` y `search`, así que tras borrar se vuelve a la lista sin filtro de naviera, estado, puerto ni ETA. Preexistente, pero ahora visible porque el botón aplica a todas las guías pendientes.
 - **`ShipmentService.deleteShipment` sigue público y sin guardas**: cualquier caller futuro que lo use se salta la regla. El nombre seguro por defecto sería el restringido.
 - **Sin CSRF en los POST**: mitigado por la cookie `SameSite=Lax`, no por el servidor. Afecta a borrar, registrar y "Monitorear Ahora" por igual.
+- **`*.perm-probe.tmp` en los árboles de código**: `src/main/java/com/shiparrival/.perm-probe.tmp` y `src/test/java/com/shiparrival/.perm-probe.tmp`. Sin rastrear, no entran al JAR; son residuo de una prueba de permisos. No bloquean nada.
+- **`users.html` sin commitear**: la migración ArriVix de esa plantilla (279 líneas) sigue en el árbol de trabajo sobre `master` en `ba3fdfd`. Vive fuera de este ciclo y necesita su propia rama.
 
 ---
 
