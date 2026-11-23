@@ -297,10 +297,17 @@ public class ShipmentWebController {
                                  RedirectAttributes redirectAttributes) {
         requireOperator(currentUser);
         try {
-            shipmentService.deleteShipment(id);
+            // La validación del estado vive dentro de la transacción del servicio,
+            // de modo que nadie puede mover la guía entre el chequeo y el borrado.
+            shipmentService.deleteShipmentManually(id);
             redirectAttributes.addFlashAttribute("successMessage", "Embarque eliminado correctamente.");
+        } catch (IllegalStateException ex) {
+            // Rechazo por estado: el mensaje del servicio ya es apto para el usuario.
+            redirectAttributes.addFlashAttribute("errorMessage", ex.getMessage());
+        } catch (IllegalArgumentException ex) {
+            redirectAttributes.addFlashAttribute("errorMessage", "Embarque no encontrado (ID: " + id + ")");
         } catch (Exception ex) {
-            log.error("Error al eliminar embarque ID {}: {}", id, ex.getMessage());
+            log.error("Error al eliminar embarque ID {}", id, ex);
             redirectAttributes.addFlashAttribute("errorMessage", "Error al eliminar embarque: " + ex.getMessage());
         }
         return redirectToDashboard(page, size, new ShipmentFilter(search, null, null, null, null, null));

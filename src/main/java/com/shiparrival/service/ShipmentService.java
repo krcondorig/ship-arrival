@@ -351,14 +351,68 @@ public class ShipmentService {
         return "%" + value.trim().toLowerCase() + "%";
     }
 
+    /**
+     * Borra un embarque <strong>sin restricción de estado</strong>.
+     *
+     * <p>Es la variante de uso interno: la usa la retención automática
+     * ({@link ShipmentRetentionService}) para purgar guías arribadas, canceladas
+     * y con error cuyo plazo ya venció. Por eso no consulta
+     * {@link ShipmentStatus#canBeDeletedManually()} y no debe empezar a hacerlo:
+     * si lo hiciera, la limpieza dejaría de borrar los arribados y la base
+     * crecería sin límite.</p>
+     *
+     * <p>La acción manual del operador desde el dashboard usa
+     * {@link #deleteShipmentManually(Long)}, que sí valida el estado.</p>
+     */
     @Transactional
     public void deleteShipment(Long id) {
         Shipment shipment = shipmentRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Embarque no encontrado con ID: " + id));
-        
+        performDelete(shipment);
+    }
+
+    /**
+     * Borra un embarque solicitado a mano por un operador, validando el estado
+     * dentro de la <strong>misma transacción</strong> que hace el borrado.
+     *
+     * <p>Existe para cerrar la ventana de carrera del flujo anterior, que
+     * cargaba la guía en una transacción de solo lectura (entidad ya separada de
+     * la sesión), validaba el estado en el controlador y borraba en otra
+     * transacción distinta. Entre la validación y el borrado el planificador
+     * podía mover la guía de {@code PENDING_FIRST_CHECK} a {@code IN_TRANSIT} y
+     * se terminaba eliminando una guía ya monitoreada.</p>
+     *
+     * <p>Es distinto de {@link #deleteShipment(Long)}: aquel es la variante sin
+     * restricción de estado reservada a procesos internos como la retención,
+     * mientras que este es el único punto de entrada válido para el borrado
+     * manual desde la web.</p>
+     *
+     * @throws IllegalArgumentException si el embarque no existe.
+     * @throws IllegalStateException    si el estado no admite borrado manual.
+     */
+    @Transactional
+    public void deleteShipmentManually(Long id) {
+        Shipment shipment = shipmentRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Embarque no encontrado con ID: " + id));
+
+        if (!shipment.getStatus().canBeDeletedManually()) {
+            throw new IllegalStateException(
+                    "No se puede eliminar una guía en estado \"" + shipment.getStatus().getLabel() + "\"");
+        }
+
+        performDelete(shipment);
+    }
+
+    /**
+     * Borrado real compartido por las dos variantes: primero el historial (hay
+     * una clave foránea hacia el embarque) y luego el embarque.
+     */
+    private void performDelete(Shipment shipment) {
+        Long id = shipment.getId();
+
         // Primero eliminar los logs relacionados
         shipmentEventLogRepository.deleteByShipmentId(id);
-        
+
         // Luego eliminar el embarque
         shipmentRepository.delete(shipment);
         log.info("Embarque eliminado: ID={}, Guía={}", id, shipment.getTrackingNumber());

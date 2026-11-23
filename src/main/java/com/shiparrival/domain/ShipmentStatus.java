@@ -35,4 +35,20 @@ public enum ShipmentStatus {
             case MANUAL_CHECK -> "Verificar manual";
         };
     }
+
+    /**
+     * Criterio de borrado manual desde el dashboard.
+     *
+     * <p>Solo se permite eliminar una guía que todavía no ha sido monitoreada
+     * ({@code PENDING_FIRST_CHECK}) o cuya consulta a la naviera falló
+     * ({@code ERROR_CHECKING}). En cualquier otro estado el embarque tiene
+     * información útil que no debe perderse con un clic accidental.</p>
+     *
+     * <p>Este criterio es solo para la acción manual del operador: la purga
+     * automática de retención ({@code ShipmentRetentionService}) borra también
+     * guías arribadas y canceladas, y por eso no consulta este método.</p>
+     */
+    public boolean canBeDeletedManually() {
+        return this == PENDING_FIRST_CHECK || this == ERROR_CHECKING;
+    }
 }

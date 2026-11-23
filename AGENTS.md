@@ -6,7 +6,7 @@ Este archivo sirve como referencia central para cualquier agente o desarrollador
 
 ## 1. Estado Actual del Proyecto
 
-- **Fase actual:** Implementación completa con soporte para ONE, MSC, MAERSK y HAPAG-LLOYD; suite de pruebas pasando (255 tests, 6 omitidos por requerir navegador real). Se corrigió un falso estado "Arribado" en ONE para transbordos, con migración de auto-recuperación al arranque (`ShipmentDataReactivationMigration`) y reactivación automática de embarques. Optimización ultra-ligera en MSC y MAERSK bloqueando la carga de imágenes (`--blink-settings=imagesEnabled=false`, `managed_default_content_settings.images=2`) y aplicando carga `EAGER` en Maersk para reducir en un 98% la transferencia de red hacia el exit node móvil. Pre-descarga y caché de ChromeDriver en GitHub Actions antes de conectar Tailscale con modo `SE_OFFLINE` y `SE_AVOID_STATS`, eliminando los retrasos de red y telemetría de Selenium sobre el exit node móvil. Optimización del ciclo diario en CI activando paralelismo acotado MSC/Maersk (`TRACKING_PARALLEL_ENABLED=true`), reducción del delay de cortesía a 1.0s (`TRACKING_REQUEST_DELAY_MS=1000`), eliminación de delays innecesarios en `MANUAL_SKIP` y empaquetado directo con `-Dmaven.test.skip=true package` para acortar el tiempo total de ejecución. Monitoreo desatendido en GitHub Actions y dashboard desplegable en Render.
+- **Fase actual:** Implementación completa con soporte para ONE, MSC, MAERSK y HAPAG-LLOYD; suite de pruebas pasando (279 tests, 6 omitidos por requerir navegador real). Se corrigió un falso estado "Arribado" en ONE para transbordos, con migración de auto-recuperación al arranque (`ShipmentDataReactivationMigration`) y reactivación automática de embarques. Optimización ultra-ligera en MSC y MAERSK bloqueando la carga de imágenes (`--blink-settings=imagesEnabled=false`, `managed_default_content_settings.images=2`) y aplicando carga `EAGER` en Maersk para reducir en un 98% la transferencia de red hacia el exit node móvil. Pre-descarga y caché de ChromeDriver en GitHub Actions antes de conectar Tailscale con modo `SE_OFFLINE` y `SE_AVOID_STATS`, eliminando los retrasos de red y telemetría de Selenium sobre el exit node móvil. Optimización del ciclo diario en CI activando paralelismo acotado MSC/Maersk (`TRACKING_PARALLEL_ENABLED=true`), reducción del delay de cortesía a 1.0s (`TRACKING_REQUEST_DELAY_MS=1000`), eliminación de delays innecesarios en `MANUAL_SKIP` y empaquetado directo con `-Dmaven.test.skip=true package` para acortar el tiempo total de ejecución. Monitoreo desatendido en GitHub Actions y dashboard desplegable en Render.
 - **Repositorio Git:** Rama `master`, con Maven Wrapper autónomo y suite de tests verde.
 - **Entorno de ejecución:** 
   - Sistema Operativo: Windows (win32)
@@ -128,11 +128,12 @@ Aplicación web monolítica ligera en **Java 21** con **Spring Boot 3**, que per
 - [x] Componente para subida de archivo Excel con reporte de resultados.
 - [x] Botón de "Monitorear Ahora" con retroalimentación visual.
 - [x] Modal/Página para ver el historial de cambios de ETA de un embarque.
+- [x] Borrado manual condicionado en el dashboard: el botón "Eliminar" aparece solo en guías todavía sin monitorear (`PENDING_FIRST_CHECK`) o cuya consulta a la naviera falló (`ERROR_CHECKING`), criterio centralizado en `ShipmentStatus.canBeDeletedManually()` y compartido por la vista (Thymeleaf) y el servicio. El borrado manual pasa por `ShipmentService.deleteShipmentManually()`, que valida el estado y borra dentro de la misma transacción para que el planificador no pueda mover la guía entre el chequeo y el borrado; el controlador solo traduce el rechazo a un flash de error con la etiqueta del estado. Aplica a `ADMIN` y `OPERADOR` (`currentUser.canOperate()`). La retención automática (`ShipmentRetentionService`) sigue usando `ShipmentService.deleteShipment()`, la variante sin restricción de estado, para purgar arribados, cancelados y errores vencidos.
 
 ### Fase 9: Pruebas E2E y Verificación Final
 - [x] Probar flujo completo: Carga manual/Excel -> Rastreo -> Actualización de datos -> Disparo de alerta -> Visualización web.
 - [x] Verificar HAPAG-LLOYD con las guías reales `HLCUNG12607EKZE0` y `HLCUNG12608BMJY0`: datos de buque, viaje, puerto y arribo, historial de ETA y supresión de alertas históricas.
-- [x] Suite final: 246 tests, 0 fallos, 6 omitidos (pruebas reales de navegador MSC, MAERSK y HAPAG-LLOYD, más integraciones condicionadas).
+- [x] Suite final: 279 tests, 0 fallos, 6 omitidos (pruebas reales de navegador MSC, MAERSK y HAPAG-LLOYD, más integraciones condicionadas).
 
 ### Fase 10: Ejecución Desatendida en la Nube
 - [x] `TrackingRunOnceRunner`: ejecuta un único ciclo y termina el proceso; se activa con `--tracking.run-once=true`.
@@ -146,3 +147,28 @@ Aplicación web monolítica ligera en **Java 21** con **Spring Boot 3**, que per
 - [x] Botón "Monitorear Ahora" que dispara el workflow real de GitHub Actions (`workflow_dispatch`) con un token fine-grained de permiso `Actions: Read and write` (`GITHUB_TOKEN`, `GITHUB_DISPATCH_ENABLED=true`). Sin token configurado, el botón conserva el ciclo local en proceso.
 - [x] El runner publica su avance en `tracking_run_progress` (identificado con `github.run_id` vía `TRACKING_RUN_ID`); el dashboard lo lee en `GET /shipments/live-status` y dibuja la barra. Si el exit node falla, el mensaje lo explica en lugar de dejar la barra detenida.
 - [x] Horas siempre en `America/Lima` (`app.timezone`), independientemente de la zona del visitante o del anfitrión.
+
+---
+
+## 5. Convenciones para agentes
+
+### Evidencia antes de declarar terminado
+
+Ningún agente da una tarea por terminada sin **pegar la salida literal** de la verificación que le corresponde. Un "está hecho", "debería pasar" o un resumen del resultado no es evidencia y no se acepta como entrega.
+
+| Tipo de tarea | Verificación obligatoria | Qué se pega |
+|---|---|---|
+| Cambio en código Java o en tests | `.\mvnw.cmd test` | El bloque `[INFO] Results:` con el conteo (tests, fallos, errores, omitidos) y la línea `BUILD SUCCESS` / `BUILD FAILURE` |
+| Cambio en plantillas Thymeleaf | La suite, porque `@SpringBootTest` renderiza la plantilla real | Lo mismo que arriba; un `@WebMvcTest` no prueba la vista |
+| Cambio en documentación | Releer el archivo escrito | El fragmento tal como quedó en disco |
+| Cambio de configuración | Releer el archivo | El bloque modificado, completo |
+
+Si la verificación falla y no se puede resolver, se reporta el **mensaje de error literal** y el estado real. Nunca se relajan aserciones ni se omite una prueba para dejar la suite en verde.
+
+### Alcance de un encargo
+
+Un encargo = un entregable verificable. Si una tarea necesita leer varios archivos, editar tres y además ejecutar y depurar la suite, se parte en entregas sucesivas en lugar de pedir todo de golpe: los límites de pasos por agente (`steps` en `.opencode/agents/*.md`) no dan para encargos grandes, y el resultado es trabajo a medias sin evidencia.
+
+### Permisos de escritura
+
+Cada agente edita solo las rutas declaradas en su ficha. Antes de delegar una edición, se revisa el bloque `permissions` del agente destino: una ruta no listada falla con `Permission denied` sin importar el contenido. En particular, solo `project-manager` edita `AGENTS.md` y `docs/status/**`, y solo `reclutador` edita las fichas de `.opencode/agents/**`.

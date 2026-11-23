@@ -30,6 +30,8 @@ import java.util.Optional;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -129,9 +131,52 @@ class ShipmentWebControllerTest {
                         .param("size", "20")
                         .param("search", "ONE"))
                 .andExpect(status().is3xxRedirection())
-                .andExpect(redirectedUrl("/?page=2&size=20&search=ONE"));
+                .andExpect(redirectedUrl("/?page=2&size=20&search=ONE"))
+                .andExpect(flash().attribute("successMessage", "Embarque eliminado correctamente."));
 
-        verify(shipmentService).deleteShipment(1L);
+        verify(shipmentService).deleteShipmentManually(1L);
+    }
+
+    @Test
+    @DisplayName("POST /shipments/{id}/delete rechaza guías ya monitoreadas y no las borra")
+    void shouldRefuseDeletingMonitoredShipment() throws Exception {
+        doThrow(new IllegalStateException("No se puede eliminar una guía en estado \"En Tránsito\""))
+                .when(shipmentService).deleteShipmentManually(7L);
+
+        mockMvc.perform(post("/shipments/7/delete")
+                        .param("page", "0")
+                        .param("size", "10"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/?page=0&size=10"))
+                .andExpect(flash().attribute("errorMessage",
+                        "No se puede eliminar una guía en estado \"En Tránsito\""));
+
+        verify(shipmentService, never()).deleteShipment(any());
+    }
+
+    @Test
+    @DisplayName("POST /shipments/{id}/delete permite borrar una guía con error de consulta")
+    void shouldAllowDeletingShipmentInError() throws Exception {
+        mockMvc.perform(post("/shipments/9/delete"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/?page=0&size=10"))
+                .andExpect(flash().attribute("successMessage", "Embarque eliminado correctamente."));
+
+        verify(shipmentService).deleteShipmentManually(9L);
+    }
+
+    @Test
+    @DisplayName("POST /shipments/{id}/delete advierte cuando la guía no existe")
+    void shouldWarnWhenShipmentToDeleteIsMissing() throws Exception {
+        doThrow(new IllegalArgumentException("Embarque no encontrado con ID: 404"))
+                .when(shipmentService).deleteShipmentManually(404L);
+
+        mockMvc.perform(post("/shipments/404/delete"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/?page=0&size=10"))
+                .andExpect(flash().attribute("errorMessage", "Embarque no encontrado (ID: 404)"));
+
+        verify(shipmentService, never()).deleteShipment(any());
     }
 
     @Test

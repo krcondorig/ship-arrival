@@ -56,6 +56,43 @@ class ShipmentStatusTest {
     }
 
     @Test
+    @DisplayName("Solo pendiente y error de consulta admiten borrado manual")
+    void onlyPendingAndErrorCanBeDeletedManually() {
+        assertThat(ShipmentStatus.PENDING_FIRST_CHECK.canBeDeletedManually())
+                .as("PENDING_FIRST_CHECK todavía no se ha monitoreado")
+                .isTrue();
+        assertThat(ShipmentStatus.ERROR_CHECKING.canBeDeletedManually())
+                .as("ERROR_CHECKING no tiene datos útiles que perder")
+                .isTrue();
+
+        assertThat(ShipmentStatus.IN_TRANSIT.canBeDeletedManually())
+                .as("IN_TRANSIT ya tiene datos del viaje")
+                .isFalse();
+        assertThat(ShipmentStatus.NEAR_ARRIVAL.canBeDeletedManually())
+                .as("NEAR_ARRIVAL está por arribar")
+                .isFalse();
+        assertThat(ShipmentStatus.ARRIVED.canBeDeletedManually())
+                .as("ARRIVED ya confirmó el arribo")
+                .isFalse();
+        assertThat(ShipmentStatus.CANCELLED.canBeDeletedManually())
+                .as("CANCELLED conserva el motivo de la cancelación")
+                .isFalse();
+        assertThat(ShipmentStatus.MANUAL_CHECK.canBeDeletedManually())
+                .as("MANUAL_CHECK espera revisión de un operador")
+                .isFalse();
+    }
+
+    @Test
+    @DisplayName("El borrado manual cubre exactamente dos de los siete estados")
+    void manualDeletionCoversExactlyTwoStatuses() {
+        assertThat(Arrays.stream(ShipmentStatus.values())
+                .filter(ShipmentStatus::canBeDeletedManually))
+                .containsExactlyInAnyOrder(
+                        ShipmentStatus.PENDING_FIRST_CHECK,
+                        ShipmentStatus.ERROR_CHECKING);
+    }
+
+    @Test
     @DisplayName("Las constantes persistidas conservan su nombre exacto")
     void persistedNamesAreUnchanged() {
         assertThat(Arrays.stream(ShipmentStatus.values()).map(Enum::name))

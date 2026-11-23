@@ -30,6 +30,7 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
@@ -313,5 +314,92 @@ class ShipmentServiceTest {
 
         assertThat(arrived.getStatus()).isEqualTo(ShipmentStatus.ARRIVED);
         verify(shipmentRepository, never()).save(any());
+    }
+
+    // ------------------------------------------------------------------
+    // Borrado manual vs. borrado sin restricción (retención)
+    // ------------------------------------------------------------------
+
+    private Shipment existingShipment(Long id, ShipmentStatus status) {
+        return Shipment.builder()
+                .id(id)
+                .trackingNumber("TESTBL9" + id)
+                .carrier(Carrier.ONE)
+                .status(status)
+                .build();
+    }
+
+    @Test
+    @DisplayName("deleteShipmentManually borra una guía pendiente y la quita del repositorio")
+    void shouldDeletePendingShipmentManually() {
+        Shipment pending = existingShipment(1L, ShipmentStatus.PENDING_FIRST_CHECK);
+        when(shipmentRepository.findById(1L)).thenReturn(Optional.of(pending));
+
+        shipmentService.deleteShipmentManually(1L);
+
+        verify(shipmentEventLogRepository).deleteByShipmentId(1L);
+        verify(shipmentRepository).delete(pending);
+    }
+
+    @Test
+    @DisplayName("deleteShipmentManually borra una guía con error de consulta")
+    void shouldDeleteErroredShipmentManually() {
+        Shipment errored = existingShipment(2L, ShipmentStatus.ERROR_CHECKING);
+        when(shipmentRepository.findById(2L)).thenReturn(Optional.of(errored));
+
+        shipmentService.deleteShipmentManually(2L);
+
+        verify(shipmentEventLogRepository).deleteByShipmentId(2L);
+        verify(shipmentRepository).delete(errored);
+    }
+
+    @Test
+    @DisplayName("deleteShipmentManually rechaza y no borra los estados ya monitoreados")
+    void shouldRefuseManualDeletionForMonitoredStatuses() {
+        List<ShipmentStatus> blocked = List.of(
+                ShipmentStatus.IN_TRANSIT,
+                ShipmentStatus.ARRIVED,
+                ShipmentStatus.CANCELLED,
+                ShipmentStatus.MANUAL_CHECK);
+
+        long id = 10L;
+        for (ShipmentStatus status : blocked) {
+            final long shipmentId = id;
+            Shipment shipment = existingShipment(shipmentId, status);
+            when(shipmentRepository.findById(shipmentId)).thenReturn(Optional.of(shipment));
+
+            assertThatThrownBy(() -> shipmentService.deleteShipmentManually(shipmentId))
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining(status.getLabel());
+
+            id++;
+        }
+
+        verify(shipmentRepository, never()).delete(any(Shipment.class));
+        verify(shipmentEventLogRepository, never()).deleteByShipmentId(any());
+    }
+
+    @Test
+    @DisplayName("deleteShipmentManually lanza IllegalArgumentException si el id no existe")
+    void shouldThrowWhenDeletingMissingShipmentManually() {
+        when(shipmentRepository.findById(99L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> shipmentService.deleteShipmentManually(99L))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("99");
+
+        verify(shipmentRepository, never()).delete(any(Shipment.class));
+    }
+
+    @Test
+    @DisplayName("deleteShipment (sin restricción) sigue borrando una guía ARRIVED: la retención no se rompió")
+    void shouldStillDeleteArrivedShipmentWithoutRestriction() {
+        Shipment arrived = existingShipment(3L, ShipmentStatus.ARRIVED);
+        when(shipmentRepository.findById(3L)).thenReturn(Optional.of(arrived));
+
+        shipmentService.deleteShipment(3L);
+
+        verify(shipmentEventLogRepository).deleteByShipmentId(3L);
+        verify(shipmentRepository).delete(arrived);
     }
 }

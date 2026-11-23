@@ -858,12 +858,14 @@
                                    title="Ver ficha completa (estado actual + historial)">
                                     <i class="bi bi-eye" aria-hidden="true"></i>
                                 </a>
-                                <!-- Eliminar es una acción destructiva: solo se ofrece en filas
-                                     ERROR_CHECKING, el estado que sí requiere intervención del
-                                     operador. En el resto de estados la columna Acciones queda con
+                                <!-- Eliminar es una acción destructiva: solo se ofrece en guías aún
+                                     no monitoreadas (PENDING_FIRST_CHECK) o con consulta fallida
+                                     (ERROR_CHECKING). El criterio vive en
+                                     ShipmentStatus.canBeDeletedManually() y el controlador lo
+                                     revalida. En el resto de estados la columna Acciones queda con
                                      un único icono (ojo), como en dashboard-icon-buttons.html.
                                      El filtro de rol (canOperate) se conserva intacto. -->
-                                <form th:if="${(currentUser == null or currentUser.canOperate()) and s.status.name() == 'ERROR_CHECKING'}"
+                                <form th:if="${(currentUser == null or currentUser.canOperate()) and s.status.canBeDeletedManually()}"
                                       th:action="@{'/shipments/' + ${s.id} + '/delete'}"
                                       method="post"
                                       style="display: inline;"
