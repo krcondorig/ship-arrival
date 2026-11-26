@@ -34,6 +34,18 @@ public class ShipmentService {
 
     private static final int MAX_EVENT_DESCRIPTION_LENGTH = 512;
 
+    /**
+     * Días que un embarque arribado sigue visible en el dashboard antes de
+     * quedar archivado. Es la única fuente de verdad de la ventana: tanto la
+     * tabla ({@link #getVisibleShipments}) como las tarjetas KPI
+     * ({@link #getVisibleShipmentStats}) la leen de aquí, para que no puedan
+     * mostrar cifras distintas.
+     *
+     * <p>No confundir con {@code tracking.retention.days}, que rige el borrado
+     * definitivo y es un plazo independiente.</p>
+     */
+    private static final int VISIBLE_WINDOW_DAYS = 7;
+
     private final ShipmentRepository shipmentRepository;
     private final ShipmentEventLogRepository shipmentEventLogRepository;
     private final ExcelImportService excelImportService;
@@ -282,20 +294,16 @@ public class ShipmentService {
     }
 
     /**
-     * Obtiene los embarques visibles en el dashboard de forma paginada.
-     * Los embarques arribados hace más de 3 días se omiten automáticamente
-     * (quedan archivados en la base de datos).
-     */
-    /**
      * Obtiene los embarques visibles en el dashboard de forma paginada, aplicando
      * los criterios de {@link ShipmentFilter} (búsqueda de texto, naviera, estado,
-     * puerto y rango de ETA). Los embarques arribados hace más de 3 días se
-     * omiten automáticamente.
+     * puerto y rango de ETA). Los embarques arribados hace más de
+     * {@link #VISIBLE_WINDOW_DAYS} días se omiten automáticamente (quedan
+     * archivados en la base de datos).
      */
     @Transactional(readOnly = true)
     public Page<Shipment> getVisibleShipments(ShipmentFilter filter, Pageable pageable) {
         ShipmentFilter safe = (filter == null) ? ShipmentFilter.empty() : filter;
-        LocalDateTime cutoff = LocalDateTime.now().minusDays(3);
+        LocalDateTime cutoff = visibilityCutoff();
         org.springframework.data.jpa.domain.Specification<Shipment> spec =
                 org.springframework.data.jpa.domain.Specification.where(
                         com.shiparrival.repository.ShipmentSpecifications.visible(cutoff, ShipmentStatus.ARRIVED))
@@ -315,7 +323,7 @@ public class ShipmentService {
     @Transactional(readOnly = true)
     public ShipmentStats getVisibleShipmentStats(ShipmentFilter filter) {
         ShipmentFilter safe = (filter == null) ? ShipmentFilter.empty() : filter;
-        LocalDateTime cutoff = LocalDateTime.now().minusDays(3);
+        LocalDateTime cutoff = visibilityCutoff();
         org.springframework.data.jpa.domain.Specification<Shipment> spec =
                 org.springframework.data.jpa.domain.Specification.where(
                         com.shiparrival.repository.ShipmentSpecifications.visible(cutoff, ShipmentStatus.ARRIVED))
@@ -331,6 +339,15 @@ public class ShipmentService {
         long nearArrival = all.stream().filter(s -> s.getStatus() == ShipmentStatus.NEAR_ARRIVAL).count();
         long arrived = all.stream().filter(s -> s.getStatus() == ShipmentStatus.ARRIVED).count();
         return new ShipmentStats(total, inTransit, nearArrival, arrived);
+    }
+
+    /**
+     * Corte temporal de la ventana de visibilidad del dashboard. Es el único
+     * lugar donde se aplica {@link #VISIBLE_WINDOW_DAYS}: lo consumen tanto la
+     * tabla como las tarjetas KPI.
+     */
+    private LocalDateTime visibilityCutoff() {
+        return LocalDateTime.now().minusDays(VISIBLE_WINDOW_DAYS);
     }
 
     private String toSearchPattern(String searchTerm) {

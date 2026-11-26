@@ -76,7 +76,7 @@ class ShipmentRepositoryTest {
     }
 
     @Test
-    @DisplayName("Debe ocultar embarques arribados hace más de 3 días y mantener los recientes")
+    @DisplayName("La consulta findVisibleShipments respeta el cutoff recibido: los arribos anteriores al corte quedan ocultos y los posteriores se mantienen")
     void shouldHideOldArrivedShipments() {
         LocalDateTime now = LocalDateTime.now();
 
