@@ -44,6 +44,16 @@ public class ChromeHapagLloydTrackingClient implements HapagLloydTrackingClient 
 
     private static final String TRACKING_URL =
             "https://www.hapag-lloyd.com/en/online-business/track/track-by-booking-solution.html";
+
+    /**
+     * URL de detalle por contenedor del portal legacy. Es el camino que se midió
+     * funcionando con WARP: la sonda fue directo a esta página (sin pasar por el
+     * listado del B/L, sin radio y sin botón {@code Details}) y obtuvo 8 estados
+     * y 14 filas en ~1.9 s.
+     */
+    private static final String CONTAINER_DETAIL_URL =
+            "https://www.hapag-lloyd.com/en/online-business/track/"
+                    + "track-by-container-solution-legacy.html?view=S8510&container=";
     private static final String RESULTS_TABLE_ID = "tracing_by_booking_f:hl27";
     private static final String DETAILS_BUTTON_ID = "tracing_by_booking_f:hl27:hl53";
     private static final String DETAIL_TABLE_ID = "tracing_by_booking_f:hl66";
@@ -78,32 +88,14 @@ public class ChromeHapagLloydTrackingClient implements HapagLloydTrackingClient 
             })()
             """;
 
-    private static final String MOVEMENTS_JS = """
-            (() => {
-              const table = document.getElementById('tracing_by_booking_f:hl66');
-              if (!table) return '[]';
-              const out = [];
-              for (const row of table.querySelectorAll('tbody tr')) {
-                const cells = row.querySelectorAll('td');
-                if (cells.length < 6) continue;
-                const status = (cells[0].textContent || '').trim();
-                if (!status) continue;
-                const actual = Array.from(cells).some(
-                  c => (c.className || '').toString().toLowerCase().includes('strong')
-                );
-                out.push({
-                  status,
-                  place: (cells[1].textContent || '').trim(),
-                  date: (cells[2].textContent || '').trim(),
-                  time: (cells[3].textContent || '').trim(),
-                  transport: (cells[4].textContent || '').trim(),
-                  voyageNumber: (cells[5].textContent || '').trim(),
-                  actual
-                });
-              }
-              return JSON.stringify(out);
-            })()
-            """;
+    private static final String DETAIL_TEXT_JS =
+            "document.body ? document.body.innerText : ''";
+
+    /** Estados que emite la tabla de movimientos de Hapag-Lloyd, en su texto exacto. */
+    private static final List<String> HAPAG_STATES = List.of(
+            "gate out empty", "gate in empty", "gate out full", "gate in full",
+            "arrival in", "departure from", "loaded", "discharged",
+            "vessel departed", "vessel arrived");
 
     private static final String CLICK_DETAILS_JS = """
             (() => {
@@ -225,29 +217,25 @@ public class ChromeHapagLloydTrackingClient implements HapagLloydTrackingClient 
         }
 
         ContainerRow first = containers.get(0);
-        boolean detailReady = false;
-        HapagLloydTrackingException lastDetailError = null;
 
-        for (int attempt = 1; attempt <= 2 && !detailReady; attempt++) {
-            try {
-                clickContainerAndDetails(first.containerNumber(), trackingNumber);
-                detailReady = waitForDetailTable(trackingNumber);
-            } catch (HapagLloydTrackingException ex) {
-                lastDetailError = ex;
-                log.debug("No se pudo abrir el detalle de {} (intento {}): {}",
-                        first.containerNumber(), attempt, ex.getMessage());
-            }
-            if (!detailReady && attempt < 2) {
-                sleepQuietly(1500L);
-            }
+        // Camino medido con WARP: se va directo a la página de detalle legacy por
+        // contenedor en lugar de marcar el radio y pulsar el botón Details, que es
+        // la mitad que fallaba. El número viaja tal como lo devuelve el listado.
+        String detailUrl = buildContainerDetailUrl(first.containerNumber());
+        log.debug("Navegando al detalle de Hapag-Lloyd: {}", detailUrl);
+        try {
+            cdp.navigate(detailUrl);
+        } catch (HapagLloydTrackingException ex) {
+            log.debug("La navegación del detalle de Hapag-Lloyd interrumpió el contexto CDP: {}",
+                    ex.getMessage());
         }
+        waitForPageReady(debugPort, "tracing by", "container=");
+        ensureCdpConnected();
 
-        if (!detailReady) {
-            throw lastDetailError != null
-                    ? lastDetailError
-                    : new HapagLloydTrackingException(
-                            "No se pudo abrir el detalle del contenedor "
-                                    + first.containerNumber());
+        if (!waitForDetailTable(trackingNumber)) {
+            throw new HapagLloydTrackingException(
+                    "No se pudo abrir el detalle del contenedor "
+                            + first.containerNumber());
         }
 
         List<HapagLloydMovement> movements = parseMovements();
@@ -429,6 +417,15 @@ public class ChromeHapagLloydTrackingClient implements HapagLloydTrackingClient 
      * contrario la página puede estar en una transición y perder la guía.
      */
     private void waitForPageReady(int port) {
+        waitForPageReady(port, "tracing by booking", "blno=");
+    }
+
+    /**
+     * Espera a que la pestaña llegue al título y a la URL indicados. La variante
+     * sin argumentos espera el listado por B/L ({@code blno=}); la navegación
+     * directa al detalle legacy espera {@code container=}.
+     */
+    private void waitForPageReady(int port, String titleFragment, String urlFragment) {
         long deadline = System.currentTimeMillis() + pageTimeout();
         PageTarget lastTarget = null;
         long lastInteractionAttempt = 0L;
@@ -445,9 +442,9 @@ public class ChromeHapagLloydTrackingClient implements HapagLloydTrackingClient 
             }
             if (target != null
                     && target.title() != null
-                    && target.title().toLowerCase(Locale.ROOT).contains("tracing by booking")
+                    && target.title().toLowerCase(Locale.ROOT).contains(titleFragment)
                     && target.url() != null
-                    && target.url().contains("blno=")) {
+                    && target.url().contains(urlFragment)) {
                 log.debug("Página de Hapag-Lloyd lista (título: {})", target.title());
                 return;
             }
@@ -475,6 +472,45 @@ public class ChromeHapagLloydTrackingClient implements HapagLloydTrackingClient 
         throw new HapagLloydTrackingException(
                 "Cloudflare no liberó la página de Hapag-Lloyd a tiempo. "
                         + "Estado observado: " + pageState);
+    }
+
+    /**
+     * Compone la URL del detalle legacy por contenedor, el camino medido con WARP.
+     *
+     * <p>El sitio emite el número como cuatro letras, dos espacios y siete dígitos
+     * ({@code HLBU  2959982}) y envía cada espacio como {@code +}, de modo que el
+     * parámetro queda {@code container=HLBU++2959982}. Se rellena a esa forma
+     * aunque el listado devuelva el número compacto, porque la variante compacta
+     * no se comprobó contra el portal.</p>
+     */
+    static String buildContainerDetailUrl(String containerNumber) {
+        return CONTAINER_DETAIL_URL + containerParam(paddedContainer(containerNumber));
+    }
+
+    /** Deja solo letras y dígitos: {@code HLBU++2959982} -> {@code HLBU2959982}. */
+    static String normalizeContainer(String raw) {
+        return raw == null ? "" : raw.toUpperCase(Locale.ROOT).replaceAll("[^A-Z0-9]", "");
+    }
+
+    /**
+     * Devuelve el número con el relleno que emite el sitio: {@code HLBU  2959982}.
+     * Si no tiene los 11 caracteres esperados se deja como está.
+     */
+    static String paddedContainer(String raw) {
+        String number = normalizeContainer(raw);
+        if (number.length() != 11) {
+            return number;
+        }
+        return number.substring(0, 4) + "  " + number.substring(4);
+    }
+
+    /**
+     * Traduce el texto a la forma que envía el sitio: cada espacio se vuelve
+     * {@code +}. No se usa {@code URLEncoder} porque escaparía el {@code +} a
+     * {@code %2B} y el servidor no encontraría el contenedor.
+     */
+    static String containerParam(String raw) {
+        return raw == null ? "" : raw.trim().replace(" ", "+");
     }
 
     static String pageStateForDiagnostics(String title, String url) {
@@ -641,7 +677,7 @@ public class ChromeHapagLloydTrackingClient implements HapagLloydTrackingClient 
         long deadline = System.currentTimeMillis() + pageTimeout();
         long challengeSince = 0L;
         while (System.currentTimeMillis() < deadline) {
-            if (safeEvaluateBoolean(DETAIL_EXISTS_JS)) {
+            if (isRealDetailText(safeBodyText())) {
                 return true;
             }
 
@@ -667,30 +703,123 @@ public class ChromeHapagLloydTrackingClient implements HapagLloydTrackingClient 
                 buildTimeoutMessage("detalles del contenedor", trackingNumber));
     }
 
-    private List<HapagLloydMovement> parseMovements() {
-        String json = cdp.evaluateString(MOVEMENTS_JS);
-        try {
-            JsonNode root = objectMapper.readTree(json);
-            List<HapagLloydMovement> movements = new ArrayList<>();
-            if (root != null && root.isArray()) {
-                for (JsonNode node : root) {
-                    movements.add(HapagLloydMovement.builder()
-                            .status(node.path("status").asText(""))
-                            .place(node.path("place").asText(""))
-                            .date(node.path("date").asText(""))
-                            .time(node.path("time").asText(""))
-                            .transport(node.path("transport").asText(""))
-                            .voyageNumber(node.path("voyageNumber").asText(""))
-                            .actual(node.path("actual").asBoolean(false))
-                            .build());
+    /**
+     * ¿El texto corresponde a un detalle real y no a la shell de la SPA nueva?
+     *
+     * <p>Se cuentan estados de la tabla en lugar de buscar un id de componente:
+     * el detalle legacy es otra vista JSF y no comparte los client id del
+     * listado. Un detalle real trae al menos dos estados.</p>
+     */
+    static boolean isRealDetailText(String bodyText) {
+        if (bodyText == null || bodyText.isBlank()) {
+            return false;
+        }
+        String flat = bodyText.toLowerCase(Locale.ROOT);
+        int found = 0;
+        for (String state : HAPAG_STATES) {
+            if (flat.contains(state)) {
+                found++;
+                if (found >= 2) {
+                    return true;
                 }
             }
-            return movements;
-        } catch (JsonProcessingException ex) {
-            throw new HapagLloydTrackingException(
-                    "No se pudo interpretar los movimientos de Hapag-Lloyd: "
-                            + ex.getMessage(), ex);
         }
+        return false;
+    }
+
+    private List<HapagLloydMovement> parseMovements() {
+        String text = cdp.evaluateString(DETAIL_TEXT_JS);
+        List<HapagLloydMovement> movements = new ArrayList<>();
+        for (String line : (text == null ? "" : text).split("\\R")) {
+            String stripped = line.strip();
+            if (stripped.isEmpty()) {
+                continue;
+            }
+
+            String[] cells = line.contains("\t")
+                    ? line.split("\t", -1)
+                    : null;
+
+            String status;
+            String place = "";
+            String date = "";
+            String time = "";
+            String transport = "";
+            String voyageNumber = "";
+
+            if (cells != null && cells.length >= 3) {
+                status = cells[0].strip();
+                place = cells[1].strip();
+                date = cells[2].strip();
+                int next = 3;
+                if (cells.length > next && cells[next].strip().matches("\\d{1,2}:\\d{2}")) {
+                    time = cells[next].strip();
+                    next++;
+                }
+                if (cells.length > next) {
+                    transport = cells[next].strip();
+                    next++;
+                }
+                if (cells.length > next) {
+                    voyageNumber = cells[next].strip();
+                }
+            } else {
+                // Sin tabuladores se exige que empiece por un estado conocido y se
+                // corta por la fecha, que es el ancla fiable de la fila.
+                status = HAPAG_STATES.stream()
+                        .filter(state -> stripped.toLowerCase(Locale.ROOT)
+                                .startsWith(state))
+                        .findFirst()
+                        .orElse(null);
+                if (status == null) {
+                    continue;
+                }
+                String rest = stripped.substring(status.length()).strip();
+                java.util.regex.Matcher match =
+                        java.util.regex.Pattern.compile("\\d{4}-\\d{2}-\\d{2}").matcher(rest);
+                if (!match.find()) {
+                    continue;
+                }
+                place = rest.substring(0, match.start()).strip();
+                date = match.group();
+                String[] tail = rest.substring(match.end()).strip().split("\\s+");
+                int next = 0;
+                if (tail.length > next && tail[next].matches("\\d{1,2}:\\d{2}")) {
+                    time = tail[next];
+                    next++;
+                }
+                if (tail.length > next) {
+                    transport = tail[next];
+                    next++;
+                }
+                if (tail.length > next) {
+                    voyageNumber = tail[next];
+                }
+            }
+
+            if (!isKnownState(status)) {
+                continue;
+            }
+
+            movements.add(HapagLloydMovement.builder()
+                    .status(status)
+                    .place(place)
+                    .date(date)
+                    .time(time)
+                    .transport(transport)
+                    .voyageNumber(voyageNumber)
+                    .actual(false)
+                    .build());
+        }
+        return movements;
+    }
+
+    private static boolean isKnownState(String status) {
+        if (status == null) {
+            return false;
+        }
+        String lower = status.toLowerCase(Locale.ROOT);
+        return HAPAG_STATES.contains(lower);
     }
 
     private boolean safeEvaluateBoolean(String expression) {

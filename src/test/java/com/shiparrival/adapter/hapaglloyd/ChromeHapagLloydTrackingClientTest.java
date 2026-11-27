@@ -71,6 +71,50 @@ class ChromeHapagLloydTrackingClientTest {
         assertThat(argumentosConPrefijo(command, "--proxy-server")).isEmpty();
     }
 
+    @Test
+    @DisplayName("La URL del detalle rellena el contenedor compacto como ++")
+    void containerDetailUrlPadsCompactContainer() {
+        assertThat(ChromeHapagLloydTrackingClient.buildContainerDetailUrl("HLBU2959982"))
+                .endsWith("?view=S8510&container=HLBU++2959982");
+    }
+
+    @Test
+    @DisplayName("La URL del detalle conserva el relleno que ya trae el listado")
+    void containerDetailUrlKeepsPaddedContainer() {
+        assertThat(ChromeHapagLloydTrackingClient.buildContainerDetailUrl("HLBU  2959982"))
+                .endsWith("?view=S8510&container=HLBU++2959982");
+    }
+
+    @Test
+    @DisplayName("La URL del detalle no escapa el + a %2B")
+    void containerDetailUrlDoesNotEscapePlus() {
+        assertThat(ChromeHapagLloydTrackingClient.buildContainerDetailUrl("HLBU2959982"))
+                .doesNotContain("%2B");
+    }
+
+    @Test
+    @DisplayName("Un detalle real se reconoce por al menos dos estados")
+    void realDetailNeedsTwoStates() {
+        assertThat(ChromeHapagLloydTrackingClient.isRealDetailText(
+                "Discharged\tMANZANILLO, COL (MX)\t2026-10-22\nLoaded\tSHANGHAI\t2026-09-30"))
+                .isTrue();
+    }
+
+    @Test
+    @DisplayName("La shell de la SPA no se confunde con un detalle")
+    void spaShellIsNotRealDetail() {
+        assertThat(ChromeHapagLloydTrackingClient.isRealDetailText(
+                "Track your shipment. Please enter a container number."))
+                .isFalse();
+    }
+
+    @Test
+    @DisplayName("Un solo estado no basta para considerar detalle real")
+    void singleStateIsNotEnough() {
+        assertThat(ChromeHapagLloydTrackingClient.isRealDetailText("Discharged"))
+                .isFalse();
+    }
+
     private static List<String> argumentosConPrefijo(List<String> command, String prefix) {
         return command.stream().filter(arg -> arg.startsWith(prefix)).toList();
     }

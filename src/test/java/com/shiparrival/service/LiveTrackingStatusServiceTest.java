@@ -48,9 +48,13 @@ class LiveTrackingStatusServiceTest {
     }
 
     @Test
-    @DisplayName("Cuando falla el paso de Tailscale, avisa del teléfono apagado")
-    void shouldExplainPhoneOffline() {
+    @DisplayName("Cuando falla el paso de salida, avisa de que el proxy no responde")
+    void shouldExplainEgressFailure() {
         when(gitHubActionsClient.findRun(RUN_ID)).thenReturn(Optional.of(run("completed", "failure")));
+        // LiveTrackingStatusService.isPhoneStep (lineas 152-154) solo reconoce los pasos
+        // que contienen "Tailscale" o "Exit Node". Se usa ese literal a proposito: el
+        // nombre real del workflow ya es "Connect WARP through SOCKS5 proxy", que hoy
+        // NO entra en esa rama. Ver shouldFallBackToGenericMessageForWarpStep.
         when(gitHubActionsClient.findFailedStep(RUN_ID))
                 .thenReturn(Optional.of("Connect to Tailscale (Phone Exit Node)"));
         when(progressService.find(String.valueOf(RUN_ID))).thenReturn(Optional.empty());
@@ -59,6 +63,25 @@ class LiveTrackingStatusServiceTest {
 
         assertThat(status.phase()).isEqualTo("FAILED");
         assertThat(status.message()).isEqualTo(LiveTrackingStatusService.PHONE_OFFLINE_MESSAGE);
+        assertThat(status.running()).isFalse();
+    }
+
+    @Test
+    @DisplayName("El paso real de WARP no se reconoce como fallo de egreso: cae en el mensaje generico")
+    void shouldFallBackToGenericMessageForWarpStep() {
+        // Caracteriza la brecha actual de produccion: el workflow migro el egreso a
+        // Cloudflare WARP, pero isPhoneStep sigue mirando solo "Tailscale"/"Exit Node".
+        // Cuando se corrija en src/main/java, este test debe pasar a esperar
+        // PHONE_OFFLINE_MESSAGE (o el mensaje que lo reemplace).
+        when(gitHubActionsClient.findRun(RUN_ID)).thenReturn(Optional.of(run("completed", "failure")));
+        when(gitHubActionsClient.findFailedStep(RUN_ID))
+                .thenReturn(Optional.of("Connect WARP through SOCKS5 proxy"));
+        when(progressService.find(String.valueOf(RUN_ID))).thenReturn(Optional.empty());
+
+        LiveTrackingStatus status = service.resolve(RUN_ID);
+
+        assertThat(status.phase()).isEqualTo("FAILED");
+        assertThat(status.message()).isEqualTo(LiveTrackingStatusService.GENERIC_FAILURE_MESSAGE);
         assertThat(status.running()).isFalse();
     }
 

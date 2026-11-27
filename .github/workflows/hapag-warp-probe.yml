@@ -211,8 +211,13 @@ jobs:
           HAPAG_LLOYD_BROWSER_TEST: "true"
           HAPAG_LLOYD_ARRIVED_GUIDE: "HLCUNG12607EKZE0"
           HAPAG_LLOYD_PROXY: "socks5://127.0.0.1:40000"
-          HAPAG_LLOYD_HEADLESS: "false"
-        run: xvfb-run -a ./mvnw -B -Dtest=HapagLloydTrackingBrowserIntegrationTest test
+          # Se mide la MISMA configuración que usa el cron: headless, sin xvfb.
+          # La sonda del repo de referencia midió que headless, headful y stealth
+          # son indistinguibles con WARP (8 estados, 14 filas, ~1,9-2,0 s), así
+          # que se elige la variante con menos piezas. Medir aquí lo que se
+          # despliega evita validar una configuración que nunca va a correr.
+          HAPAG_LLOYD_HEADLESS: "true"
+        run: ./mvnw -B -Dtest=HapagLloydTrackingBrowserIntegrationTest test
 
       - name: Upload Chrome logs and profile
         if: always()
