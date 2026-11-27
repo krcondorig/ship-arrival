@@ -42,8 +42,13 @@ import java.util.concurrent.TimeUnit;
 @Slf4j
 public class ChromeHapagLloydTrackingClient implements HapagLloydTrackingClient {
 
+    /**
+     * Listado del B/L en la app legacy. El sufijo {@code -legacy} es obligatorio:
+     * sin él el portal redirige a la SPA nueva ({@code /solutions/tracking/}) y la
+     * espera de título/URL de {@code waitForPageReady} nunca acierta.
+     */
     private static final String TRACKING_URL =
-            "https://www.hapag-lloyd.com/en/online-business/track/track-by-booking-solution.html";
+            "https://www.hapag-lloyd.com/en/online-business/track/track-by-booking-solution-legacy.html";
 
     /**
      * URL de detalle por contenedor del portal legacy. Es el camino que se midió
