@@ -96,6 +96,50 @@ public class ChromeHapagLloydTrackingClient implements HapagLloydTrackingClient 
     private static final String DETAIL_TEXT_JS =
             "document.body ? document.body.innerText : ''";
 
+    /**
+     * Movimientos del detalle con su marca de confirmación.
+     *
+     * <p>La tabla se localiza por contenido y no por client id: el detalle legacy
+     * es otra vista JSF y no comparte los identificadores del listado. Se exige
+     * que la primera celda sea un estado conocido para no confundir filas de
+     * cabecera. {@code actual} se deduce de la clase {@code strong}, que es como
+     * el portal marca los hitos confirmados frente a los planificados.</p>
+     *
+     * <p>La lista {@code STATES} debe coincidir con {@link #HAPAG_STATES}; se
+     * escribe literal porque el JavaScript corre en el navegador.</p>
+     */
+    private static final String MOVEMENTS_JS = """
+            (() => {
+              const STATES = ["gate out empty","gate in empty","gate out full","gate in full",
+                              "arrival in","departure from","loaded","discharged",
+                              "vessel departed","vessel arrived"];
+              const text = (cells, index) => {
+                const cell = cells[index];
+                return cell ? (cell.textContent || '').trim() : '';
+              };
+              const out = [];
+              for (const row of document.querySelectorAll('tr')) {
+                const cells = row.querySelectorAll('td');
+                if (cells.length < 3) continue;
+                const status = text(cells, 0);
+                if (!status || !STATES.includes(status.toLowerCase())) continue;
+                const actual = Array.from(cells).some(
+                  c => (c.className || '').toString().toLowerCase().includes('strong')
+                );
+                out.push({
+                  status,
+                  place: text(cells, 1),
+                  date: text(cells, 2),
+                  time: text(cells, 3),
+                  transport: text(cells, 4),
+                  voyageNumber: text(cells, 5),
+                  actual
+                });
+              }
+              return JSON.stringify(out);
+            })()
+            """;
+
     /** Estados que emite la tabla de movimientos de Hapag-Lloyd, en su texto exacto. */
     private static final List<String> HAPAG_STATES = List.of(
             "gate out empty", "gate in empty", "gate out full", "gate in full",
@@ -733,90 +777,29 @@ public class ChromeHapagLloydTrackingClient implements HapagLloydTrackingClient 
     }
 
     private List<HapagLloydMovement> parseMovements() {
-        String text = cdp.evaluateString(DETAIL_TEXT_JS);
-        List<HapagLloydMovement> movements = new ArrayList<>();
-        for (String line : (text == null ? "" : text).split("\\R")) {
-            String stripped = line.strip();
-            if (stripped.isEmpty()) {
-                continue;
-            }
-
-            String[] cells = line.contains("\t")
-                    ? line.split("\t", -1)
-                    : null;
-
-            String status;
-            String place = "";
-            String date = "";
-            String time = "";
-            String transport = "";
-            String voyageNumber = "";
-
-            if (cells != null && cells.length >= 3) {
-                status = cells[0].strip();
-                place = cells[1].strip();
-                date = cells[2].strip();
-                int next = 3;
-                if (cells.length > next && cells[next].strip().matches("\\d{1,2}:\\d{2}")) {
-                    time = cells[next].strip();
-                    next++;
-                }
-                if (cells.length > next) {
-                    transport = cells[next].strip();
-                    next++;
-                }
-                if (cells.length > next) {
-                    voyageNumber = cells[next].strip();
-                }
-            } else {
-                // Sin tabuladores se exige que empiece por un estado conocido y se
-                // corta por la fecha, que es el ancla fiable de la fila.
-                status = HAPAG_STATES.stream()
-                        .filter(state -> stripped.toLowerCase(Locale.ROOT)
-                                .startsWith(state))
-                        .findFirst()
-                        .orElse(null);
-                if (status == null) {
-                    continue;
-                }
-                String rest = stripped.substring(status.length()).strip();
-                java.util.regex.Matcher match =
-                        java.util.regex.Pattern.compile("\\d{4}-\\d{2}-\\d{2}").matcher(rest);
-                if (!match.find()) {
-                    continue;
-                }
-                place = rest.substring(0, match.start()).strip();
-                date = match.group();
-                String[] tail = rest.substring(match.end()).strip().split("\\s+");
-                int next = 0;
-                if (tail.length > next && tail[next].matches("\\d{1,2}:\\d{2}")) {
-                    time = tail[next];
-                    next++;
-                }
-                if (tail.length > next) {
-                    transport = tail[next];
-                    next++;
-                }
-                if (tail.length > next) {
-                    voyageNumber = tail[next];
+        String json = cdp.evaluateString(MOVEMENTS_JS);
+        try {
+            JsonNode root = objectMapper.readTree(json);
+            List<HapagLloydMovement> movements = new ArrayList<>();
+            if (root != null && root.isArray()) {
+                for (JsonNode node : root) {
+                    movements.add(HapagLloydMovement.builder()
+                            .status(node.path("status").asText(""))
+                            .place(node.path("place").asText(""))
+                            .date(node.path("date").asText(""))
+                            .time(node.path("time").asText(""))
+                            .transport(node.path("transport").asText(""))
+                            .voyageNumber(node.path("voyageNumber").asText(""))
+                            .actual(node.path("actual").asBoolean(false))
+                            .build());
                 }
             }
-
-            if (!isKnownState(status)) {
-                continue;
-            }
-
-            movements.add(HapagLloydMovement.builder()
-                    .status(status)
-                    .place(place)
-                    .date(date)
-                    .time(time)
-                    .transport(transport)
-                    .voyageNumber(voyageNumber)
-                    .actual(false)
-                    .build());
+            return movements;
+        } catch (JsonProcessingException ex) {
+            throw new HapagLloydTrackingException(
+                    "No se pudo interpretar los movimientos de Hapag-Lloyd: "
+                            + ex.getMessage(), ex);
         }
-        return movements;
     }
 
     private static boolean isKnownState(String status) {
