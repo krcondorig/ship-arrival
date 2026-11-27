@@ -20,6 +20,9 @@
 # Run 5: el cliente usa ya el listado legacy (`track-by-booking-solution-legacy.html`).
 # El run 4 mostro title='Tracking | Hapag-Lloyd' y url='/solutions/tracking/',
 # que es la SPA nueva: faltaba el sufijo -legacy en TRACKING_URL.
+# Run 6: se restauro el criterio de negrita (clase `strong`) para marcar los
+# movimientos confirmados. El run 5 llego al detalle y paso las lineas 39-45 del
+# test; solo fallaba la 46 (actualArrival nulo) porque actual quedaba fijo en false.
 name: Hapag WARP Probe
 
 on:
