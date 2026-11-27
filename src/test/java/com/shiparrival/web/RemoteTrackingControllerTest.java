@@ -8,6 +8,7 @@ import com.shiparrival.repository.AppUserRepository;
 import com.shiparrival.repository.ShipmentRepository;
 import com.shiparrival.service.GitHubActionsClient;
 import com.shiparrival.service.GitHubRunState;
+import com.shiparrival.service.LiveTrackingStatusService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -90,22 +91,22 @@ class RemoteTrackingControllerTest {
     }
 
     @Test
-    @DisplayName("Si el teléfono no responde, el mensaje lo dice")
-    void shouldReportPhoneOffline() throws Exception {
+    @DisplayName("Si el egreso por Cloudflare WARP no responde, el mensaje lo dice")
+    void shouldReportEgressOffline() throws Exception {
         AppUser admin = givenAdmin();
         when(gitHubActionsClient.isEnabled()).thenReturn(true);
         when(gitHubActionsClient.findRun(987654L)).thenReturn(Optional.of(
                 new GitHubRunState(987654L, "completed", "failure",
                         "https://github.com/x/y/actions/runs/987654", null)));
         when(gitHubActionsClient.findFailedStep(987654L))
-                .thenReturn(Optional.of("Activate Phone Exit Node"));
+                .thenReturn(Optional.of("Connect WARP through SOCKS5 proxy"));
 
         mockMvc.perform(get("/shipments/live-status").param("runId", "987654")
                         .sessionAttr(AuthFilter.SESSION_USER_ID, admin.getId()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.phase").value("FAILED"))
                 .andExpect(jsonPath("$.message").value(
-                        "Tu teléfono no responde como nodo de salida. Verifica que esté encendido, con datos móviles y Tailscale activo."));
+                        LiveTrackingStatusService.EGRESS_OFFLINE_MESSAGE));
     }
 
     @Test

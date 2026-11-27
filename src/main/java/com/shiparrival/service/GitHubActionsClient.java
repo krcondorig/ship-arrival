@@ -22,8 +22,8 @@ import java.util.Optional;
  * Cliente mínimo de la API de GitHub Actions.
  *
  * <p>Se usa para dos cosas: disparar el monitoreo desde el dashboard y averiguar
- * por qué un run no llegó a ejecutarse (por ejemplo, el paso de Tailscale falla
- * cuando el teléfono que sirve de salida está apagado).</p>
+ * por qué un run no llegó a ejecutarse (por ejemplo, el paso que conecta el
+ * proxy SOCKS5 de Cloudflare WARP falla y el ciclo se queda sin salida).</p>
  *
  * <p>Todos los métodos degradan a vacío o {@code false} ante cualquier error:
  * el dashboard debe seguir funcionando aunque GitHub esté caído o el token haya
