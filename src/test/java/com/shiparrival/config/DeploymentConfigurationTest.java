@@ -114,6 +114,14 @@ class DeploymentConfigurationTest {
         assertThat(workflow).contains("HAPAG_LLOYD_PROXY: \"socks5://127.0.0.1:40000\"");
         assertThat(workflow).contains("HAPAG_LLOYD_HEADLESS: \"true\"");
 
+        // El respaldo Chrome -> ZenRows solo se cablea si el runner lo enciende: la
+        // propiedad nace en false para que Render no gaste consultas de pago, y el
+        // workflow la activa como contingencia. Si esa linea desaparece del workflow,
+        // el respaldo se apaga en silencio y ningun test lo notaria.
+        assertThat(workflow).contains("HAPAG_LLOYD_FALLBACK_ENABLED: \"true\"");
+        assertThat(properties)
+                .contains("hapag-lloyd.fallback.enabled=${HAPAG_LLOYD_FALLBACK_ENABLED:false}");
+
         // Proteccion deliberada: en Render la lista por defecto mantiene Hapag
         // fuera del rastreo automatico, porque ahi no hay Chrome ni WARP.
         assertThat(properties).contains(

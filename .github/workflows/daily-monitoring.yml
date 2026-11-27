@@ -213,6 +213,9 @@ jobs:
           HAPAG_LLOYD_PROXY: "socks5://127.0.0.1:40000"
           HAPAG_LLOYD_HEADLESS: "true"
           HAPAG_LLOYD_CLIENT: "chrome"
+          # Contingencia, no camino primario: si el Chrome sobre WARP falla, se
+          # reintenta con ZenRows y el run deja una anotación `::warning::`.
+          HAPAG_LLOYD_FALLBACK_ENABLED: "true"
           APP_TIMEZONE: "America/Lima"
           TRACKING_RUN_ID: ${{ github.run_id }}
           TRACKING_ORIGIN: ci
