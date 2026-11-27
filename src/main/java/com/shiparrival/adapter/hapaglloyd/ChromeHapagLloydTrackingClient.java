@@ -151,6 +151,13 @@ public class ChromeHapagLloydTrackingClient implements HapagLloydTrackingClient 
     @Value("${hapag-lloyd.headless:false}")
     private boolean headless;
 
+    /**
+     * Proxy del navegador, por ejemplo {@code socks5://127.0.0.1:40000}.
+     * Vacío significa sin proxy, que es el comportamiento por defecto.
+     */
+    @Value("${hapag-lloyd.proxy:}")
+    private String configuredProxy;
+
     private Process chromeProcess;
     private int debugPort;
     private CdpClient cdp;
@@ -294,26 +301,10 @@ public class ChromeHapagLloydTrackingClient implements HapagLloydTrackingClient 
 
         debugPort = configuredDebugPort > 0 ? configuredDebugPort : findFreePort();
         String chromePath = resolveChromePath();
+        String proxy = resolveProxy();
 
-        List<String> command = new ArrayList<>();
-        command.add(chromePath);
-        command.add("--remote-debugging-port=" + debugPort);
-        command.add("--remote-allow-origins=*");
-        command.add("--user-data-dir=" + profilePath);
-        command.add("--no-first-run");
-        command.add("--no-default-browser-check");
-        command.add("--disable-features=Translate");
-        command.add("--disable-blink-features=AutomationControlled");
-        command.add("--disable-background-timer-throttling");
-        command.add("--disable-backgrounding-occluded-windows");
-        command.add("--disable-renderer-backgrounding");
-        command.add("--window-position=0,0");
-        command.add("--window-size=1280,900");
-        command.add("--lang=en-US,en;q=0.9");
-        if (headless) {
-            command.add("--headless=new");
-        }
-        command.add(initialUrl);
+        List<String> command = buildChromeCommand(
+                chromePath, profilePath, debugPort, headless, proxy, initialUrl);
 
         Path logFile = Path.of("data", "hapag-chrome.log").toAbsolutePath();
         try {
@@ -334,6 +325,44 @@ public class ChromeHapagLloydTrackingClient implements HapagLloydTrackingClient 
         waitForDevTools(debugPort);
         connectCdp();
         waitForPageReady(debugPort);
+    }
+
+    /**
+     * Construye la lista de argumentos con los que se lanza Chrome.
+     *
+     * <p>Es estático y package-private para poder verificarlo sin abrir un
+     * navegador. Los flags conservan el orden histórico del cliente; el proxy,
+     * cuando existe, se inserta justo antes de la URL inicial.</p>
+     */
+    static List<String> buildChromeCommand(String chromePath,
+                                          Path profilePath,
+                                          int debugPort,
+                                          boolean headless,
+                                          String proxy,
+                                          String initialUrl) {
+        List<String> command = new ArrayList<>();
+        command.add(chromePath);
+        command.add("--remote-debugging-port=" + debugPort);
+        command.add("--remote-allow-origins=*");
+        command.add("--user-data-dir=" + profilePath);
+        command.add("--no-first-run");
+        command.add("--no-default-browser-check");
+        command.add("--disable-features=Translate");
+        command.add("--disable-blink-features=AutomationControlled");
+        command.add("--disable-background-timer-throttling");
+        command.add("--disable-backgrounding-occluded-windows");
+        command.add("--disable-renderer-backgrounding");
+        command.add("--window-position=0,0");
+        command.add("--window-size=1280,900");
+        command.add("--lang=en-US,en;q=0.9");
+        if (headless) {
+            command.add("--headless=new");
+        }
+        if (proxy != null && !proxy.isBlank()) {
+            command.add("--proxy-server=" + proxy.trim());
+        }
+        command.add(initialUrl);
+        return command;
     }
 
     private void connectCdp() {
@@ -838,6 +867,23 @@ public class ChromeHapagLloydTrackingClient implements HapagLloydTrackingClient 
             throw new HapagLloydTrackingException(
                     "No se pudo reservar un puerto local para Chrome", ex);
         }
+    }
+
+    /**
+     * Resuelve el proxy del navegador con la misma precedencia que
+     * {@link #resolveChromePath()}: primero el valor inyectado por Spring y,
+     * si no hay, la variable de entorno {@code HAPAG_LLOYD_PROXY}. Así la
+     * sonda que instancia el cliente sin Spring (y sin {@code @Value}) también
+     * sale por el proxy cuando se le pasa por entorno.
+     *
+     * @return el proxy normalizado, o {@code null} si no hay proxy configurado
+     */
+    private String resolveProxy() {
+        String configured = blankToNull(configuredProxy);
+        if (configured != null) {
+            return configured;
+        }
+        return blankToNull(System.getenv("HAPAG_LLOYD_PROXY"));
     }
 
     private String resolveChromePath() {
