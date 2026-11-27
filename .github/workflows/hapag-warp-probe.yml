@@ -217,7 +217,30 @@ jobs:
           # que se elige la variante con menos piezas. Medir aquí lo que se
           # despliega evita validar una configuración que nunca va a correr.
           HAPAG_LLOYD_HEADLESS: "true"
-        run: ./mvnw -B -Dtest=HapagLloydTrackingBrowserIntegrationTest test
+        run: |
+          set -uo pipefail
+          ./mvnw -B -Dtest=HapagLloydTrackingBrowserIntegrationTest test
+          status=$?
+          echo "=== mvn exit status: ${status} ==="
+
+          # Los reportes de surefire traen el mensaje de la aserción que falló.
+          # Sin esto solo se ve "exit code 1" en las anotaciones.
+          for f in target/surefire-reports/*HapagLloydTrackingBrowserIntegrationTest*; do
+            if [ -f "$f" ]; then
+              echo "=== ${f} ==="
+              cat "$f"
+            fi
+          done
+
+          # La cola del log de Chrome dice en qué página se quedó.
+          if [ -f data/hapag-chrome.log ]; then
+            echo "=== data/hapag-chrome.log (últimas 200 líneas) ==="
+            tail -n 200 data/hapag-chrome.log
+          else
+            echo "=== data/hapag-chrome.log NO EXISTE ==="
+          fi
+
+          exit ${status}
 
       - name: Upload Chrome logs and profile
         if: always()
@@ -227,5 +250,6 @@ jobs:
           path: |
             data/hapag-chrome.log
             data/hapag-chrome-profile/**
+            target/surefire-reports/**
           if-no-files-found: warn
           retention-days: 3
