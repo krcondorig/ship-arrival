@@ -23,8 +23,23 @@ class DeploymentConfigurationTest {
         assertThat(workflow).contains("TRACKING_PARALLEL_ENABLED: \"true\"");
         assertThat(workflow).contains("TRACKING_REQUEST_DELAY_MS: \"1000\"");
         assertThat(workflow).contains("-Dmaven.test.skip=true package");
-        assertThat(workflow).contains("--exit-node=${{ secrets.TAILSCALE_EXIT_NODE_IP }}");
+
+        // El egreso ya no sale por el telefono: el runner levanta Cloudflare WARP en
+        // modo proxy y el rastreo de Hapag-Lloyd apunta a ese SOCKS5 local.
+        assertThat(workflow).contains("runs-on: ubuntu-24.04");
+        assertThat(workflow).contains("warp-cli --accept-tos mode proxy");
+        assertThat(workflow).contains("socks5://127.0.0.1:40000");
         assertThat(workflow).doesNotMatch("(?s).*--exit-node=\\d+\\.\\d+\\.\\d+\\.\\d+.*");
+
+        // Se comprueba que no quede infraestructura de Tailscale, no la palabra suelta:
+        // el paso de pre-descarga conserva el nombre historico "... before Tailscale".
+        assertThat(workflow).doesNotContainIgnoringCase("tailscale/github-action");
+        assertThat(workflow).doesNotContainIgnoringCase("tailscale set");
+        assertThat(workflow).doesNotContainIgnoringCase("tailscale status");
+        assertThat(workflow).doesNotContainIgnoringCase("tailscale down");
+        assertThat(workflow).doesNotContain("TAILSCALE_");
+        assertThat(workflow).doesNotContain("xvfb-run");
+
         assertThat(render).doesNotContain("TRACKING_PARALLEL_ENABLED");
     }
 
@@ -75,13 +90,34 @@ class DeploymentConfigurationTest {
     }
 
     @Test
-    @DisplayName("El workflow usa ZenRows solo para disparos manuales y conserva Hapag-Lloyd manual en el cron")
-    void workflowEnablesHapagLloydOnlyForManualDispatch() throws IOException {
+    @DisplayName("El cron rastrea Hapag-Lloyd por Chrome sobre WARP y deja ZenRows como respaldo")
+    void workflowTracksHapagLloydThroughWarpInScheduledRuns() throws IOException {
         String workflow = Files.readString(Path.of(".github/workflows/daily-monitoring.yml"));
+        String properties = Files.readString(Path.of("src/main/resources/application.properties"));
 
         assertThat(workflow).contains("ZENROWS_API_KEY: ${{ secrets.ZENROWS_API_KEY }}");
-        assertThat(workflow).contains("TRACKING_MANUAL_CHECK_CARRIERS: ${{ github.event_name == 'schedule' && 'HAPAG_LLOYD' || '' }}");
         assertThat(workflow).doesNotContain("echo $ZENROWS_API_KEY");
+
+        // Hapag-Lloyd ya no se omite del rastreo automatico: el cliente Chrome lo
+        // consulta por el SOCKS5 de WARP, medido contra el portal real en el run
+        // 45950314181. Si alguien devuelve 'HAPAG_LLOYD' a esta lista, el cron
+        // volveria a marcar las guias como verificacion manual y el adaptador
+        // quedaria sin usar en silencio.
+        assertThat(workflow).contains("TRACKING_MANUAL_CHECK_CARRIERS: \"\"");
+
+        // El runner activa el cliente Chrome; Render, que no define la variable,
+        // conserva ZenRows por el valor por defecto de la propiedad.
+        assertThat(workflow).contains("HAPAG_LLOYD_CLIENT: \"chrome\"");
+        assertThat(properties).contains("hapag-lloyd.client=${HAPAG_LLOYD_CLIENT:zenrows}");
+
+        // El egreso sale por WARP y el navegador corre sin pantalla.
+        assertThat(workflow).contains("HAPAG_LLOYD_PROXY: \"socks5://127.0.0.1:40000\"");
+        assertThat(workflow).contains("HAPAG_LLOYD_HEADLESS: \"true\"");
+
+        // Proteccion deliberada: en Render la lista por defecto mantiene Hapag
+        // fuera del rastreo automatico, porque ahi no hay Chrome ni WARP.
+        assertThat(properties).contains(
+                "tracking.manual-check-carriers=${TRACKING_MANUAL_CHECK_CARRIERS:HAPAG_LLOYD}");
     }
 
     @Test
@@ -96,17 +132,19 @@ class DeploymentConfigurationTest {
     }
 
     @Test
-    @DisplayName("El workflow pre-descarga ChromeDriver antes de Tailscale y desactiva telemetria/red en el ciclo")
-    void workflowShouldPrefetchChromeDriverBeforeTailscale() throws IOException {
+    @DisplayName("El workflow pre-descarga ChromeDriver antes de WARP y desactiva telemetria/red en el ciclo")
+    void workflowShouldPrefetchChromeDriverBeforeWarp() throws IOException {
         String workflow = Files.readString(Path.of(".github/workflows/daily-monitoring.yml"));
 
+        // El nombre del paso de pre-descarga conserva el literal historico
+        // ("... before Tailscale") aunque ya no se use Tailscale.
         int prefetchIdx = workflow.indexOf("Prefetch ChromeDriver and resolve driver before Tailscale");
-        int tailscaleIdx = workflow.indexOf("Connect to Tailscale (Phone Exit Node)");
+        int warpIdx = workflow.indexOf("Connect WARP through SOCKS5 proxy");
         int cycleIdx = workflow.indexOf("Run tracking cycle once");
 
         assertThat(prefetchIdx).as("ChromeDriver prefetch step exists").isGreaterThan(0);
-        assertThat(tailscaleIdx).as("Tailscale connection step exists").isGreaterThan(prefetchIdx);
-        assertThat(cycleIdx).as("Tracking cycle step exists").isGreaterThan(tailscaleIdx);
+        assertThat(warpIdx).as("WARP connection step exists").isGreaterThan(prefetchIdx);
+        assertThat(cycleIdx).as("Tracking cycle step exists").isGreaterThan(warpIdx);
 
         assertThat(workflow).contains("SE_OFFLINE: \"true\"");
         assertThat(workflow).contains("SE_AVOID_STATS: \"true\"");

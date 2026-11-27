@@ -1,5 +1,12 @@
 name: Daily Ship Arrival Monitoring
 
+# El egreso de las navieras sale por Cloudflare WARP en modo proxy (SOCKS5 en
+# 127.0.0.1:40000). Se midió que la única variable que decide si Hapag-Lloyd
+# responde es la IP de salida: WARP + Chrome headless devuelve el detalle del
+# B/L igual que headful o stealth, y es la variante más rápida y con menos
+# piezas (sin servidor de pantalla, sin perfil persistente). MSC y Maersk siguen saliendo
+# directos: no necesitan proxy y su tráfico no pasa por WARP.
+
 on:
   schedule:
     # GitHub Actions usa UTC. 13:00 UTC = 08:00 AM en Peru (UTC-5).
@@ -13,7 +20,9 @@ concurrency:
 
 jobs:
   monitor:
-    runs-on: ubuntu-latest
+    # Fijado a 24.04: `ubuntu-latest` ya apunta a 26.04, que no provee
+    # libtss2-tctildr0t64 y hace fallar la instalación de cloudflare-warp.
+    runs-on: ubuntu-24.04
     timeout-minutes: 45
     steps:
       - name: Checkout code
@@ -29,7 +38,7 @@ jobs:
       - name: Make Maven wrapper executable
         run: chmod +x mvnw
 
-      - name: Build application (before Tailscale)
+      - name: Build application (before WARP)
         run: ./mvnw -B -Dmaven.test.skip=true package
 
       - name: Ensure Google Chrome is available
@@ -58,24 +67,132 @@ jobs:
             chmod +x /tmp/selenium-manager
             echo "Descargando y verificando compatibilidad de ChromeDriver..."
             /tmp/selenium-manager --browser chrome --avoid-stats
-            echo "ChromeDriver pre-descargado con éxito antes de conectar Tailscale."
+            echo "ChromeDriver pre-descargado con éxito antes de conectar el proxy de egreso."
           else
             echo "Advertencia: No se encontró selenium-manager jar en ~/.m2"
           fi
 
-      - name: Connect to Tailscale (Phone Exit Node)
-        uses: tailscale/github-action@v3
+      - name: Cache WARP packages
+        uses: actions/cache@v4
         with:
-          authkey: ${{ secrets.TAILSCALE_AUTHKEY }}
+          path: ~/.warp-debs
+          key: warp-debs-${{ runner.os }}-v1
 
-      - name: Activate Phone Exit Node
+      - name: Install cloudflare-warp
         run: |
-          sudo tailscale set --exit-node=${{ secrets.TAILSCALE_EXIT_NODE_IP }}
-          echo "Estado de Tailscale y exit node:"
-          tailscale status
-          echo "IP publica visible para las navieras:"
-          curl -fsS --max-time 20 https://ifconfig.me/ip
-          echo ""
+          set -euo pipefail
+          mkdir -p "$HOME/.warp-debs"
+
+          curl -fsSL https://pkg.cloudflareclient.com/pubkey.gpg \
+            | sudo gpg --yes --dearmor -o /usr/share/keyrings/cloudflare-warp-archive-keyring.gpg
+          CODENAME=$(. /etc/os-release && echo "${VERSION_CODENAME}")
+          echo "Repositorio WARP con codename real: ${CODENAME}"
+          echo "deb [signed-by=/usr/share/keyrings/cloudflare-warp-archive-keyring.gpg] https://pkg.cloudflareclient.com/ ${CODENAME} main" \
+            | sudo tee /etc/apt/sources.list.d/cloudflare-client.list >/dev/null
+
+          if compgen -G "$HOME/.warp-debs/*.deb" >/dev/null; then
+            echo "Instalando cloudflare-warp desde el caché local..."
+            sudo dpkg -i "$HOME"/.warp-debs/*.deb \
+              || echo "dpkg -i dejó dependencias pendientes; apt-get las resolverá a continuación"
+          else
+            echo "Sin .deb en caché; se instalará desde el repositorio."
+          fi
+
+          sudo apt-get update -qq
+          if ! sudo apt-get install -y -qq --no-install-recommends cloudflare-warp; then
+            echo "::warning::cloudflare-warp no instaló a la primera; se inspecciona libtss2-tctildr0t64."
+            apt-cache policy libtss2-tctildr0t64 || true
+            sudo apt-get install -y -qq --no-install-recommends libtss2-tctildr0t64 \
+              || sudo apt-get install -y -qq --no-install-recommends libtss2-tctildr0t \
+              || true
+            sudo apt-get install -y -qq --no-install-recommends -f cloudflare-warp
+          fi
+          warp-cli --version
+
+          # Guardar los .deb para que la próxima ejecución no vuelva a descargarlos.
+          if compgen -G "/var/cache/apt/archives/*.deb" >/dev/null; then
+            cp -n /var/cache/apt/archives/*.deb "$HOME/.warp-debs/" 2>/dev/null || true
+            echo ".deb en caché: $(ls -1 "$HOME/.warp-debs"/*.deb | wc -l)"
+          fi
+
+      - name: Connect WARP through SOCKS5 proxy
+        run: |
+          set -euo pipefail
+          if ! sudo systemctl enable --now warp-svc 2>/dev/null; then
+            echo "systemd no disponible; arrancando warp-svc con nohup"
+            sudo nohup warp-svc >/tmp/warp-svc.log 2>&1 &
+          fi
+
+          for i in $(seq 1 30); do
+            if warp-cli --accept-tos status >/dev/null 2>&1; then
+              echo "El demonio responde (intento ${i})."
+              break
+            fi
+            sleep 1
+          done
+
+          if ! warp-cli --accept-tos registration show >/dev/null 2>&1; then
+            warp-cli --accept-tos registration new
+          fi
+          warp-cli --accept-tos mode proxy
+          warp-cli --accept-tos proxy port 40000
+          warp-cli --accept-tos connect
+
+          for i in $(seq 1 60); do
+            status=$(warp-cli --accept-tos status 2>&1 || true)
+            echo "[${i}] ${status}"
+            if echo "$status" | grep -qiE '(^|[[:space:]])connected([[:space:]]|$)' \
+              && ! echo "$status" | grep -qi 'disconnected'; then
+              echo "WARP conectado en modo proxy (SOCKS5 127.0.0.1:40000)."
+              exit 0
+            fi
+            sleep 2
+          done
+
+          # No se aborta: Hapag-Lloyd quedará en ERROR_CHECKING y se reintentará
+          # mañana, pero MSC y Maersk salen directos y deben consultarse igual.
+          echo "::warning::WARP no llegó a Connected en 120 s; Hapag-Lloyd fallará este ciclo y MSC/Maersk siguen por conexión directa."
+          warp-cli --accept-tos status || true
+          sudo journalctl -u warp-svc --no-pager -n 100 2>/dev/null || true
+          sudo cat /tmp/warp-svc.log 2>/dev/null || true
+          exit 0
+
+      # Informativo: si el SOCKS5 no responde no se aborta el ciclo, porque MSC
+      # y Maersk van por conexión directa y deben seguir consultándose.
+      - name: Verify egress through WARP SOCKS5
+        run: |
+          set -euo pipefail
+          direct=$(curl -fsS --max-time 20 https://api.ipify.org || true)
+
+          socks=""
+          for i in $(seq 1 10); do
+            if socks=$(curl -fsS --max-time 20 --socks5 127.0.0.1:40000 https://api.ipify.org 2>/dev/null); then
+              break
+            fi
+            socks=""
+            echo "SOCKS5 aún sin respuesta (intento ${i}/10)"
+            sleep 3
+          done
+
+          {
+            echo "### Egreso observado"
+            echo ""
+            echo "| Ruta | IP pública |"
+            echo "| --- | --- |"
+            echo "| Directa del runner | \`${direct:-<vacío>}\` |"
+            echo "| SOCKS5 127.0.0.1:40000 (WARP) | \`${socks:-<sin respuesta>}\` |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          if [ -z "$socks" ]; then
+            echo "::warning::El SOCKS5 de WARP (127.0.0.1:40000) no respondió; Hapag-Lloyd fallará pero MSC y Maersk siguen por conexión directa."
+            warp-cli --accept-tos status || true
+            exit 0
+          fi
+          if [ -n "$direct" ] && [ "$direct" = "$socks" ]; then
+            echo "::warning::La IP directa y la de WARP son la misma (${direct}); el tráfico no está saliendo por WARP."
+            exit 0
+          fi
+          echo "Egreso confirmado por WARP: ${direct:-<vacío>} -> ${socks}"
 
       - name: Run tracking cycle once
         env:
@@ -92,8 +209,10 @@ jobs:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
           DISCORD_ENABLED: ${{ secrets.DISCORD_ENABLED }}
           ZENROWS_API_KEY: ${{ secrets.ZENROWS_API_KEY }}
-          TRACKING_MANUAL_CHECK_CARRIERS: ${{ github.event_name == 'schedule' && 'HAPAG_LLOYD' || '' }}
-          HAPAG_LLOYD_HEADLESS: "false"
+          TRACKING_MANUAL_CHECK_CARRIERS: ""
+          HAPAG_LLOYD_PROXY: "socks5://127.0.0.1:40000"
+          HAPAG_LLOYD_HEADLESS: "true"
+          HAPAG_LLOYD_CLIENT: "chrome"
           APP_TIMEZONE: "America/Lima"
           TRACKING_RUN_ID: ${{ github.run_id }}
           TRACKING_ORIGIN: ci
@@ -108,7 +227,7 @@ jobs:
           # es de un solo hilo, así que basta con 2 conexiones.
           for attempt in 1 2 3; do
             echo "--- Intento $attempt de 3 ---"
-            if xvfb-run -a java -jar "$JAR" \
+            if java -jar "$JAR" \
                 --tracking.run-once=true \
                 --spring.datasource.hikari.maximum-pool-size=2 \
                 --spring.datasource.hikari.minimum-idle=1; then
@@ -124,12 +243,3 @@ jobs:
 
           echo "::error::El monitoreo falló tras 3 intentos."
           exit 1
-
-      # El exit node solo hace falta para el ciclo de rastreo. Si se deja activo,
-      # la subida de caché y logs del runner sale por la red móvil del teléfono y
-      # se queda colgada. Este paso corre siempre, incluso si el ciclo falla.
-      - name: Disconnect from Tailscale
-        if: always()
-        run: |
-          sudo tailscale set --exit-node= || true
-          sudo tailscale down || true
