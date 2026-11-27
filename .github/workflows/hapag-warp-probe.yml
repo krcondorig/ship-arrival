@@ -21,6 +21,14 @@ name: Hapag WARP Probe
 
 on:
   workflow_dispatch:
+  # Disparo por push: el botón "Run workflow" de workflow_dispatch solo aparece
+  # cuando el archivo existe en la rama por defecto (master), y esta sonda vive
+  # en una rama de feature. Un push que toque este archivo lo ejecuta desde la
+  # rama que lo recibió, que es lo que necesitamos para medir. Sonda desechable:
+  # se borra cuando termine la comparación WARP vs Tailscale.
+  push:
+    paths:
+      - '.github/workflows/hapag-warp-probe.yml'
 
 permissions:
   contents: read
