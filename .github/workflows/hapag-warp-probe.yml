@@ -223,21 +223,33 @@ jobs:
           status=$?
           echo "=== mvn exit status: ${status} ==="
 
-          # Los reportes de surefire traen el mensaje de la aserción que falló.
-          # Sin esto solo se ve "exit code 1" en las anotaciones.
-          for f in target/surefire-reports/*HapagLloydTrackingBrowserIntegrationTest*; do
-            if [ -f "$f" ]; then
-              echo "=== ${f} ==="
-              cat "$f"
+          # Los logs de Actions no son legibles sin token (403), pero las
+          # anotaciones del check-run si lo son. Todo diagnostico que importe
+          # tiene que salir por ::error:: para poder leerse desde la API.
+          if [ "${status}" -ne 0 ]; then
+            report=$(ls target/surefire-reports/*HapagLloydTrackingBrowserIntegrationTest.txt 2>/dev/null | head -n 1)
+            if [ -n "${report}" ] && [ -f "${report}" ]; then
+              echo "=== ${report} ==="
+              cat "${report}"
+              # Primera linea con pinta de fallo: "testX(Clase)  Time elapsed ... <<< FAILURE!"
+              detail=$(grep -m 1 -E '<<< (FAILURE|ERROR)|AssertionFailedError|HapagLloydTrackingException' "${report}" || true)
+              if [ -z "${detail}" ]; then
+                detail=$(grep -m 1 -v '^\s*$' "${report}" || true)
+              fi
+              echo "::error::surefire: ${detail}"
+            else
+              echo "::error::No hay reporte de surefire: el fallo ocurrio antes de ejecutar el test (compilacion o arranque de Maven)."
             fi
-          done
 
-          # La cola del log de Chrome dice en qué página se quedó.
-          if [ -f data/hapag-chrome.log ]; then
-            echo "=== data/hapag-chrome.log (últimas 200 líneas) ==="
-            tail -n 200 data/hapag-chrome.log
-          else
-            echo "=== data/hapag-chrome.log NO EXISTE ==="
+            if [ -f data/hapag-chrome.log ]; then
+              echo "=== data/hapag-chrome.log (ultimas 200 lineas) ==="
+              tail -n 200 data/hapag-chrome.log
+              # La ultima linea del log de Chrome suele decir donde se quedo.
+              chrome_tail=$(tail -n 1 data/hapag-chrome.log || true)
+              echo "::error::chrome-log-ultima-linea: ${chrome_tail}"
+            else
+              echo "::error::data/hapag-chrome.log no existe: Chrome nunca llego a arrancar."
+            fi
           fi
 
           exit ${status}

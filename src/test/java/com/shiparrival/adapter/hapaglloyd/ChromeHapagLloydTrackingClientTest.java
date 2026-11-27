@@ -115,6 +115,43 @@ class ChromeHapagLloydTrackingClientTest {
                 .isFalse();
     }
 
+    @Test
+    @DisplayName("Con headless el comando de Chrome lleva --headless=new")
+    void headlessCommandContainsHeadlessFlag() {
+        List<String> command = ChromeHapagLloydTrackingClient.buildChromeCommand(
+                "/usr/bin/google-chrome", Path.of("/tmp/profile"), 9222, true, null,
+                "https://example.com");
+        assertThat(command).contains("--headless=new");
+    }
+
+    @Test
+    @DisplayName("Sin headless el comando de Chrome no lleva --headless=new")
+    void headfulCommandHasNoHeadlessFlag() {
+        List<String> command = ChromeHapagLloydTrackingClient.buildChromeCommand(
+                "/usr/bin/google-chrome", Path.of("/tmp/profile"), 9222, false, null,
+                "https://example.com");
+        assertThat(command).doesNotContain("--headless=new");
+    }
+
+    @Test
+    @DisplayName("La variable de entorno HAPAG_LLOYD_HEADLESS gana sobre el valor de Spring")
+    void envHeadlessWinsOverSpringValue() {
+        assertThat(ChromeHapagLloydTrackingClient.resolveHeadless("true", false)).isTrue();
+    }
+
+    @Test
+    @DisplayName("Sin variable de entorno se usa el valor de Spring")
+    void springValueUsedWhenEnvIsAbsent() {
+        assertThat(ChromeHapagLloydTrackingClient.resolveHeadless(null, true)).isTrue();
+        assertThat(ChromeHapagLloydTrackingClient.resolveHeadless("", false)).isFalse();
+    }
+
+    @Test
+    @DisplayName("El entorno puede desactivar headless aunque Spring lo active")
+    void envCanDisableHeadless() {
+        assertThat(ChromeHapagLloydTrackingClient.resolveHeadless("false", true)).isFalse();
+    }
+
     private static List<String> argumentosConPrefijo(List<String> command, String prefix) {
         return command.stream().filter(arg -> arg.startsWith(prefix)).toList();
     }

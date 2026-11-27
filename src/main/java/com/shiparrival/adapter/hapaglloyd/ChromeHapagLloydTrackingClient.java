@@ -272,9 +272,9 @@ public class ChromeHapagLloydTrackingClient implements HapagLloydTrackingClient 
     }
 
     private void launchBrowser(String initialUrl) {
-        if (headless) {
-            log.warn("Hapag-Lloyd está configurado en modo headless; Cloudflare suele bloquearlo. "
-                    + "Se recomienda hapag-lloyd.headless=false (Chrome fuera de pantalla).");
+        boolean headlessMode = resolveHeadless();
+        if (headlessMode) {
+            log.debug("Hapag-Lloyd se lanza en modo headless (sin ventana).");
         }
 
         Path profilePath = profilePath();
@@ -292,7 +292,7 @@ public class ChromeHapagLloydTrackingClient implements HapagLloydTrackingClient 
         String proxy = resolveProxy();
 
         List<String> command = buildChromeCommand(
-                chromePath, profilePath, debugPort, headless, proxy, initialUrl);
+                chromePath, profilePath, debugPort, headlessMode, proxy, initialUrl);
 
         Path logFile = Path.of("data", "hapag-chrome.log").toAbsolutePath();
         try {
@@ -1013,6 +1013,34 @@ public class ChromeHapagLloydTrackingClient implements HapagLloydTrackingClient 
             return configured;
         }
         return blankToNull(System.getenv("HAPAG_LLOYD_PROXY"));
+    }
+
+    /**
+     * ¿Se lanza Chrome sin ventana?
+     *
+     * <p>Delega en {@link #resolveHeadless(String, boolean)} pasándole el valor del
+     * entorno {@code HAPAG_LLOYD_HEADLESS} y el campo inyectado por Spring. Así la
+     * sonda, que instancia el cliente con {@code new} y no tiene {@code @Value},
+     * también puede pedir headless por entorno; sin ese camino el flag quedaba en
+     * {@code false} y Chrome arrancaba con ventana en un runner sin servidor X,
+     * donde muere al instante.</p>
+     */
+    private boolean resolveHeadless() {
+        return resolveHeadless(System.getenv("HAPAG_LLOYD_HEADLESS"), headless);
+    }
+
+    /**
+     * Decide el modo headless a partir del valor del entorno y del valor de Spring.
+     *
+     * <p>La variable de entorno gana cuando está presente: el campo {@code headless}
+     * solo tiene valor cuando hay Spring, y cuando no lo hay vale {@code false} sin
+     * distinguir "no configurado" de "configurado en false".</p>
+     */
+    static boolean resolveHeadless(String envValue, boolean springValue) {
+        if (envValue != null && !envValue.isBlank()) {
+            return Boolean.parseBoolean(envValue.trim());
+        }
+        return springValue;
     }
 
     private String resolveChromePath() {
