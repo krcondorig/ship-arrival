@@ -90,22 +90,34 @@ class DeploymentConfigurationTest {
     }
 
     @Test
-    @DisplayName("El workflow deja Hapag-Lloyd fuera del cron programado mientras el cliente activo no sea el de WARP")
-    void workflowKeepsHapagLloydOutOfScheduledRunsUntilWarpIsActive() throws IOException {
+    @DisplayName("El cron rastrea Hapag-Lloyd por Chrome sobre WARP y deja ZenRows como respaldo")
+    void workflowTracksHapagLloydThroughWarpInScheduledRuns() throws IOException {
         String workflow = Files.readString(Path.of(".github/workflows/daily-monitoring.yml"));
+        String properties = Files.readString(Path.of("src/main/resources/application.properties"));
 
         assertThat(workflow).contains("ZENROWS_API_KEY: ${{ secrets.ZENROWS_API_KEY }}");
         assertThat(workflow).doesNotContain("echo $ZENROWS_API_KEY");
 
-        // El cliente activo de Hapag-Lloyd sigue siendo el de ZenRows, y el cron no
-        // debe consultarlo por esa via: solo un disparo manual lo rastrea.
-        assertThat(workflow).contains(
-                "TRACKING_MANUAL_CHECK_CARRIERS: ${{ github.event_name == 'schedule' && 'HAPAG_LLOYD' || '' }}");
+        // Hapag-Lloyd ya no se omite del rastreo automatico: el cliente Chrome lo
+        // consulta por el SOCKS5 de WARP, medido contra el portal real en el run
+        // 45950314181. Si alguien devuelve 'HAPAG_LLOYD' a esta lista, el cron
+        // volveria a marcar las guias como verificacion manual y el adaptador
+        // quedaria sin usar en silencio.
+        assertThat(workflow).contains("TRACKING_MANUAL_CHECK_CARRIERS: \"\"");
 
-        // Las variables de WARP siguen declaradas aunque hoy esten inertes; el test
-        // las protege para que no se pierdan antes de activar el cliente de Chrome.
+        // El runner activa el cliente Chrome; Render, que no define la variable,
+        // conserva ZenRows por el valor por defecto de la propiedad.
+        assertThat(workflow).contains("HAPAG_LLOYD_CLIENT: \"chrome\"");
+        assertThat(properties).contains("hapag-lloyd.client=${HAPAG_LLOYD_CLIENT:zenrows}");
+
+        // El egreso sale por WARP y el navegador corre sin pantalla.
         assertThat(workflow).contains("HAPAG_LLOYD_PROXY: \"socks5://127.0.0.1:40000\"");
         assertThat(workflow).contains("HAPAG_LLOYD_HEADLESS: \"true\"");
+
+        // Proteccion deliberada: en Render la lista por defecto mantiene Hapag
+        // fuera del rastreo automatico, porque ahi no hay Chrome ni WARP.
+        assertThat(properties).contains(
+                "tracking.manual-check-carriers=${TRACKING_MANUAL_CHECK_CARRIERS:HAPAG_LLOYD}");
     }
 
     @Test

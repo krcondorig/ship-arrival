@@ -4,7 +4,11 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
+import org.jsoup.Jsoup;
+import org.jsoup.nodes.Element;
+import org.jsoup.select.Elements;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
@@ -38,8 +42,15 @@ import java.util.concurrent.TimeUnit;
  * <p>El navegador se lanza con la primera URL de guía para que Cloudflare se
  * resuelva antes de conectarse. Luego se reutiliza durante el ciclo y se cierra
  * al finalizar mediante {@link #close()}.</p>
+ *
+ * <p>Se activa solo con {@code hapag-lloyd.client=chrome}. El dashboard de Render
+ * no define esa propiedad ni tiene Chrome instalado, asi que ahi sigue vigente el
+ * cliente de ZenRows; el runner de GitHub Actions la activa junto con el proxy
+ * SOCKS5 de WARP.</p>
  */
 @Slf4j
+@Component
+@ConditionalOnProperty(name = "hapag-lloyd.client", havingValue = "chrome")
 public class ChromeHapagLloydTrackingClient implements HapagLloydTrackingClient {
 
     /**
@@ -97,48 +108,27 @@ public class ChromeHapagLloydTrackingClient implements HapagLloydTrackingClient 
             "document.body ? document.body.innerText : ''";
 
     /**
-     * Movimientos del detalle con su marca de confirmación.
+     * Clase CSS con la que el portal marca los hitos confirmados.
      *
-     * <p>La tabla se localiza por contenido y no por client id: el detalle legacy
-     * es otra vista JSF y no comparte los identificadores del listado. Se exige
-     * que la primera celda sea un estado conocido para no confundir filas de
-     * cabecera. {@code actual} se deduce de la clase {@code strong}, que es como
-     * el portal marca los hitos confirmados frente a los planificados.</p>
-     *
-     * <p>La lista {@code STATES} debe coincidir con {@link #HAPAG_STATES}; se
-     * escribe literal porque el JavaScript corre en el navegador.</p>
+     * <p>{@link HapagLloydMovement#isActual()} depende de esta marca: los
+     * movimientos confirmados salen en negrita y los planificados no. Si el
+     * portal cambiara de marca, el arribo real dejaria de detectarse y la guia
+     * nunca pasaria a {@code ARRIVED}. Por eso el valor vive aqui, en Java, y no
+     * dentro de un script: asi un test puede custodiarlo.</p>
      */
-    private static final String MOVEMENTS_JS = """
-            (() => {
-              const STATES = ["gate out empty","gate in empty","gate out full","gate in full",
-                              "arrival in","departure from","loaded","discharged",
-                              "vessel departed","vessel arrived"];
-              const text = (cells, index) => {
-                const cell = cells[index];
-                return cell ? (cell.textContent || '').trim() : '';
-              };
-              const out = [];
-              for (const row of document.querySelectorAll('tr')) {
-                const cells = row.querySelectorAll('td');
-                if (cells.length < 3) continue;
-                const status = text(cells, 0);
-                if (!status || !STATES.includes(status.toLowerCase())) continue;
-                const actual = Array.from(cells).some(
-                  c => (c.className || '').toString().toLowerCase().includes('strong')
-                );
-                out.push({
-                  status,
-                  place: text(cells, 1),
-                  date: text(cells, 2),
-                  time: text(cells, 3),
-                  transport: text(cells, 4),
-                  voyageNumber: text(cells, 5),
-                  actual
-                });
-              }
-              return JSON.stringify(out);
-            })()
-            """;
+    static final String ACTUAL_CLASS_MARKER = "strong";
+
+    /**
+     * Script que devuelve el HTML de cada fila de la pagina de detalle.
+     *
+     * <p>No interpreta nada: solo serializa las filas. La decision de que fila es
+     * un movimiento y de cual esta confirmada se toma en Java, en
+     * {@link #parseMovementRow(org.jsoup.nodes.Element)}, para que sea testeable
+     * sin abrir un navegador.</p>
+     */
+    private static final String MOVEMENT_ROWS_JS =
+            "JSON.stringify(Array.from(document.querySelectorAll('tr'))"
+                    + ".map(r => r.outerHTML))";
 
     /** Estados que emite la tabla de movimientos de Hapag-Lloyd, en su texto exacto. */
     private static final List<String> HAPAG_STATES = List.of(
@@ -777,21 +767,19 @@ public class ChromeHapagLloydTrackingClient implements HapagLloydTrackingClient 
     }
 
     private List<HapagLloydMovement> parseMovements() {
-        String json = cdp.evaluateString(MOVEMENTS_JS);
+        String json = cdp.evaluateString(MOVEMENT_ROWS_JS);
         try {
             JsonNode root = objectMapper.readTree(json);
             List<HapagLloydMovement> movements = new ArrayList<>();
             if (root != null && root.isArray()) {
                 for (JsonNode node : root) {
-                    movements.add(HapagLloydMovement.builder()
-                            .status(node.path("status").asText(""))
-                            .place(node.path("place").asText(""))
-                            .date(node.path("date").asText(""))
-                            .time(node.path("time").asText(""))
-                            .transport(node.path("transport").asText(""))
-                            .voyageNumber(node.path("voyageNumber").asText(""))
-                            .actual(node.path("actual").asBoolean(false))
-                            .build());
+                    String rowHtml = node.asText("");
+                    Element row = Jsoup.parse(
+                            "<table><tbody>" + rowHtml + "</tbody></table>").selectFirst("tr");
+                    HapagLloydMovement movement = row == null ? null : parseMovementRow(row);
+                    if (movement != null) {
+                        movements.add(movement);
+                    }
                 }
             }
             return movements;
@@ -800,6 +788,65 @@ public class ChromeHapagLloydTrackingClient implements HapagLloydTrackingClient 
                     "No se pudo interpretar los movimientos de Hapag-Lloyd: "
                             + ex.getMessage(), ex);
         }
+    }
+
+    /**
+     * Convierte una fila del detalle en un movimiento, o {@code null} si la fila
+     * no es un movimiento.
+     *
+     * <p>Se exige que la primera celda sea un estado conocido: asi se descartan
+     * las filas de cabecera y las de maquetacion sin depender de un client id,
+     * que el detalle legacy no comparte con el listado.</p>
+     *
+     * <p>{@code actual} sale de la clase {@link #ACTUAL_CLASS_MARKER} en
+     * cualquiera de las celdas: es como el portal marca los hitos confirmados
+     * frente a los planificados.</p>
+     */
+    static HapagLloydMovement parseMovementRow(Element row) {
+        if (row == null) {
+            return null;
+        }
+        Elements cells = row.select("td");
+        if (cells.size() < 3) {
+            return null;
+        }
+        String status = cellText(cells, 0);
+        if (!isKnownState(status)) {
+            return null;
+        }
+        return HapagLloydMovement.builder()
+                .status(status)
+                .place(cellText(cells, 1))
+                .date(cellText(cells, 2))
+                .time(cellText(cells, 3))
+                .transport(cellText(cells, 4))
+                .voyageNumber(cellText(cells, 5))
+                .actual(isConfirmedRow(cells))
+                .build();
+    }
+
+    private static String cellText(Elements cells, int index) {
+        if (index >= cells.size()) {
+            return "";
+        }
+        return cells.get(index).text().trim();
+    }
+
+    /**
+     * ¿La fila esta marcada como confirmada?
+     *
+     * <p>El portal aplica la clase {@link #ACTUAL_CLASS_MARKER} a las celdas de
+     * los hitos que ya ocurrieron. Se comprueba en toda la fila y no solo en una
+     * celda porque la marca no siempre cae en la misma columna.</p>
+     */
+    static boolean isConfirmedRow(Elements cells) {
+        for (Element cell : cells) {
+            String classes = cell.className().toLowerCase(Locale.ROOT);
+            if (classes.contains(ACTUAL_CLASS_MARKER)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static boolean isKnownState(String status) {

@@ -5,6 +5,7 @@ import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
@@ -16,6 +17,7 @@ import java.util.List;
 
 /** Fetches the first Hapag-Lloyd container and its movements through ZenRows. */
 @Component
+@ConditionalOnProperty(name = "hapag-lloyd.client", havingValue = "zenrows", matchIfMissing = true)
 public class ZenRowsHapagLloydTrackingClient implements HapagLloydTrackingClient {
 
     private static final String ZENROWS_ENDPOINT = "https://api.zenrows.com/v1/";
