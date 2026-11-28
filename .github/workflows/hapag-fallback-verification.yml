@@ -1,0 +1,38 @@
+# Verifica el respaldo de ZenRows de Hapag-Lloyd cuando Chrome (sobre WARP) falla.
+# Es manual y cada ejecucion consume 1 credito de ZenRows (solo el test de red;
+# el segundo test usa dobles y no toca la red).
+# El test se omite en la suite normal porque exige HAPAG_LLOYD_FALLBACK_INTEGRATION=true.
+name: Hapag Fallback Verification
+
+on:
+  workflow_dispatch:
+    inputs:
+      guide:
+        description: 'B/L de Hapag-Lloyd a consultar'
+        required: false
+        default: 'HLCUNG12607EKZE0'
+
+permissions:
+  contents: read
+
+jobs:
+  verify-fallback:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: 'maven'
+      - name: Make Maven wrapper executable
+        run: chmod +x mvnw
+      - name: Verify Hapag fallback against ZenRows
+        env:
+          HAPAG_LLOYD_FALLBACK_INTEGRATION: "true"
+          HAPAG_LLOYD_GUIDE: ${{ inputs.guide }}
+          ZENROWS_API_KEY: ${{ secrets.ZENROWS_API_KEY }}
+        run: ./mvnw -B -Dtest=HapagLloydFallbackIntegrationTest test
